@@ -4,6 +4,8 @@ import subprocess
 import sys
 import os
 import hashlib
+import sqlite3 # Import top-level for exception handling
+from io import BytesIO # Needed for Pillow processing
 from pathlib import Path
 from typing import Optional, Tuple
 
@@ -14,6 +16,8 @@ if str(SRC_DIR) not in sys.path:
     sys.path.append(str(SRC_DIR))
 
 from PIL import Image, UnidentifiedImageError
+from loopsleuth.db import get_db_connection, DEFAULT_DB_PATH # Import top-level
+from loopsleuth.metadata import get_video_duration, FFprobeError # Import top-level for example
 
 # Constants
 FFMPEG_COMMAND = "ffmpeg" # Assumes ffmpeg is in PATH
@@ -288,8 +292,10 @@ def process_thumbnails(
 # a database entry created by the scanner to have duration and ID.
 
 if __name__ == '__main__':
-    from io import BytesIO # Needed for example usage with BytesIO
-    from loopsleuth.db import get_db_connection, DEFAULT_DB_PATH
+    # Imports already moved to top level
+    # from io import BytesIO
+    # from loopsleuth.db import get_db_connection, DEFAULT_DB_PATH
+    # from loopsleuth.metadata import get_video_duration, FFprobeError
     import time
 
     # --- Test Setup ---
@@ -320,7 +326,6 @@ if __name__ == '__main__':
         cursor = conn.cursor()
 
         # Get duration first
-        from loopsleuth.metadata import get_video_duration, FFprobeError
         try:
             sample_duration = get_video_duration(sample_video_path)
             if sample_duration is None:
