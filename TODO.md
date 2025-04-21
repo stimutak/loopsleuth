@@ -31,7 +31,7 @@
 - [x] **Hash:** Calculate perceptual hash (pHash) using `imagehash`.
 - [x] **Hash:** Store pHash in the database.
 - [x] **TUI:** Create basic Textual app structure.
-- [ ] **TUI:** Implement grid view to display thumbnails and metadata from the database.
+- [x] **TUI:** Implement grid view to display thumbnails and metadata from the database.
 - [ ] **TUI:** Add `<Space>` key binding to toggle a 'starred' flag in the database.
 - [ ] **TUI:** Add `t` key binding to open an input field for editing free-text tags (store in DB).
 - [ ] **TUI:** Add `d` key binding to mark a clip for deletion (or delete immediately - decide strategy). Handle file deletion and DB update.
