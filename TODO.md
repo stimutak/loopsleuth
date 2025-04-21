@@ -14,19 +14,19 @@
 
 
 ## Setup & Foundation
-- [ ] Initialize Python project (e.g., using Poetry or `venv` + `requirements.txt`).
-- [ ] Add core dependencies: `Pillow`, `imagehash`, `Textual`, `Typer`.
-- [ ] Set up basic project structure (e.g., `src/loopsleuth`, `tests/`).
-- [ ] Ensure `ffmpeg` and `ffprobe` are accessible (document installation/path).
-- [ ] Define SQLite database schema.
-- [ ] Implement basic database connection and table creation logic.
+- [x] Initialize Python project (e.g., using Poetry or `venv` + `requirements.txt`).
+- [x] Add core dependencies: `Pillow`, `imagehash`, `Textual`, `Typer`.
+- [x] Set up basic project structure (e.g., `src/loopsleuth`, `tests/`).
+- [x] Ensure `ffmpeg` and `ffprobe` are accessible (document installation/path).
+- [x] Define SQLite database schema.
+- [x] Implement basic database connection and table creation logic.
 
 ## MVP (v0.1)
-- [ ] **Scan:** Implement directory walking to find video files.
-- [ ] **Scan:** Integrate `ffprobe` execution to extract duration and other relevant metadata.
-- [ ] **Scan:** Save clip path and metadata to the SQLite database.
-- [ ] **Thumb:** Implement `ffmpeg` call to extract a frame at 25% duration.
-- [ ] **Thumb:** Use `Pillow` to resize the frame to 256px width and save as JPEG.
+- [x] **Scan:** Implement directory walking to find video files.
+- [x] **Scan:** Integrate `ffprobe` execution to extract duration and other relevant metadata.
+- [x] **Scan:** Save clip path and metadata to the SQLite database.
+- [x] **Thumb:** Implement `ffmpeg` call to extract a frame at 25% duration.
+- [x] **Thumb:** Use `Pillow` to resize the frame to 256px width and save as JPEG.
 - [ ] **Thumb:** Store thumbnail path or blob in the database.
 - [ ] **Hash:** Calculate perceptual hash (pHash) using `imagehash`.
 - [ ] **Hash:** Store pHash in the database.
