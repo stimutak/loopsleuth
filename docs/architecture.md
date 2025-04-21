@@ -1,0 +1,5 @@
+- **ingest.py** → probes metadata, inserts into DB.
+- **thumbs.py** → generates thumbnails, stores in `.thumbs/`.
+- **hash.py** → pHash helpers (hamming distance).
+- **tui.py** → Textual App: ClipGrid, StatusBar, TagModal.
+- **export_td.py** → writes keepers file for TouchDesigner.
