@@ -28,8 +28,8 @@
 - [x] **Thumb:** Implement `ffmpeg` call to extract a frame at 25% duration.
 - [x] **Thumb:** Use `Pillow` to resize the frame to 256px width and save as JPEG.
 - [x] **Thumb:** Store thumbnail path or blob in the database.
-- [ ] **Hash:** Calculate perceptual hash (pHash) using `imagehash`.
-- [ ] **Hash:** Store pHash in the database.
+- [x] **Hash:** Calculate perceptual hash (pHash) using `imagehash`.
+- [x] **Hash:** Store pHash in the database.
 - [ ] **TUI:** Create basic Textual app structure.
 - [ ] **TUI:** Implement grid view to display thumbnails and metadata from the database.
 - [ ] **TUI:** Add `<Space>` key binding to toggle a 'starred' flag in the database.
