@@ -387,36 +387,14 @@ if __name__ == '__main__':
     else:
         print("No thumbnails were successfully generated according to process_thumbnails.")
 
-    # --- Cleanup ---
-    print("\nCleaning up test environment...")
-    if generated_thumb_path and generated_thumb_path.exists():
-        generated_thumb_path.unlink()
-        print(f"- Removed: {generated_thumb_path}")
-    if thumb_dir.exists():
-        try:
-            # Only remove if empty
-            os.rmdir(thumb_dir)
-            # Try removing parent if empty
-            os.rmdir(thumb_dir.parent)
-            print(f"- Removed empty thumbnail dirs")
-        except OSError:
-            print(f"- Thumbnail dir not empty, left as is: {thumb_dir}")
-            pass # Not empty, leave it
-    if test_db_path.exists():
-        test_db_path.unlink()
-        print(f"- Removed: {test_db_path}")
-    # Keep the dummy video file for next run if needed, or remove manually
-    # if sample_video_path.exists():
-    #     sample_video_path.unlink()
-    #     print(f"- Removed: {sample_video_path}")
-    if test_video_dir.exists():
-         try:
-             os.rmdir(test_video_dir)
-             print(f"- Removed: {test_video_dir}")
-         except OSError:
-             print(f"- Test dir not empty, left as is: {test_video_dir}")
-             pass
+    # --- Cleanup --- 
+    # Removed automatic cleanup for prerequisite chaining
+    # print("\nCleaning up test environment...")
+    # if generated_thumb_path and generated_thumb_path.exists():
+    #     generated_thumb_path.unlink()
+    #     print(f"- Removed: {generated_thumb_path}")
+    # ... (rest of cleanup code commented out or removed) ...
 
-    print("--- Example Done ---")
+    print("--- Example Done (Cleanup Skipped) ---")
 
 # """ 

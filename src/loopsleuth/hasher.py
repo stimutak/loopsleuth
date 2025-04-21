@@ -216,5 +216,6 @@ if __name__ == '__main__':
     else:
         print("No hashes were successfully generated or verified.")
 
-    # Note: Cleanup of the test DB and thumbnails is handled by the thumbnailer example.
+    # Note: Cleanup of the test DB and thumbnails should be handled externally or manually.
+    # Removed automatic cleanup.
     print("--- Example Done ---") 
