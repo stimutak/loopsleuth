@@ -1,8 +1,20 @@
-"""Directory scanning functionality for finding video clips."""
+"""Directory scanning and ingestion into the database."""
 
 import os
+import sqlite3
+import sys
 from pathlib import Path
-from typing import Iterable, List, Set
+from typing import Iterable, List, Set, Optional
+
+# Adjust import path assuming this script might be run directly
+# or as part of the package
+SCRIPTS_DIR = Path(__file__).parent.resolve()
+SRC_DIR = SCRIPTS_DIR.parent
+if str(SRC_DIR) not in sys.path:
+    sys.path.append(str(SRC_DIR))
+
+from loopsleuth.db import get_db_connection, DEFAULT_DB_PATH
+from loopsleuth.metadata import get_video_duration, FFprobeError
 
 # Common video file extensions
 # TODO: Make this configurable
@@ -15,34 +27,108 @@ DEFAULT_VIDEO_EXTENSIONS: Set[str] = {
     # DXV is often in a .mov container, so it should be covered.
 }
 
-def scan_directory(
+def _scan_directory_internal(
     start_path: Path,
     extensions: Set[str] = DEFAULT_VIDEO_EXTENSIONS,
 ) -> Iterable[Path]:
-    """
-    Recursively scans a directory for video files with specified extensions.
-
-    Args:
-        start_path: The directory path to start scanning from.
-        extensions: A set of lowercase file extensions to look for (including the dot).
-
-    Yields:
-        Path objects for found video files.
-    """
-    if not start_path.is_dir():
-        raise ValueError(f"Invalid start path: {start_path} is not a directory.")
-
-    print(f"Scanning {start_path} for video files ({', '.join(extensions)})...")
+    """Internal helper to yield video file paths."""
     # TODO: Add tqdm progress bar here for large directories
-
     for item in start_path.rglob("*"): # Recursively glob for all files
         if item.is_file() and item.suffix.lower() in extensions:
             yield item.resolve() # Yield absolute path
 
-# Example usage for testing
-if __name__ == '__main__':
-    # Create dummy files for testing
-    test_dir = Path("./temp_scan_test")
+def ingest_directory(
+    start_path: Path,
+    db_path: Path = DEFAULT_DB_PATH,
+    extensions: Set[str] = DEFAULT_VIDEO_EXTENSIONS,
+) -> None:
+    """
+    Scans a directory for video files, extracts metadata (duration),
+    and saves the information to the database.
+
+    Args:
+        start_path: The directory path to start scanning from.
+        db_path: Path to the SQLite database file.
+        extensions: A set of lowercase file extensions to look for.
+    """
+    if not start_path.is_dir():
+        print(f"Error: Invalid start path '{start_path}' is not a directory.", file=sys.stderr)
+        return
+
+    print(f"Scanning {start_path} for video files ({', '.join(extensions)})...")
+
+    conn = None
+    try:
+        conn = get_db_connection(db_path)
+        cursor = conn.cursor()
+
+        processed_count = 0
+        skipped_count = 0
+        error_count = 0
+
+        for video_path in _scan_directory_internal(start_path, extensions):
+            try:
+                path_str = str(video_path)
+                filename = video_path.name
+
+                # Check if path already exists
+                cursor.execute("SELECT id FROM clips WHERE path = ?", (path_str,))
+                existing = cursor.fetchone()
+                if existing:
+                    # TODO: Add option to re-scan/update existing entries
+                    # print(f"Skipping already existing: {filename}")
+                    skipped_count += 1
+                    continue
+
+                print(f"Processing: {filename}")
+                duration: Optional[float] = None
+                try:
+                    duration = get_video_duration(video_path)
+                except FFprobeError as e:
+                    print(f"  Warning: Could not get duration for {filename}. Error: {e}", file=sys.stderr)
+                    error_count += 1
+                except FileNotFoundError as e:
+                    # Handle ffprobe not found globally here
+                    print(f"  Error: {e}", file=sys.stderr)
+                    print("  Aborting scan due to missing ffprobe.", file=sys.stderr)
+                    error_count += 1
+                    break # Stop processing further files if ffprobe isn't there
+
+                # Insert into DB
+                cursor.execute(
+                    """
+                    INSERT INTO clips (path, filename, duration, modified_at)
+                    VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                    """,
+                    (path_str, filename, duration)
+                )
+                processed_count += 1
+
+            except Exception as e:
+                # Catch unexpected errors during processing of a single file
+                print(f"  Error processing file {video_path}: {e}", file=sys.stderr)
+                error_count += 1
+                continue # Skip to the next file
+
+        conn.commit()
+        print("\nScan complete.")
+        print(f"  Processed: {processed_count}")
+        print(f"  Skipped (already exist): {skipped_count}")
+        print(f"  Errors: {error_count}")
+
+    except sqlite3.Error as e:
+        print(f"Database error during scan: {e}", file=sys.stderr)
+    except Exception as e:
+        print(f"An unexpected error occurred during scan: {e}", file=sys.stderr)
+    finally:
+        if conn:
+            conn.close()
+            print("Database connection closed.")
+
+# --- Example usage section --- #
+
+def _setup_test_environment(test_dir: Path):
+    """Creates dummy files and directories for testing."""
     test_dir.mkdir(exist_ok=True)
     (test_dir / "video1.mov").touch()
     (test_dir / "video2.mp4").touch()
@@ -50,24 +136,71 @@ if __name__ == '__main__':
     (test_dir / "subfolder" / "video3.mkv").touch()
     (test_dir / "image.jpg").touch()
     (test_dir / "document.txt").touch()
+    print(f"Created test environment in: {test_dir}")
 
-    print("Starting scan...")
-    found_files: List[Path] = list(scan_directory(test_dir))
+def _cleanup_test_environment(test_dir: Path, db_path: Path):
+    """Removes dummy files, directories, and the test database."""
+    print("\nCleaning up test environment...")
+    files_to_remove = [
+        test_dir / "video1.mov",
+        test_dir / "video2.mp4",
+        test_dir / "subfolder" / "video3.mkv",
+        test_dir / "image.jpg",
+        test_dir / "document.txt"
+    ]
+    for f in files_to_remove:
+        try:
+            os.remove(f)
+        except OSError:
+            pass # Ignore if file doesn't exist
 
-    print("\nFound video files:")
-    if found_files:
-        for f in found_files:
-            print(f" - {f}")
-    else:
-        print("No video files found in the test directory.")
+    dirs_to_remove = [test_dir / "subfolder", test_dir]
+    for d in dirs_to_remove:
+        try:
+            os.rmdir(d)
+        except OSError:
+            pass # Ignore if dir doesn't exist or isn't empty
 
-    # Clean up dummy files
-    print("\nCleaning up test files...")
-    os.remove(test_dir / "video1.mov")
-    os.remove(test_dir / "video2.mp4")
-    os.remove(test_dir / "subfolder" / "video3.mkv")
-    os.remove(test_dir / "image.jpg")
-    os.remove(test_dir / "document.txt")
-    os.rmdir(test_dir / "subfolder")
-    os.rmdir(test_dir)
-    print("Cleanup complete.") 
+    try:
+        if db_path.exists():
+            os.remove(db_path)
+            print(f"Removed test database: {db_path}")
+    except OSError as e:
+        print(f"Error removing test database {db_path}: {e}", file=sys.stderr)
+
+    print("Cleanup complete.")
+
+if __name__ == '__main__':
+    test_dir = Path("./temp_scan_test")
+    test_db = Path("./temp_test_loopsleuth.db")
+
+    # Ensure clean state before test
+    _cleanup_test_environment(test_dir, test_db)
+
+    _setup_test_environment(test_dir)
+
+    print("\nStarting ingestion process...")
+    # Note: This will likely fail to get duration unless ffprobe is installed
+    # and accessible. The errors will be printed.
+    ingest_directory(test_dir, db_path=test_db)
+
+    # Optional: Verify DB content (basic check)
+    if test_db.exists():
+        conn_check = None
+        try:
+            conn_check = sqlite3.connect(test_db)
+            cursor_check = conn_check.cursor()
+            cursor_check.execute("SELECT COUNT(*) FROM clips")
+            count = cursor_check.fetchone()[0]
+            print(f"\nVerification: Found {count} entries in the test database.")
+            cursor_check.execute("SELECT path, filename, duration FROM clips")
+            for row in cursor_check.fetchall():
+                print(f"  - {row[1]} (Path: {row[0]}, Duration: {row[2]})")
+        except sqlite3.Error as e:
+            print(f"Error verifying test database: {e}", file=sys.stderr)
+        finally:
+            if conn_check:
+                conn_check.close()
+
+    # Clean up after test
+    _cleanup_test_environment(test_dir, test_db) 
