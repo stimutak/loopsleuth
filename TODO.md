@@ -27,7 +27,7 @@
 - [x] **Scan:** Save clip path and metadata to the SQLite database.
 - [x] **Thumb:** Implement `ffmpeg` call to extract a frame at 25% duration.
 - [x] **Thumb:** Use `Pillow` to resize the frame to 256px width and save as JPEG.
-- [ ] **Thumb:** Store thumbnail path or blob in the database.
+- [x] **Thumb:** Store thumbnail path or blob in the database.
 - [ ] **Hash:** Calculate perceptual hash (pHash) using `imagehash`.
 - [ ] **Hash:** Store pHash in the database.
 - [ ] **TUI:** Create basic Textual app structure.

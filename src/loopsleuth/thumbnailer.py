@@ -175,6 +175,114 @@ def generate_thumbnail(
              except OSError:
                  pass
 
+def process_thumbnails(
+    db_path: Path = DEFAULT_DB_PATH,
+    limit: Optional[int] = None,
+    force_regenerate: bool = False,
+) -> Tuple[int, int]:
+    """
+    Finds clips missing thumbnails in the database and generates them.
+
+    Args:
+        db_path: Path to the SQLite database.
+        limit: Maximum number of thumbnails to generate in one run (optional).
+        force_regenerate: If True, regenerate thumbnails even if they exist (optional).
+
+    Returns:
+        A tuple containing (success_count, error_count).
+    """
+    conn = None
+    success_count = 0
+    error_count = 0
+    base_output_dir = _get_thumbnail_dir(db_path.parent) # Store thumbs relative to DB location
+
+    print(f"Processing missing thumbnails (DB: {db_path})...")
+
+    try:
+        conn = get_db_connection(db_path)
+        # Use a separate cursor for updates within the loop
+        conn.isolation_level = None # Autocommit mode for updates
+        read_cursor = conn.cursor()
+        update_cursor = conn.cursor()
+
+        query = """
+            SELECT id, path, duration
+            FROM clips
+            WHERE duration IS NOT NULL AND duration > 0
+        """
+        if not force_regenerate:
+            query += " AND thumbnail_path IS NULL"
+
+        if limit is not None and limit > 0:
+            query += f" LIMIT {limit}"
+
+        read_cursor.execute(query)
+
+        row = read_cursor.fetchone()
+        while row is not None:
+            clip_id, path_str, duration = row['id'], row['path'], row['duration']
+            video_path = Path(path_str)
+            print(f"- Processing clip ID {clip_id}: {video_path.name}")
+
+            if not video_path.exists():
+                print(f"  Warning: Video file not found: {video_path}. Skipping.", file=sys.stderr)
+                error_count += 1
+                row = read_cursor.fetchone() # Move to next row
+                continue
+
+            try:
+                thumb_path = generate_thumbnail(
+                    video_path=video_path,
+                    duration=duration,
+                    clip_id=clip_id,
+                    output_dir=base_output_dir
+                )
+
+                if thumb_path:
+                    # Store path relative to the main project/db directory
+                    relative_thumb_path = str(thumb_path.relative_to(db_path.parent))
+                    try:
+                        # Use explicit transaction for update
+                        update_cursor.execute("BEGIN")
+                        update_cursor.execute(
+                            "UPDATE clips SET thumbnail_path = ? WHERE id = ?",
+                            (relative_thumb_path, clip_id)
+                        )
+                        update_cursor.execute("COMMIT")
+                        success_count += 1
+                        # print(f"  Success: {relative_thumb_path}")
+                    except sqlite3.Error as db_err:
+                         print(f"  Error updating database for clip ID {clip_id}: {db_err}", file=sys.stderr)
+                         update_cursor.execute("ROLLBACK")
+                         error_count += 1
+                         # Optionally delete the generated thumb if DB update failed?
+                         # if thumb_path.exists(): thumb_path.unlink()
+                else:
+                    print(f"  Warning: Thumbnail generation failed for clip ID {clip_id}.", file=sys.stderr)
+                    error_count += 1
+
+            except (ThumbnailError, FileNotFoundError, ValueError) as e:
+                print(f"  Error generating thumbnail for clip ID {clip_id}: {e}", file=sys.stderr)
+                error_count += 1
+            except Exception as e:
+                 print(f"  Unexpected error for clip ID {clip_id}: {e}", file=sys.stderr)
+                 error_count += 1
+
+            # Fetch next row before potentially long processing
+            row = read_cursor.fetchone()
+
+    except sqlite3.Error as e:
+        print(f"Database error during thumbnail processing: {e}", file=sys.stderr)
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}", file=sys.stderr)
+    finally:
+        if conn:
+            conn.close()
+            print("Database connection closed.")
+
+    print(f"\nThumbnail processing complete. Success: {success_count}, Errors: {error_count}")
+    return success_count, error_count
+
 # --- Example Usage ---
 # Note: This requires a real video file, ffmpeg installed, and ideally
 # a database entry created by the scanner to have duration and ID.
@@ -241,51 +349,38 @@ if __name__ == '__main__':
     finally:
         if conn: conn.close()
 
-    # 2. Generate Thumbnail
-    generated_thumb_path = None
-    if sample_duration and clip_id_in_db:
-        print(f"\nAttempting to generate thumbnail for ID {clip_id_in_db}...")
-        start_time = time.time()
+    # 2. Generate Thumbnail (using the new process_thumbnails function)
+    print("\nAttempting to generate missing thumbnails...")
+    start_time = time.time()
+
+    # Instead of calling generate_thumbnail directly, call process_thumbnails
+    # It will find the entry we added above (since thumbnail_path is NULL)
+    success, errors = process_thumbnails(db_path=test_db_path)
+
+    end_time = time.time()
+    print(f"process_thumbnails finished in {end_time - start_time:.2f}s")
+
+    # 3. Verification (check if DB was updated)
+    generated_thumb_path = None # We need to find the path generated
+    if success > 0:
+        conn_verify = None
         try:
-            generated_thumb_path = generate_thumbnail(
-                video_path=sample_video_path,
-                duration=sample_duration,
-                clip_id=clip_id_in_db,
-                output_dir=thumb_dir
-            )
-            end_time = time.time()
-            if generated_thumb_path:
-                print(f"Successfully generated thumbnail: {generated_thumb_path}")
-                print(f"Time taken: {end_time - start_time:.2f}s")
-
-                # 3. (Simulate) Update DB with thumbnail path
-                conn_update = None
-                try:
-                    conn_update = get_db_connection(test_db_path)
-                    cursor_update = conn_update.cursor()
-                    thumb_path_str = str(generated_thumb_path.relative_to(Path('.'))) # Store relative path
-                    cursor_update.execute("UPDATE clips SET thumbnail_path = ? WHERE id = ?",
-                                         (thumb_path_str, clip_id_in_db))
-                    conn_update.commit()
-                    print(f"Updated DB record {clip_id_in_db} with thumbnail path: {thumb_path_str}")
-
-                     # Verification
-                    cursor_update.execute("SELECT thumbnail_path FROM clips WHERE id = ?", (clip_id_in_db,))
-                    db_thumb_path = cursor_update.fetchone()[0]
-                    print(f"Verification: DB thumbnail_path = {db_thumb_path}")
-
-                except sqlite3.Error as e:
-                     print(f"Database error updating thumbnail path: {e}", file=sys.stderr)
-                finally:
-                    if conn_update: conn_update.close()
-
+            conn_verify = get_db_connection(test_db_path)
+            cursor_verify = conn_verify.cursor()
+            cursor_verify.execute("SELECT id, thumbnail_path FROM clips WHERE path = ?", (str(sample_video_path.resolve()),))
+            result = cursor_verify.fetchone()
+            if result and result['thumbnail_path']:
+                print(f"Verification successful: DB record {result['id']} has thumbnail path: {result['thumbnail_path']}")
+                # Construct full path for cleanup check
+                generated_thumb_path = test_db_path.parent / result['thumbnail_path']
             else:
-                print("Thumbnail generation returned None (failed).")
-
-        except (ThumbnailError, FileNotFoundError, ValueError) as e:
-            print(f"Error generating thumbnail: {e}")
-        except Exception as e:
-             print(f"An unexpected error occurred: {e}")
+                print("Verification failed: DB record not updated or thumbnail path is NULL.")
+        except sqlite3.Error as e:
+            print(f"Error verifying DB after thumbnail processing: {e}", file=sys.stderr)
+        finally:
+            if conn_verify: conn_verify.close()
+    else:
+        print("No thumbnails were successfully generated according to process_thumbnails.")
 
     # --- Cleanup ---
     print("\nCleaning up test environment...")
