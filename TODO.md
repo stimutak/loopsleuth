@@ -30,7 +30,7 @@
 - [x] **Thumb:** Store thumbnail path or blob in the database.
 - [x] **Hash:** Calculate perceptual hash (pHash) using `imagehash`.
 - [x] **Hash:** Store pHash in the database.
-- [ ] **TUI:** Create basic Textual app structure.
+- [x] **TUI:** Create basic Textual app structure.
 - [ ] **TUI:** Implement grid view to display thumbnails and metadata from the database.
 - [ ] **TUI:** Add `<Space>` key binding to toggle a 'starred' flag in the database.
 - [ ] **TUI:** Add `t` key binding to open an input field for editing free-text tags (store in DB).
