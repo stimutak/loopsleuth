@@ -20,5 +20,25 @@ A terminal‑first librarian for video loops.
 _Stretch_: duplicate‑collapse, CLIP auto‑tags, .tox export.
 
 ## Tech
-Python ≥ 3.10, ffmpeg/ffprobe, SQLite, Pillow, imagehash, Textual, Typer.
+Python ≥ 3.10, ffmpeg/ffprobe, SQLite, Pillow, imagehash, Textual, Typer.
+
+## Installation & Setup
+
+1.  **Clone the repository:**
+    ```bash
+    git clone https://github.com/your-username/loopsleuth.git # Replace with actual URL later
+    cd loopsleuth
+    ```
+2.  **Install FFmpeg:**
+    LoopSleuth relies on `ffmpeg` and `ffprobe` for video processing. You must install FFmpeg separately. Download it from [ffmpeg.org](https://ffmpeg.org/download.html).
+    **Important:** Ensure the `ffmpeg` and `ffprobe` executables are available in your system's PATH environment variable. Alternatively, configuration options to specify the paths might be added in the future.
+3.  **Set up Python environment:**
+    ```bash
+    python -m venv .venv
+    # Activate the environment (Windows PowerShell)
+    .venv\Scripts\Activate.ps1
+    # Activate the environment (Bash/Zsh)
+    # source .venv/bin/activate
+    pip install -r requirements.txt
+    ```
 
