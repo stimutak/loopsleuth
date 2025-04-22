@@ -41,10 +41,11 @@
 ## Stretch Goals (next sprint)
 
 ### 1  TUI Thumbnails & UX polish
-- [ ] Add `Image` widget (Textual ≥ 0.60) for inline JPEG render - **Blocked by current Textual version (<0.60?)**
-- [ ] Detect client capability → **Kitty/Sixel/ANSI** fallback
+- [x] Attempted to add `Image` widget for inline JPEG render — **Blocked: Image widget not available in Textual 0.76.0 on this platform/environment.**
+- [x] Fallback: Static placeholder used for thumbnails in TUI grid.
+- [ ] Detect client capability → **Kitty/Sixel/ANSI** fallback (**future: if/when image support is available**)
 - [ ] Generate ANSI fallback spritesheet once per run (avoid Pillow in loop)
-- [ ] **Lazy‑load:** only decode thumbs for rows in viewport
+- [ ] **Lazy‑load:** only decode thumbs for rows in viewport (**future: if/when image support is available**)
 - [ ] Hover / focus info pane (resolution, codec, duration)
 - [ ] Key‑hints footer & help modal (`?`)
 

@@ -64,26 +64,31 @@ class ClipCard(Static):
         self.can_focus = True # Make cards focusable
 
     def compose(self) -> ComposeResult:
-        """Compose the clip card with text info."""
+        """Compose the clip card with thumbnail and text info."""
         if not self.clip_data:
             yield Static("[b]Error:[/b] No data.")
-            return # Stop composing if no data
+            return  # Stop composing if no data
 
         # Safely get data
         clip_id = self.clip_data.get('id', 'N/A')
         filename = self.clip_data.get('filename', 'Unknown')
         starred = self.clip_data.get('starred', False)
         tags = self.clip_data.get('tags', '')
+        thumb_rel = self.clip_data.get('thumbnail_path', None)
 
         star_icon = "[b green]★[/]" if starred else "[dim]☆[/]"
         tags_display = f"Tags: {tags}" if tags else "Tags: --"
 
-        # Just yield the text information
+        # Fallback: show a placeholder (Image widget not available)
+        # If you upgrade Textual and the Image widget becomes available, you can restore thumbnail rendering here.
+        yield Static("[dim]No Thumbnail (Image widget unavailable)[/dim]", id="thumb-img")
+
+        # Show the text information
         yield Static(
             f"[b]{filename}[/b]\n"
             f"{star_icon} ID: {clip_id}\n"
             f"{tags_display}",
-            id="info-text" # Add ID for clarity
+            id="info-text"  # Add ID for clarity
         )
 
     def update_display(self):
