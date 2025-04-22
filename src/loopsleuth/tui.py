@@ -5,6 +5,7 @@ import sqlite3
 import subprocess
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+import os
 
 # Adjust import path
 SCRIPTS_DIR = Path(__file__).parent.resolve()
@@ -141,10 +142,16 @@ class LoopSleuthApp(App[None]):
         ("q", "quit", "Quit"),
         ("d", "toggle_dark", "Toggle Dark Mode"),
         ("r", "refresh_grid", "Refresh Grid"),
+        ("space", "toggle_star", "Toggle Star"),
     ]
 
     # Store DB path for the app instance
-    db_path: Path = DEFAULT_DB_PATH
+    db_path: Path
+
+    def __init__(self, db_path: Path = DEFAULT_DB_PATH, **kwargs):
+        """Initialize the app, ensuring base class init and setting DB path."""
+        super().__init__(**kwargs)
+        self.db_path = db_path
 
     def compose(self) -> ComposeResult:
         """Create child widgets for the app."""
@@ -153,8 +160,17 @@ class LoopSleuthApp(App[None]):
         yield Footer()
 
     def action_toggle_dark(self) -> None:
-        """Toggle dark mode."""
-        self.dark = not self.dark
+        """Toggle dark mode (Currently may be unstable in v3.1.0)."""
+        # Attempt to toggle dark mode, but catch potential errors
+        try:
+            self.dark = not self.dark
+        except Exception as e:
+            # Log if possible, notify user
+            try:
+                self.log.error(f"Failed to toggle dark mode: {e}")
+            except Exception:
+                pass # Logging might also fail
+            self.notify(f"Error toggling dark mode: {e}", severity="error")
 
     def action_refresh_grid(self) -> None:
         """Reload clips in the grid."""
@@ -165,6 +181,48 @@ class LoopSleuthApp(App[None]):
         except Exception as e:
             self.notify(f"Error refreshing grid: {e}", severity="error")
             print(f"Error refreshing grid: {e}", file=sys.stderr)
+
+    def action_toggle_star(self) -> None:
+        """Toggle the starred status of the currently focused clip."""
+        focused_widget = self.focused
+        if isinstance(focused_widget, ClipCard) and focused_widget.clip_data:
+            clip_id = focused_widget.clip_data.get('id')
+            current_starred = focused_widget.clip_data.get('starred', False)
+            new_starred = not current_starred
+
+            if clip_id is None:
+                self.notify("Cannot star clip: Missing ID.", severity="error")
+                return
+
+            conn = None
+            try:
+                conn = get_db_connection(self.db_path)
+                cursor = conn.cursor()
+                cursor.execute("UPDATE clips SET starred = ? WHERE id = ?", (new_starred, clip_id))
+                conn.commit()
+
+                # Update the widget's reactive data to refresh display
+                # Create a copy, modify, and reassign to trigger reactivity
+                updated_data = focused_widget.clip_data.copy()
+                updated_data['starred'] = new_starred
+                focused_widget.clip_data = updated_data
+
+                status = "Starred" if new_starred else "Unstarred"
+                self.notify(f"{status}: {focused_widget.clip_data.get('filename', '?')}")
+
+            except sqlite3.Error as e:
+                self.notify(f"Database error toggling star: {e}", severity="error")
+                print(f"Database error toggling star for ID {clip_id}: {e}", file=sys.stderr)
+            except Exception as e:
+                self.notify(f"Error toggling star: {e}", severity="error")
+                print(f"Error toggling star for ID {clip_id}: {e}", file=sys.stderr)
+            finally:
+                if conn:
+                    conn.close()
+        elif focused_widget:
+             self.notify(f"Cannot star: Focused item is not a ClipCard ({type(focused_widget).__name__})")
+        else:
+             self.notify("Cannot star: No clip selected.")
 
 
 # --- Main execution block for testing --- #
@@ -202,6 +260,13 @@ if __name__ == "__main__":
     # Define the path to the test database used by the examples
     TEST_DB = Path("./temp_thumb_test.db")
 
+    # --- Remove forced logging via environment variable --- 
+    # We'll rely on default textual.log if needed
+    # log_file = Path("debug.log")
+    # import os
+    # os.environ['TEXTUAL_LOG'] = str(log_file.resolve())
+    # print(f"Textual logging redirected to: {log_file.resolve()}")
+
     # Ensure prerequisite data exists
     print("--- Setting up Test Environment --- ")
     if not run_prerequisites():
@@ -210,8 +275,8 @@ if __name__ == "__main__":
     print("-----------------------------------")
 
     print("\n--- Starting TUI --- ")
-    # Create an app instance specifically for testing, pointing to the test DB
-    test_app = LoopSleuthApp()
-    test_app.db_path = TEST_DB # Override the default DB path for this instance
+    # Instantiate the app directly, passing the test DB path
+    test_app = LoopSleuthApp(db_path=TEST_DB)
+    # test_app.db_path = TEST_DB # No longer needed, passed via __init__
     test_app.run()
     print("--------------------") 
