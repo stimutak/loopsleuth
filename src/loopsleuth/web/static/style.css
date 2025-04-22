@@ -1,0 +1,21 @@
+/*
+LoopSleuth Web: Minimal CSS
+- Placeholder for grid and body styling
+- Will be expanded for full UI
+*/
+body {
+    font-family: system-ui, sans-serif;
+    background: #181a1b;
+    color: #f0f0f0;
+    margin: 0;
+    padding: 2em;
+}
+h1 {
+    color: #ffb347;
+}
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1.5em;
+    margin-top: 2em;
+} 

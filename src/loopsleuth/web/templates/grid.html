@@ -1,0 +1,23 @@
+<!--
+LoopSleuth Web: Grid View Template
+- Placeholder for the main grid of clips
+- Will be expanded with thumbnails, controls, etc.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>LoopSleuth - Clip Grid</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <h1>LoopSleuth - Clip Grid (Web UI)</h1>
+    {% if clips %}
+        <div class="grid">
+            {# TODO: Render each clip as a card with thumbnail, filename, etc. #}
+        </div>
+    {% else %}
+        <p>No clips found. (This is a placeholder page.)</p>
+    {% endif %}
+</body>
+</html> 
