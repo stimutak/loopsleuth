@@ -1,0 +1,33 @@
+<!--
+LoopSleuth Web: Clip Detail Page
+- Shows video playback and metadata for a single clip
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ clip.filename }} - LoopSleuth</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        .video-container { text-align: center; margin: 2em 0; }
+        video { width: 80%; max-width: 720px; border-radius: 8px; background: #111; }
+        .meta { margin-top: 1em; text-align: center; }
+        .back-link { color: #7fd6d6; text-decoration: none; font-size: 1.1em; }
+        .back-link:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <a class="back-link" href="/">← Back to grid</a>
+    <h1>{{ clip.filename }}</h1>
+    <div class="video-container">
+        <video controls>
+            <source src="{{ clip.path }}" type="video/mp4">
+            Your browser does not support the video tag.
+        </video>
+    </div>
+    <div class="meta">
+        <div class="star">{% if clip.starred %}★{% else %}☆{% endif %}</div>
+        <div class="tags">Tags: {{ clip.tags or '--' }}</div>
+    </div>
+</body>
+</html> 

@@ -64,4 +64,14 @@ h1 {
     font-size: 0.9em;
     color: #7fd6d6;
     margin-top: 0.2em;
+}
+.card-link {
+    text-decoration: none;
+    color: inherit;
+    display: block;
+}
+.card-link:hover .card {
+    box-shadow: 0 4px 16px #000c;
+    background: #2a2e32;
+    transition: box-shadow 0.2s, background 0.2s;
 } 

@@ -15,6 +15,7 @@ LoopSleuth Web: Grid View Template
     {% if clips %}
         <div class="grid">
             {% for clip in clips %}
+                <a class="card-link" href="/clip/{{ clip.id }}">
                 <div class="card">
                     {% if clip.thumbnail_path %}
                         <img class="thumb" src="/static/{{ clip.thumbnail_path | replace('\\', '/') }}" alt="Thumbnail for {{ clip.filename }}" />
@@ -27,6 +28,7 @@ LoopSleuth Web: Grid View Template
                         <div class="tags">{{ clip.tags or '' }}</div>
                     </div>
                 </div>
+                </a>
             {% endfor %}
         </div>
     {% else %}

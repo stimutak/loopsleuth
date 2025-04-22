@@ -5,7 +5,7 @@ LoopSleuth Web Frontend (FastAPI)
 - Will support video playback, tagging, starring, and export
 - Uses Jinja2 templates and static files
 """
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -53,6 +53,35 @@ def grid(request: Request):
             conn.close()
     return templates.TemplateResponse(
         "grid.html", {"request": request, "clips": clips}
+    )
+
+@app.get("/clip/{clip_id}", response_class=HTMLResponse)
+def clip_detail(request: Request, clip_id: int):
+    """
+    Detail page for a single clip: video playback and metadata.
+    """
+    conn = None
+    clip = None
+    try:
+        conn = get_db_connection(DEFAULT_DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT id, filename, path, thumbnail_path, starred, tags
+            FROM clips WHERE id = ?
+        """, (clip_id,))
+        row = cursor.fetchone()
+        if row:
+            clip = dict(row)
+        else:
+            raise HTTPException(status_code=404, detail="Clip not found")
+    except Exception as e:
+        print(f"[Error] Could not load clip {clip_id}: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+    finally:
+        if conn:
+            conn.close()
+    return templates.TemplateResponse(
+        "clip_detail.html", {"request": request, "clip": clip}
     )
 
 # TODO: Add API endpoints for clips, tagging, starring, etc.
