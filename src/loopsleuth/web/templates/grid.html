@@ -20,24 +20,83 @@ LoopSleuth Web: Grid View Template
     {% if clips %}
         <div class="grid">
             {% for clip in clips %}
-                <a class="card-link" href="/clip/{{ clip.id }}">
-                <div class="card">
+                <div class="card" data-clip-id="{{ clip.id }}">
                     {% if clip.thumbnail_path %}
-                        <img class="thumb" src="/thumbs/{{ clip.thumb_filename }}" alt="Thumbnail for {{ clip.filename }}" />
+                        <a class="card-link" href="/clip/{{ clip.id }}">
+                            <img class="thumb" src="/thumbs/{{ clip.thumb_filename }}" alt="Thumbnail for {{ clip.filename }}" />
+                        </a>
                     {% else %}
                         <div class="thumb placeholder">No Thumbnail</div>
                     {% endif %}
                     <div class="meta">
-                        <div class="filename">{{ clip.filename }}</div>
-                        <div class="star">{% if clip.starred %}★{% else %}☆{% endif %}</div>
-                        <div class="tags">{{ clip.tags or '' }}</div>
+                        <a class="card-link" href="/clip/{{ clip.id }}">
+                            <div class="filename">{{ clip.filename }}</div>
+                        </a>
+                        {% if clip.duration %}
+                            <div class="duration">{{ (clip.duration // 60)|int }}:{{ '%02d' % (clip.duration % 60) }} min</div>
+                        {% endif %}
+                        <div class="star" style="cursor:pointer;" onclick="toggleStar(event, {{ clip.id }})" title="Toggle star">{% if clip.starred %}★{% else %}☆{% endif %}</div>
+                        <div class="tags">
+                            <!-- Tags are always visible as static text -->
+                            <span class="tags-text" id="tags-text-{{ clip.id }}">{{ clip.tags or '' }}</span>
+                            <button type="button" class="edit-tag-btn" onclick="editTags(event, {{ clip.id }})" style="margin-left:0.5em; font-size:0.9em;">✎</button>
+                            <!-- Tag input is only shown when editing -->
+                            <input type="text" class="tag-input" id="tag-input-{{ clip.id }}" value="{{ clip.tags or '' }}" style="display:none; width:80%; margin-top:0.3em;" onkeyup="tagInputKey(event, {{ clip.id }})" />
+                            <button type="button" class="save-tag-btn" id="save-tag-btn-{{ clip.id }}" style="display:none; margin-left:0.3em; font-size:0.9em;" onclick="saveTags(event, {{ clip.id }})">💾</button>
+                        </div>
                     </div>
                 </div>
-                </a>
             {% endfor %}
         </div>
     {% else %}
         <p>No clips found. (This is a placeholder page.)</p>
     {% endif %}
 </body>
+<script>
+function toggleStar(event, clipId) {
+    event.stopPropagation();
+    fetch(`/star/${clipId}`, {method: 'POST'})
+        .then(r => r.json())
+        .then(data => {
+            if (data.starred !== undefined) {
+                const card = event.target.closest('.card');
+                event.target.textContent = data.starred ? '★' : '☆';
+            }
+        });
+}
+function editTags(event, clipId) {
+    event.stopPropagation();
+    document.getElementById(`tags-text-${clipId}`).style.display = 'none';
+    document.getElementById(`tag-input-${clipId}`).style.display = '';
+    document.getElementById(`save-tag-btn-${clipId}`).style.display = '';
+    document.getElementById(`tag-input-${clipId}`).focus();
+}
+function tagInputKey(event, clipId) {
+    if (event.key === 'Enter') {
+        event.preventDefault();
+        event.stopPropagation();
+        saveTags(event, clipId);
+    }
+}
+function saveTags(event, clipId) {
+    event.preventDefault();
+    event.stopPropagation();
+    const input = document.getElementById(`tag-input-${clipId}`);
+    const tags = input.value;
+    fetch(`/tag/${clipId}`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({tags})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.tags !== undefined) {
+            document.getElementById(`tags-text-${clipId}`).textContent = data.tags;
+        }
+        document.getElementById(`tags-text-${clipId}`).style.display = '';
+        input.style.display = 'none';
+        document.getElementById(`save-tag-btn-${clipId}`).style.display = 'none';
+    });
+}
+</script>
 </html> 

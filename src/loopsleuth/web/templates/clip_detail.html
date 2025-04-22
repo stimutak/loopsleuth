@@ -21,13 +21,71 @@ LoopSleuth Web: Clip Detail Page
     <h1>{{ clip.filename }}</h1>
     <div class="video-container">
         <video controls>
-            <source src="/media/{{ clip.path | urlencode }}" type="video/mp4">
-            Your browser does not support the video tag.
+            <source src="/media/{{ clip.path | urlencode }}" type="{{ video_mime }}">
+            <div style="color:#ffb347; background:#222; padding:1em; border-radius:6px; margin-top:1em;">
+                <b>⚠️ This video format is not supported in your browser.</b><br>
+                <a href="/media/{{ clip.path | urlencode }}" download style="color:#7fd6d6;">Download original file</a> and play in a desktop video player.<br>
+                <span style="font-size:0.9em; color:#aaa;">(For best browser compatibility, use MP4/H.264/AAC.)</span>
+            </div>
         </video>
     </div>
     <div class="meta">
-        <div class="star">{% if clip.starred %}★{% else %}☆{% endif %}</div>
-        <div class="tags">Tags: {{ clip.tags or '--' }}</div>
+        <div class="star" style="cursor:pointer; font-size:2em;" onclick="toggleStar(event, {{ clip.id }})" title="Toggle star">{% if clip.starred %}★{% else %}☆{% endif %}</div>
+        <div class="tags" style="margin-top:1em;">
+            <span style="color:#aaa;">Tags:</span>
+            <!-- Tags are always visible as static text -->
+            <span class="tags-text" id="tags-text-{{ clip.id }}">{{ clip.tags or '' }}</span>
+            <button type="button" class="edit-tag-btn" onclick="editTags(event, {{ clip.id }})" style="margin-left:0.5em; font-size:0.9em;">✎</button>
+            <!-- Tag input is only shown when editing -->
+            <input type="text" class="tag-input" id="tag-input-{{ clip.id }}" value="{{ clip.tags or '' }}" style="display:none; width:60%; margin-top:0.3em;" onkeyup="tagInputKey(event, {{ clip.id }})" />
+            <button type="button" class="save-tag-btn" id="save-tag-btn-{{ clip.id }}" style="display:none; margin-left:0.3em; font-size:0.9em;" onclick="saveTags(event, {{ clip.id }})">💾</button>
+        </div>
     </div>
 </body>
+<script>
+function toggleStar(event, clipId) {
+    event.stopPropagation();
+    fetch(`/star/${clipId}`, {method: 'POST'})
+        .then(r => r.json())
+        .then(data => {
+            if (data.starred !== undefined) {
+                event.target.textContent = data.starred ? '★' : '☆';
+            }
+        });
+}
+function editTags(event, clipId) {
+    event.stopPropagation();
+    document.getElementById(`tags-text-${clipId}`).style.display = 'none';
+    document.getElementById(`tag-input-${clipId}`).style.display = '';
+    document.getElementById(`save-tag-btn-${clipId}`).style.display = '';
+    document.getElementById(`tag-input-${clipId}`).focus();
+}
+function tagInputKey(event, clipId) {
+    if (event.key === 'Enter') {
+        event.preventDefault();
+        event.stopPropagation();
+        saveTags(event, clipId);
+    }
+}
+function saveTags(event, clipId) {
+    event.preventDefault();
+    event.stopPropagation();
+    const input = document.getElementById(`tag-input-${clipId}`);
+    const tags = input.value;
+    fetch(`/tag/${clipId}`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({tags})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.tags !== undefined) {
+            document.getElementById(`tags-text-${clipId}`).textContent = data.tags;
+        }
+        document.getElementById(`tags-text-${clipId}`).style.display = '';
+        input.style.display = 'none';
+        document.getElementById(`save-tag-btn-${clipId}`).style.display = 'none';
+    });
+}
+</script>
 </html> 

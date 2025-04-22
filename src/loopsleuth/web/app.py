@@ -5,8 +5,8 @@ LoopSleuth Web Frontend (FastAPI)
 - Will support video playback, tagging, starring, and export
 - Uses Jinja2 templates and static files
 """
-from fastapi import FastAPI, Request, HTTPException, Form
-from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse
+from fastapi import FastAPI, Request, HTTPException, Form, Body
+from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
@@ -15,6 +15,7 @@ sys.path.append(str((Path(__file__).parent.parent.parent).resolve()))  # Ensure 
 from loopsleuth.db import get_db_connection, DEFAULT_DB_PATH
 from urllib.parse import unquote
 from loopsleuth.scanner import ingest_directory
+import mimetypes  # <-- Add this import
 
 # --- App setup ---
 # For development/demo: use the test DB with clips
@@ -44,7 +45,7 @@ def grid(request: Request):
         conn = get_db_connection(DEFAULT_DB_PATH)
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT id, filename, thumbnail_path, starred, tags
+            SELECT id, filename, duration, thumbnail_path, starred, tags
             FROM clips
             ORDER BY filename ASC
         """)
@@ -72,6 +73,7 @@ def clip_detail(request: Request, clip_id: int):
     """
     conn = None
     clip = None
+    video_mime = "video/mp4"  # Default
     try:
         conn = get_db_connection(DEFAULT_DB_PATH)
         cursor = conn.cursor()
@@ -82,6 +84,10 @@ def clip_detail(request: Request, clip_id: int):
         row = cursor.fetchone()
         if row:
             clip = dict(row)
+            # Guess MIME type from filename
+            mime, _ = mimetypes.guess_type(clip['path'])
+            if mime and mime.startswith('video/'):
+                video_mime = mime
         else:
             raise HTTPException(status_code=404, detail="Clip not found")
     except Exception as e:
@@ -91,7 +97,7 @@ def clip_detail(request: Request, clip_id: int):
         if conn:
             conn.close()
     return templates.TemplateResponse(
-        "clip_detail.html", {"request": request, "clip": clip}
+        "clip_detail.html", {"request": request, "clip": clip, "video_mime": video_mime}
     )
 
 @app.get("/thumbs/{filename}")
@@ -120,16 +126,55 @@ def serve_video(filename: str):
     return FileResponse(file_path)
 
 @app.post("/scan_folder")
-def scan_folder(folder_path: str = Form(...)):
+def scan_folder(folder_path: str = Form(...), force_rescan: bool = Form(False)):
     """
     Scan the given folder for videos and ingest them into the DB.
     Redirects back to the grid after completion.
     """
     try:
-        ingest_directory(Path(folder_path), db_path=DEFAULT_DB_PATH)
+        ingest_directory(Path(folder_path), db_path=DEFAULT_DB_PATH, force_rescan=force_rescan)
     except Exception as e:
         print(f"[Error] Scanning folder {folder_path}: {e}")
     return RedirectResponse(url="/", status_code=303)
+
+@app.post("/star/{clip_id}")
+def toggle_star(clip_id: int):
+    """Toggle the 'starred' flag for a clip and return the new state as JSON."""
+    conn = None
+    try:
+        conn = get_db_connection(DEFAULT_DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT starred FROM clips WHERE id = ?", (clip_id,))
+        row = cursor.fetchone()
+        if not row:
+            return JSONResponse({"error": "Clip not found"}, status_code=404)
+        new_star = 0 if row[0] else 1
+        cursor.execute("UPDATE clips SET starred = ? WHERE id = ?", (new_star, clip_id))
+        conn.commit()
+        return JSONResponse({"starred": new_star})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+    finally:
+        if conn:
+            conn.close()
+
+@app.post("/tag/{clip_id}")
+def update_tags(clip_id: int, tags: str = Body(None)):
+    """Update the 'tags' field for a clip. Accepts JSON {"tags": ...} or form data. Returns new tags as JSON."""
+    if tags is None:
+        return JSONResponse({"error": "No tags provided"}, status_code=400)
+    conn = None
+    try:
+        conn = get_db_connection(DEFAULT_DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("UPDATE clips SET tags = ? WHERE id = ?", (tags, clip_id))
+        conn.commit()
+        return JSONResponse({"tags": tags})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+    finally:
+        if conn:
+            conn.close()
 
 # TODO: Add API endpoints for clips, tagging, starring, etc.
 # TODO: Add video playback route 
