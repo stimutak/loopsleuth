@@ -41,7 +41,7 @@
 ## Stretch Goals (next sprint)
 
 ### 1  TUI Thumbnails & UX polish
-- [ ] Add `Image` widget (Textual ≥ 0.60) for inline JPEG render  
+- [ ] Add `Image` widget (Textual ≥ 0.60) for inline JPEG render - **Blocked by current Textual version (<0.60?)**
 - [ ] Detect client capability → **Kitty/Sixel/ANSI** fallback
 - [ ] Generate ANSI fallback spritesheet once per run (avoid Pillow in loop)
 - [ ] **Lazy‑load:** only decode thumbs for rows in viewport
@@ -51,7 +51,7 @@
 ### 2  Duplicate‑Finder Workflow
 - [ ] Add `duplicates` table `(clip_id, dup_id, distance)`
 - [ ] Batch compare pHash (≤8 Hamming) with fast bit‑ops
-- [ ] UI “Dup sets” sidebar → cycle with `Tab`
+- [ ] UI "Dup sets" sidebar → cycle with `Tab`
 - [ ] Keep / Drop hotkeys; drop removes file & DB row
 - [ ] Auto‑collapse view option (`--collapse-dupes`)
 
@@ -65,7 +65,7 @@
 ### 4  TouchDesigner Export v2
 - [ ] Define `.tox` JSON (COMP, Replicator DAT, Movie File In TOP)
 - [ ] Script to build `.tox` using `tdjson` or TD .toe template
-- [ ] Embed custom parameter page (“Next clip”, “Random”)
+- [ ] Embed custom parameter page ("Next clip", "Random")
 - [ ] Option: auto‑copy thumbs folder next to .tox for previews
 
 ### 5  Testing & CI
