@@ -13,6 +13,7 @@
     - [ ] Implement search/filtering and batch actions.
     - [ ] (Optional) Add duplicate detection, advanced metadata, and creative integrations.
     - [ ] Document migration and update README.
+    - [x] Unify tag/star JS logic in a shared static file and include in both grid and detail templates.
 - [ ] **TUI is now feature-frozen except for critical bugfixes.**
 
 ### MVP checklist (hand‑curated)

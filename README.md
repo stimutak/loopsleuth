@@ -39,6 +39,10 @@ _Stretch_: duplicate‑collapse, CLIP auto‑tags, .tox export.
 ## Tech
 Python ≥ 3.10, ffmpeg/ffprobe, SQLite, Pillow, imagehash, FastAPI, Jinja2, Textual, Typer.
 
+### Web UI JavaScript
+- All AJAX actions for starring and tag editing are handled by a shared static JS file (`src/loopsleuth/web/static/clip_actions.js`).
+- Both the grid and detail views include this file for consistent, maintainable behavior.
+
 ## Installation & Setup
 
 1.  **Clone the repository:**

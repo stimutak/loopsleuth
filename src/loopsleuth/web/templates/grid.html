@@ -52,53 +52,5 @@ LoopSleuth Web: Grid View Template
         <p>No clips found. (This is a placeholder page.)</p>
     {% endif %}
 </body>
-<script>
-function toggleStar(event) {
-    event.stopPropagation();
-    const clipId = event.target.getAttribute('data-clip-id');
-    fetch(`/star/${clipId}`, {method: 'POST'})
-        .then(r => r.json())
-        .then(data => {
-            if (data.starred !== undefined) {
-                event.target.textContent = data.starred ? '★' : '☆';
-            }
-        });
-}
-function editTags(event) {
-    event.stopPropagation();
-    const clipId = event.target.getAttribute('data-clip-id');
-    document.getElementById(`tags-text-${clipId}`).style.display = 'none';
-    document.getElementById(`tag-input-${clipId}`).style.display = '';
-    document.getElementById(`save-tag-btn-${clipId}`).style.display = '';
-    document.getElementById(`tag-input-${clipId}`).focus();
-}
-function tagInputKey(event) {
-    if (event.key === 'Enter') {
-        event.preventDefault();
-        event.stopPropagation();
-        saveTags(event);
-    }
-}
-function saveTags(event) {
-    event.preventDefault();
-    event.stopPropagation();
-    const clipId = event.target.getAttribute('data-clip-id');
-    const input = document.getElementById(`tag-input-${clipId}`);
-    const tags = input.value;
-    fetch(`/tag/${clipId}`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({tags})
-    })
-    .then(r => r.json())
-    .then(data => {
-        if (data.tags !== undefined) {
-            document.getElementById(`tags-text-${clipId}`).textContent = data.tags;
-        }
-        document.getElementById(`tags-text-${clipId}`).style.display = '';
-        input.style.display = 'none';
-        document.getElementById(`save-tag-btn-${clipId}`).style.display = 'none';
-    });
-}
-</script>
+<script src="/static/clip_actions.js"></script>
 </html> 
