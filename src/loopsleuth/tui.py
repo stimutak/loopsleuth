@@ -14,8 +14,8 @@ if str(SRC_DIR) not in sys.path:
     sys.path.append(str(SRC_DIR))
 
 from textual.app import App, ComposeResult
-from textual.containers import Container, VerticalScroll
-from textual.widgets import Header, Footer, Static, Input
+from textual.containers import Container, VerticalScroll, Horizontal
+from textual.widgets import Header, Footer, Static, Input, Button
 from textual.reactive import reactive
 from textual.events import Key
 from textual.screen import ModalScreen
@@ -192,6 +192,62 @@ class EditTagsScreen(ModalScreen[str]):
         self.dismiss(self.current_tags) # Dismiss and return original tags
 
 
+class ConfirmDeleteScreen(ModalScreen[bool]):
+    """A modal screen to confirm deletion."""
+
+    # Store info about the clip to be deleted
+    clip_id: int
+    clip_filename: str
+    clip_widget: ClipCard # Keep track of the widget to remove
+
+    DEFAULT_CSS = """
+    ConfirmDeleteScreen {
+        align: center middle;
+    }
+    #confirm-delete-container {
+        width: 60; /* Set a fixed width */
+        max-width: 80%; /* But don't allow it to exceed 80% screen width */
+        height: auto;
+        padding: 1 2;
+        border: thick $error;
+        background: $surface;
+    }
+    #confirm-delete-buttons {
+        width: 100%;
+        align-horizontal: right;
+        padding-top: 1;
+    }
+    Button {
+        margin-left: 2;
+    }
+    """
+
+    def __init__(self, clip_id: int, clip_filename: str, clip_widget: ClipCard, **kwargs):
+        super().__init__(**kwargs)
+        self.clip_id = clip_id
+        self.clip_filename = clip_filename
+        self.clip_widget = clip_widget
+
+    def compose(self) -> ComposeResult:
+        with Container(id="confirm-delete-container"):
+            yield Static(f"Permanently delete clip \'{self.clip_filename}\' (ID: {self.clip_id})?")
+            yield Static("This will delete the database record, video file, and thumbnail.")
+            with Horizontal(id="confirm-delete-buttons"):
+                yield Button("Yes, Delete", variant="error", id="confirm-delete-yes")
+                yield Button("No, Cancel", variant="primary", id="confirm-delete-no")
+
+    def on_mount(self) -> None:
+        """Focus the 'No' button by default."""
+        self.query_one("#confirm-delete-no").focus()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        """Handle button presses."""
+        if event.button.id == "confirm-delete-yes":
+            self.dismiss(True) # Return True to confirm deletion
+        else:
+            self.dismiss(False) # Return False to cancel
+
+
 class LoopSleuthApp(App[None]):
     """The main Textual application for LoopSleuth."""
 
@@ -203,11 +259,11 @@ class LoopSleuthApp(App[None]):
     Container#main-container {
         height: 1fr; /* Ensure container fills space */
     }
-    """ + ClipGrid.DEFAULT_CSS + ClipCard.DEFAULT_CSS + EditTagsScreen.DEFAULT_CSS
+    """ + ClipGrid.DEFAULT_CSS + ClipCard.DEFAULT_CSS + EditTagsScreen.DEFAULT_CSS + ConfirmDeleteScreen.DEFAULT_CSS
 
     BINDINGS = [
         ("q", "quit", "Quit"),
-        ("d", "toggle_dark", "Toggle Dark Mode"),
+        ("d", "request_delete", "Delete Clip"),
         ("r", "refresh_grid", "Refresh Grid"),
         ("space", "toggle_star", "Toggle Star"),
         ("t", "edit_tags", "Edit Tags"),
@@ -226,19 +282,6 @@ class LoopSleuthApp(App[None]):
         yield Header()
         yield Container(ClipGrid(db_path=self.db_path, id="clip-grid"), id="main-container")
         yield Footer()
-
-    def action_toggle_dark(self) -> None:
-        """Toggle dark mode (Currently may be unstable in v3.1.0)."""
-        # Attempt to toggle dark mode, but catch potential errors
-        try:
-            self.dark = not self.dark
-        except Exception as e:
-            # Log if possible, notify user
-            try:
-                self.log.error(f"Failed to toggle dark mode: {e}")
-            except Exception:
-                pass # Logging might also fail
-            self.notify(f"Error toggling dark mode: {e}", severity="error")
 
     def action_refresh_grid(self) -> None:
         """Reload clips in the grid."""
@@ -321,6 +364,133 @@ class LoopSleuthApp(App[None]):
              self.notify(f"Cannot edit tags: Focused item is not a ClipCard ({type(focused_widget).__name__})")
         else:
              self.notify("Cannot edit tags: No clip selected.")
+
+    def action_request_delete(self) -> None:
+        """Request confirmation to delete the focused clip."""
+        focused_widget = self.focused
+        if isinstance(focused_widget, ClipCard) and focused_widget.clip_data:
+            clip_id = focused_widget.clip_data.get('id')
+            filename = focused_widget.clip_data.get('filename', '?')
+
+            if clip_id is None:
+                self.notify("Cannot delete clip: Missing ID.", severity="error")
+                return
+
+            def handle_delete_confirmation(confirmed: bool):
+                """Callback for the delete confirmation modal."""
+                if confirmed:
+                    self.log(f"Deletion confirmed for clip ID {clip_id}")
+                    self.delete_clip(clip_id, focused_widget)
+                else:
+                    self.log(f"Deletion cancelled for clip ID {clip_id}")
+                    self.notify("Deletion cancelled.")
+
+            # Push the confirmation screen
+            self.push_screen(
+                ConfirmDeleteScreen(
+                    clip_id=clip_id,
+                    clip_filename=filename,
+                    clip_widget=focused_widget
+                ),
+                handle_delete_confirmation
+            )
+
+        elif focused_widget:
+            self.notify(f"Cannot delete: Focused item is not a ClipCard ({type(focused_widget).__name__})")
+        else:
+            self.notify("Cannot delete: No clip selected.")
+
+    def delete_clip(self, clip_id: int, clip_widget: ClipCard):
+        """Deletes the clip record, video file, and thumbnail file."""
+        if not clip_widget.clip_data:
+            self.notify(f"Cannot delete clip {clip_id}: Widget data missing.", severity="error")
+            return
+
+        # We need the video file path and thumbnail path
+        path_str = None
+        thumb_path_rel = clip_widget.clip_data.get('thumbnail_path')
+
+        conn_get_path = None
+        try:
+            # Get full video path from DB as it might not be in clip_data
+            conn_get_path = get_db_connection(self.db_path)
+            cursor_get_path = conn_get_path.cursor()
+            cursor_get_path.execute("SELECT path FROM clips WHERE id = ?", (clip_id,))
+            result = cursor_get_path.fetchone()
+            if result:
+                path_str = result['path']
+            else:
+                self.notify(f"Cannot find DB record for clip ID {clip_id} to get path.", severity="error")
+                return
+        except sqlite3.Error as e:
+            self.notify(f"DB error getting path for clip {clip_id}: {e}", severity="error")
+            return
+        finally:
+            if conn_get_path: conn_get_path.close()
+
+        if not path_str:
+            self.notify(f"Cannot delete clip {clip_id}: Video path not found.", severity="error")
+            return
+
+        video_file = Path(path_str)
+        thumb_file = None
+        if thumb_path_rel:
+            # Thumbnails stored relative to DB file's parent directory
+            thumb_file = self.db_path.parent / thumb_path_rel
+
+        # --- Perform Deletions --- 
+        errors = []
+        # 1. Delete video file
+        try:
+            if video_file.exists():
+                video_file.unlink()
+                self.log(f"Deleted video file: {video_file}")
+            else:
+                self.log.warning(f"Video file not found for deletion: {video_file}")
+        except OSError as e:
+            errors.append(f"Error deleting video file {video_file}: {e}")
+            self.log.error(f"Error deleting video file: {e}")
+
+        # 2. Delete thumbnail file
+        if thumb_file:
+            try:
+                if thumb_file.exists():
+                    thumb_file.unlink()
+                    self.log(f"Deleted thumbnail file: {thumb_file}")
+                else:
+                     self.log.warning(f"Thumbnail file not found for deletion: {thumb_file}")
+            except OSError as e:
+                errors.append(f"Error deleting thumbnail file {thumb_file}: {e}")
+                self.log.error(f"Error deleting thumbnail file: {e}")
+
+        # 3. Delete database record
+        conn_delete = None
+        try:
+            conn_delete = get_db_connection(self.db_path)
+            cursor_delete = conn_delete.cursor()
+            cursor_delete.execute("DELETE FROM clips WHERE id = ?", (clip_id,))
+            conn_delete.commit()
+            self.log(f"Deleted DB record for clip ID {clip_id}")
+        except sqlite3.Error as e:
+            errors.append(f"Error deleting DB record for clip ID {clip_id}: {e}")
+            self.log.error(f"Error deleting DB record: {e}")
+        finally:
+            if conn_delete: conn_delete.close()
+
+        # --- Update UI --- 
+        try:
+             clip_widget.remove()
+             self.notify(f"Removed clip {clip_id} from view.")
+        except Exception as e:
+             errors.append(f"Error removing widget for clip {clip_id}: {e}")
+             self.log.error(f"Error removing widget: {e}")
+
+        # --- Report outcome --- 
+        if not errors:
+             self.notify(f"Successfully deleted clip {clip_id} ({clip_widget.clip_data.get('filename', '?')}).", title="Deletion Complete")
+        else:
+             self.notify("Deletion completed with errors. See log/console.", title="Deletion Error", severity="error")
+             print("[Delete Errors]:\n" + "\n".join(errors), file=sys.stderr)
 
     def update_tags_in_db(self, clip_id: int, new_tags: str, widget_to_update: ClipCard):
         """Update the tags for a given clip ID in the database and refresh the widget."""

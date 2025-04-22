@@ -34,7 +34,7 @@
 - [x] **TUI:** Implement grid view to display thumbnails and metadata from the database.
 - [x] **TUI:** Add `<Space>` key binding to toggle a 'starred' flag in the database.
 - [x] **TUI:** Add `t` key binding to open an input field for editing free-text tags (store in DB).
-- [ ] **TUI:** Add `d` key binding to mark a clip for deletion (or delete immediately - decide strategy). Handle file deletion and DB update.
+- [x] **TUI:** Add `d` key binding to mark a clip for deletion (or delete immediately - decide strategy). Handle file deletion and DB update.
 - [ ] **Export:** Implement command/feature to query starred clips from the database.
 - [ ] **Export:** Write the paths of starred clips to `keepers.txt`.
 
