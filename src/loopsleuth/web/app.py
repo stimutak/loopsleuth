@@ -5,8 +5,8 @@ LoopSleuth Web Frontend (FastAPI)
 - Will support video playback, tagging, starring, and export
 - Uses Jinja2 templates and static files
 """
-from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi import FastAPI, Request, HTTPException, Form
+from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
@@ -14,6 +14,7 @@ import sys
 sys.path.append(str((Path(__file__).parent.parent.parent).resolve()))  # Ensure src/ is importable
 from loopsleuth.db import get_db_connection, DEFAULT_DB_PATH
 from urllib.parse import unquote
+from loopsleuth.scanner import ingest_directory
 
 # --- App setup ---
 # For development/demo: use the test DB with clips
@@ -117,6 +118,18 @@ def serve_video(filename: str):
     if not file_path.exists():
         return FileResponse("404.mp4", status_code=404)  # Optionally serve a placeholder
     return FileResponse(file_path)
+
+@app.post("/scan_folder")
+def scan_folder(folder_path: str = Form(...)):
+    """
+    Scan the given folder for videos and ingest them into the DB.
+    Redirects back to the grid after completion.
+    """
+    try:
+        ingest_directory(Path(folder_path), db_path=DEFAULT_DB_PATH)
+    except Exception as e:
+        print(f"[Error] Scanning folder {folder_path}: {e}")
+    return RedirectResponse(url="/", status_code=303)
 
 # TODO: Add API endpoints for clips, tagging, starring, etc.
 # TODO: Add video playback route 
