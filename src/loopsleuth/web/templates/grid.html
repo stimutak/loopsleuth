@@ -14,7 +14,20 @@ LoopSleuth Web: Grid View Template
     <h1>LoopSleuth - Clip Grid (Web UI)</h1>
     {% if clips %}
         <div class="grid">
-            {# TODO: Render each clip as a card with thumbnail, filename, etc. #}
+            {% for clip in clips %}
+                <div class="card">
+                    {% if clip.thumbnail_path %}
+                        <img class="thumb" src="/static/{{ clip.thumbnail_path | replace('\\', '/') }}" alt="Thumbnail for {{ clip.filename }}" />
+                    {% else %}
+                        <div class="thumb placeholder">No Thumbnail</div>
+                    {% endif %}
+                    <div class="meta">
+                        <div class="filename">{{ clip.filename }}</div>
+                        <div class="star">{% if clip.starred %}★{% else %}☆{% endif %}</div>
+                        <div class="tags">{{ clip.tags or '' }}</div>
+                    </div>
+                </div>
+            {% endfor %}
         </div>
     {% else %}
         <p>No clips found. (This is a placeholder page.)</p>

@@ -10,6 +10,9 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
+import sys
+sys.path.append(str((Path(__file__).parent.parent.parent).resolve()))  # Ensure src/ is importable
+from loopsleuth.db import get_db_connection, DEFAULT_DB_PATH
 
 # --- App setup ---
 app = FastAPI(title="LoopSleuth Web")
@@ -26,12 +29,28 @@ templates = Jinja2Templates(directory=str(templates_dir))
 @app.get("/", response_class=HTMLResponse)
 def grid(request: Request):
     """
-    Main grid view (placeholder for now).
-    Will display all clips with thumbnails and controls.
+    Main grid view: shows all clips with thumbnails and info.
     """
-    # Placeholder: pass empty list for now
+    # Connect to the database and fetch all clips
+    conn = None
+    clips = []
+    try:
+        conn = get_db_connection(DEFAULT_DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT id, filename, thumbnail_path, starred, tags
+            FROM clips
+            ORDER BY filename ASC
+        """)
+        for row in cursor.fetchall():
+            clips.append(dict(row))
+    except Exception as e:
+        print(f"[Error] Could not load clips: {e}")
+    finally:
+        if conn:
+            conn.close()
     return templates.TemplateResponse(
-        "grid.html", {"request": request, "clips": []}
+        "grid.html", {"request": request, "clips": clips}
     )
 
 # TODO: Add API endpoints for clips, tagging, starring, etc.
