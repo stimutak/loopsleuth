@@ -291,110 +291,15 @@ def process_thumbnails(
 # Note: This requires a real video file, ffmpeg installed, and ideally
 # a database entry created by the scanner to have duration and ID.
 
-if __name__ == '__main__':
-    # Imports already moved to top level
-    # from io import BytesIO
-    # from loopsleuth.db import get_db_connection, DEFAULT_DB_PATH
-    # from loopsleuth.metadata import get_video_duration, FFprobeError
-    import time
-
-    # --- Test Setup ---
-    test_video_dir = Path("./temp_thumb_test")
-    test_video_dir.mkdir(exist_ok=True)
-    # We need a *real* small video file for ffmpeg to process
-    # Creating a dummy one won't work here.
-    # Please manually place a small video file named 'test_clip.mp4'
-    # in the 'temp_thumb_test' directory for this example to run.
-    sample_video_path = test_video_dir / "test_clip.mp4"
-    test_db_path = Path("./temp_thumb_test.db")
-    thumb_dir = _get_thumbnail_dir(test_video_dir) # Place thumbs inside test dir
-
-    clip_id_in_db = None
-    sample_duration = None
-
-    print("--- Thumbnailer Example ---")
-    if not sample_video_path.exists():
-        print(f"!!! WARNING: Test video '{sample_video_path}' not found.")
-        print("!!! Please place a small MP4 file there to run the example.")
+if __name__ == "__main__":
+    from pathlib import Path
+    import sys
+    db_path = Path("temp_thumb_test.db")
+    if not db_path.exists():
+        print(f"Database not found: {db_path}")
         sys.exit(1)
-
-    # 1. (Simulate) Get duration and add to DB (if not already done by scanner)
-    conn = None
-    try:
-        if test_db_path.exists(): test_db_path.unlink() # Clean previous test DB
-        conn = get_db_connection(test_db_path)
-        cursor = conn.cursor()
-
-        # Get duration first
-        try:
-            sample_duration = get_video_duration(sample_video_path)
-            if sample_duration is None:
-                print("Error: Could not get duration for test video via ffprobe.", file=sys.stderr)
-                sys.exit(1)
-
-            print(f"Test video duration: {sample_duration:.2f}s")
-
-            # Add to DB
-            path_str = str(sample_video_path.resolve())
-            filename = sample_video_path.name
-            cursor.execute("INSERT INTO clips (path, filename, duration) VALUES (?, ?, ?)",
-                           (path_str, filename, sample_duration))
-            clip_id_in_db = cursor.lastrowid # Get the ID we just inserted
-            conn.commit()
-            print(f"Added test video to temporary DB (ID: {clip_id_in_db}): {test_db_path}")
-
-        except (FFprobeError, FileNotFoundError) as e:
-             print(f"Error getting duration for test video: {e}", file=sys.stderr)
-             print("Ensure ffprobe is installed and in PATH.", file=sys.stderr)
-             sys.exit(1)
-
-    except sqlite3.Error as e:
-        print(f"Database error during setup: {e}", file=sys.stderr)
-        sys.exit(1)
-    finally:
-        if conn: conn.close()
-
-    # 2. Generate Thumbnail (using the new process_thumbnails function)
-    print("\nAttempting to generate missing thumbnails...")
-    start_time = time.time()
-
-    # Instead of calling generate_thumbnail directly, call process_thumbnails
-    # It will find the entry we added above (since thumbnail_path is NULL)
-    success, errors = process_thumbnails(db_path=test_db_path)
-
-    end_time = time.time()
-    print(f"process_thumbnails finished in {end_time - start_time:.2f}s")
-
-    # 3. Verification (check if DB was updated)
-    generated_thumb_path = None # We need to find the path generated
-    if success > 0:
-        conn_verify = None
-        try:
-            conn_verify = get_db_connection(test_db_path)
-            cursor_verify = conn_verify.cursor()
-            cursor_verify.execute("SELECT id, thumbnail_path FROM clips WHERE path = ?", (str(sample_video_path.resolve()),))
-            result = cursor_verify.fetchone()
-            if result and result['thumbnail_path']:
-                print(f"Verification successful: DB record {result['id']} has thumbnail path: {result['thumbnail_path']}")
-                # Construct full path for cleanup check
-                generated_thumb_path = test_db_path.parent / result['thumbnail_path']
-            else:
-                print("Verification failed: DB record not updated or thumbnail path is NULL.")
-        except sqlite3.Error as e:
-            print(f"Error verifying DB after thumbnail processing: {e}", file=sys.stderr)
-        finally:
-            if conn_verify: conn_verify.close()
-    else:
-        print("No thumbnails were successfully generated according to process_thumbnails.")
-
-    # --- Cleanup --- 
-    # Removed automatic cleanup for prerequisite chaining
-    # print("\nCleaning up test environment...")
-    # if generated_thumb_path and generated_thumb_path.exists():
-    #     generated_thumb_path.unlink()
-    #     print(f"- Removed: {generated_thumb_path}")
-    # ... (rest of cleanup code commented out or removed) ...
-
-    print("--- Example Done (Cleanup Skipped) ---")
+    print("Attempting to generate missing thumbnails for all clips...")
+    success, error = process_thumbnails(db_path=db_path, force_regenerate=False)
+    print(f"Thumbnail processing complete. Success: {success}, Errors: {error}")
 
 # """ 

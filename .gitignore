@@ -124,4 +124,30 @@ dmypy.json
 .pyre/
 
 # pytype static analysis results
-.pytype/ 
+.pytype/
+
+# Ignore Python virtual environments
+.venv/
+
+# Ignore SQLite databases
+*.db
+
+# Ignore data and thumbnail folders
+.loopsleuth_data/
+temp_thumb_test/
+
+# Ignore video files
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.webm
+
+# Ignore image files (thumbnails, etc.)
+*.jpg
+*.jpeg
+*.png
+
+# Ignore other system files
+.DS_Store
+Thumbs.db 

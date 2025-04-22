@@ -15,6 +15,7 @@ if str(SRC_DIR) not in sys.path:
 
 from loopsleuth.db import get_db_connection, DEFAULT_DB_PATH
 from loopsleuth.metadata import get_video_duration, FFprobeError
+from loopsleuth.thumbnailer import generate_thumbnail, ThumbnailError
 
 # Common video file extensions
 # TODO: Make this configurable
@@ -41,6 +42,7 @@ def ingest_directory(
     start_path: Path,
     db_path: Path = DEFAULT_DB_PATH,
     extensions: Set[str] = DEFAULT_VIDEO_EXTENSIONS,
+    force_rescan: bool = False,
 ) -> None:
     """
     Scans a directory for video files, extracts metadata (duration),
@@ -50,6 +52,7 @@ def ingest_directory(
         start_path: The directory path to start scanning from.
         db_path: Path to the SQLite database file.
         extensions: A set of lowercase file extensions to look for.
+        force_rescan: If True, update duration and regenerate thumbnail for all files, even if they already exist.
     """
     if not start_path.is_dir():
         print(f"Error: Invalid start path '{start_path}' is not a directory.", file=sys.stderr)
@@ -74,7 +77,7 @@ def ingest_directory(
                 # Check if path already exists
                 cursor.execute("SELECT id FROM clips WHERE path = ?", (path_str,))
                 existing = cursor.fetchone()
-                if existing:
+                if existing and not force_rescan:
                     # TODO: Add option to re-scan/update existing entries
                     # print(f"Skipping already existing: {filename}")
                     skipped_count += 1
@@ -94,15 +97,49 @@ def ingest_directory(
                     error_count += 1
                     break # Stop processing further files if ffprobe isn't there
 
-                # Insert into DB
-                cursor.execute(
-                    """
-                    INSERT INTO clips (path, filename, duration, modified_at)
-                    VALUES (?, ?, ?, CURRENT_TIMESTAMP)
-                    """,
-                    (path_str, filename, duration)
-                )
-                processed_count += 1
+                if existing and force_rescan:
+                    # Update duration for existing entry
+                    clip_id = existing[0]
+                    cursor.execute(
+                        "UPDATE clips SET duration = ? WHERE id = ?",
+                        (duration, clip_id)
+                    )
+                else:
+                    # Insert into DB
+                    cursor.execute(
+                        """
+                        INSERT INTO clips (path, filename, duration, modified_at)
+                        VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                        """,
+                        (path_str, filename, duration)
+                    )
+                    clip_id = cursor.lastrowid
+                    processed_count += 1
+
+                # --- Generate thumbnail immediately if possible ---
+                if duration and duration > 0:
+                    try:
+                        from loopsleuth.thumbnailer import _get_thumbnail_dir
+                        thumb_path = generate_thumbnail(
+                            video_path=video_path,
+                            duration=duration,
+                            clip_id=clip_id,
+                            output_dir=_get_thumbnail_dir()
+                        )
+                        if thumb_path:
+                            try:
+                                abs_thumb_path = thumb_path.resolve()
+                                abs_project_root = Path.cwd().resolve()
+                                relative_thumb_path = str(abs_thumb_path.relative_to(abs_project_root))
+                            except ValueError:
+                                # If not in subpath, just use the filename
+                                relative_thumb_path = str(thumb_path.name)
+                            cursor.execute(
+                                "UPDATE clips SET thumbnail_path = ? WHERE id = ?",
+                                (relative_thumb_path, clip_id)
+                            )
+                    except (ThumbnailError, Exception) as e:
+                        print(f"  Error generating thumbnail for {filename}: {e}", file=sys.stderr)
 
             except Exception as e:
                 # Catch unexpected errors during processing of a single file
