@@ -1,6 +1,9 @@
 # LoopSleuth
 
-A terminal‑first librarian for video loops.
+> **Note (2024-06-13): LoopSleuth is now web-first!**
+> The web UI (FastAPI + Jinja2) is the primary interface for browsing, tagging, and managing video loops. See `STARTUP_MESSAGE.md` for the latest project state, usage, and next steps.
+
+A web-first (formerly terminal-first) librarian for video loops.
 
 ## Why
 - Thumbnail & metadata view for huge DXV/H.264 clip libraries
@@ -9,18 +12,15 @@ A terminal‑first librarian for video loops.
 
 ## MVP (v0.1)
 1. **Scan**: walk folder → SQLite row per clip (`ffprobe`)
-2. **Thumb**: grab frame @ 25 % duration → 256 px JPEG
+2. **Thumb**: grab frame @ 25  % duration → 256 px JPEG
 3. **Hash**: perceptual pHash → find near‑dupes later
-4. **TUI**: Textual grid  
-   - <Space> toggle star  
-   - `t` edit tags  
-   - `d` delete
+4. **Web UI**: Grid and detail views for browsing, starring, tagging, and playback
 5. **Export**: write `keepers.txt` with starred clip paths
 
 _Stretch_: duplicate‑collapse, CLIP auto‑tags, .tox export.
 
 ## Tech
-Python ≥ 3.10, ffmpeg/ffprobe, SQLite, Pillow, imagehash, Textual, Typer.
+Python ≥ 3.10, ffmpeg/ffprobe, SQLite, Pillow, imagehash, FastAPI, Jinja2, Textual, Typer.
 
 ## Installation & Setup
 

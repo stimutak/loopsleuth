@@ -1,22 +1,24 @@
-# LoopSleuth - Startup Summary
+# LoopSleuth Startup Message
 
-Good morning! Here's where we left off:
+## Project State (2024-06)
+- **Web UI** is now the primary interface (FastAPI + Jinja2).
+- **Grid and detail views**: Show all clips with thumbnails, video playback, starring, and tag editing.
+- **AJAX tag editing**: Now reliable in both grid and detail views. Tags persist and are visible after edits.
+- **/tag/{clip_id} endpoint**: Fixed to use a Pydantic model for JSON payloads, resolving 422 errors and ensuring tag persistence.
+- **Media serving**: Thumbnails and videos are served via FastAPI routes for robust access.
+- **Folder scan**: User can ingest new videos from any folder via the web UI.
+- **All major changes are committed and documented.**
 
-**Last Actions:**
-*   Implemented the `<Space>` key binding in the TUI to toggle the 'starred' status of the focused clip.
-*   Updated the `TODO.md` to reflect this completion.
-*   Removed a potentially problematic debug `self.log` call from the `ClipGrid.load_clips` method in `tui.py`.
-*   Staged and committed all changes.
+## Next Steps
+- [ ] Add a "Clear Grid" or batch action option.
+- [ ] Add advanced search/filtering and batch tagging.
+- [ ] Add video format transcoding for browser compatibility (optional).
+- [ ] Continue UI/UX polish and documentation.
 
-**Current Status:**
-*   The core TUI functionality for browsing, starring, editing tags (`t`), deleting (`d`), and exporting (`e`) starred clips is implemented.
-*   The dark mode toggle (`d` in TUI) is still potentially unstable due to issues likely related to the Textual version or environment; we reverted complex debugging attempts for stability.
-*   Logging in the TUI is not working as expected (no `textual.log` file is being generated). This needs further investigation but was deferred.
+## How to Resume
+- All recent fixes and context are documented in `TODO.md` and this message.
+- To continue, start a new chat and reference this summary for seamless handoff.
+- For any new features, review the last commits and TODOs for guidance.
 
-**Next Steps (Suggestions based on TODO.md):**
-1.  **Investigate TUI Logging:** Try to resolve why `textual.log` isn't being created. This is important for future debugging. Consider simpler logging methods or checking permissions/environment variables.
-2.  **Near-Duplicate Detection:** Implement the logic to find and potentially flag near-duplicate clips based on the stored pHash values. This might involve adding a new view or command.
-3.  **Refine Export:** Enhance the `export_starred_clips` function (e.g., allow choosing the output path, different formats).
-4.  **Testing:** Add more robust tests, especially for the TUI interactions and database operations.
-
-Let me know what you'd like to tackle first! 
+---
+_Last update: 2024-06-13_ 
