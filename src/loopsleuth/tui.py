@@ -124,14 +124,12 @@ class ClipGrid(VerticalScroll):
                 conn.close()
 
         # --- Add Logging --- 
-        self.log(f"ClipGrid loaded {len(clips)} clips from DB.")
-        # --- End Logging ---
-        if clips:
-            # Mount all cards first
-            yielded_cards = [ClipCard(clip_data=clip) for clip in clips]
-            self.mount_all(yielded_cards)
-        else:
-            self.mount(Static("No clips found in the database."))
+        self.log(f"Loaded {len(clips)} clips from the database.")
+        for clip_data in clips:
+            clip_id = clip_data.get("id")
+            if clip_id:
+                self.clip_cards[clip_id] = ClipCard(clip_data=clip_data, id=f"clip-{clip_id}")
+        yield from self.clip_cards.values()
 
 
 class EditTagsScreen(ModalScreen[str]):
