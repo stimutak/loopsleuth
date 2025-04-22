@@ -16,6 +16,7 @@ from loopsleuth.db import get_db_connection, DEFAULT_DB_PATH
 from urllib.parse import unquote
 from loopsleuth.scanner import ingest_directory
 import mimetypes  # <-- Add this import
+from pydantic import BaseModel
 
 # --- App setup ---
 # For development/demo: use the test DB with clips
@@ -158,11 +159,13 @@ def toggle_star(clip_id: int):
         if conn:
             conn.close()
 
+class TagUpdate(BaseModel):
+    tags: str
+
 @app.post("/tag/{clip_id}")
-def update_tags(clip_id: int, tags: str = Body(None)):
-    """Update the 'tags' field for a clip. Accepts JSON {"tags": ...} or form data. Returns new tags as JSON."""
-    if tags is None:
-        return JSONResponse({"error": "No tags provided"}, status_code=400)
+def update_tags(clip_id: int, tag_update: TagUpdate):
+    """Update the 'tags' field for a clip. Accepts JSON {"tags": ...}. Returns new tags as JSON."""
+    tags = tag_update.tags
     conn = None
     try:
         conn = get_db_connection(DEFAULT_DB_PATH)
