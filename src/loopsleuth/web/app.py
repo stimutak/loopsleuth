@@ -6,13 +6,14 @@ LoopSleuth Web Frontend (FastAPI)
 - Uses Jinja2 templates and static files
 """
 from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
 import sys
 sys.path.append(str((Path(__file__).parent.parent.parent).resolve()))  # Ensure src/ is importable
 from loopsleuth.db import get_db_connection, DEFAULT_DB_PATH
+from urllib.parse import unquote
 
 # --- App setup ---
 # For development/demo: use the test DB with clips
@@ -26,6 +27,8 @@ app.mount("/static", StaticFiles(directory=static_dir), name="static")
 # Set up Jinja2 templates
 templates_dir = Path(__file__).parent / "templates"
 templates = Jinja2Templates(directory=str(templates_dir))
+
+THUMB_DIR = Path(".loopsleuth_data/thumbnails")
 
 # --- Routes ---
 @app.get("/", response_class=HTMLResponse)
@@ -83,6 +86,31 @@ def clip_detail(request: Request, clip_id: int):
     return templates.TemplateResponse(
         "clip_detail.html", {"request": request, "clip": clip}
     )
+
+@app.get("/thumbs/{filename}")
+def serve_thumbnail(filename: str):
+    """
+    Serve a thumbnail image from the .loopsleuth_data/thumbnails directory.
+    """
+    thumb_path = THUMB_DIR / filename
+    if not thumb_path.exists():
+        return FileResponse(THUMB_DIR / "missing.jpg", status_code=404)  # Optionally serve a placeholder
+    return FileResponse(thumb_path)
+
+@app.get("/media/{filename:path}")
+def serve_video(filename: str):
+    """
+    Serve a video file from an absolute or relative path.
+    The filename is URL-encoded and may include slashes.
+    """
+    # Unquote in case of spaces or special chars
+    file_path = Path(unquote(filename))
+    if not file_path.is_absolute():
+        # Try relative to project root
+        file_path = Path.cwd() / file_path
+    if not file_path.exists():
+        return FileResponse("404.mp4", status_code=404)  # Optionally serve a placeholder
+    return FileResponse(file_path)
 
 # TODO: Add API endpoints for clips, tagging, starring, etc.
 # TODO: Add video playback route 

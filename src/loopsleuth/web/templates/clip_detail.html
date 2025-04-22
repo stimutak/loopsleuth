@@ -21,7 +21,7 @@ LoopSleuth Web: Clip Detail Page
     <h1>{{ clip.filename }}</h1>
     <div class="video-container">
         <video controls>
-            <source src="{{ clip.path }}" type="video/mp4">
+            <source src="/media/{{ clip.path | urlencode }}" type="video/mp4">
             Your browser does not support the video tag.
         </video>
     </div>
