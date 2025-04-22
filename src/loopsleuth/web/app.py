@@ -15,6 +15,8 @@ sys.path.append(str((Path(__file__).parent.parent.parent).resolve()))  # Ensure 
 from loopsleuth.db import get_db_connection, DEFAULT_DB_PATH
 
 # --- App setup ---
+# For development/demo: use the test DB with clips
+DEFAULT_DB_PATH = Path("temp_thumb_test.db")  # <-- Use test DB for now
 app = FastAPI(title="LoopSleuth Web")
 
 # Mount static files (for thumbnails, CSS, JS, etc.)
