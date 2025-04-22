@@ -22,6 +22,8 @@ from textual.screen import ModalScreen
 
 # Import database functions and default path
 from loopsleuth.db import get_db_connection, DEFAULT_DB_PATH
+# Import the exporter function
+from loopsleuth.exporter import export_starred_clips
 
 
 class ClipCard(Static):
@@ -267,6 +269,7 @@ class LoopSleuthApp(App[None]):
         ("r", "refresh_grid", "Refresh Grid"),
         ("space", "toggle_star", "Toggle Star"),
         ("t", "edit_tags", "Edit Tags"),
+        ("e", "export_starred", "Export Starred"),
     ]
 
     # Store DB path for the app instance
@@ -399,6 +402,23 @@ class LoopSleuthApp(App[None]):
             self.notify(f"Cannot delete: Focused item is not a ClipCard ({type(focused_widget).__name__})")
         else:
             self.notify("Cannot delete: No clip selected.")
+
+    def action_export_starred(self) -> None:
+        """Export starred clip paths to a file."""
+        # Define output file path (e.g., in the current directory)
+        output_filename = "keepers.txt"
+        # For the test environment, write next to the test DB
+        output_path = self.db_path.parent / output_filename 
+        # For a real install, you might want CWD: output_path = Path.cwd() / output_filename
+
+        self.log(f"Attempting export to {output_path}")
+        success, message = export_starred_clips(self.db_path, output_path)
+
+        if success:
+            self.notify(message, title="Export Complete", severity="information")
+        else:
+            self.notify(message, title="Export Failed", severity="error")
+            print(f"Export Error: {message}", file=sys.stderr)
 
     def delete_clip(self, clip_id: int, clip_widget: ClipCard):
         """Deletes the clip record, video file, and thumbnail file."""
@@ -577,17 +597,28 @@ if __name__ == "__main__":
             cursor_add.execute("SELECT 1 FROM clips WHERE filename = ?", (second_clip_name,))
             if cursor_add.fetchone() is None:
                 # Use metadata from the first clip for simplicity, only change path/filename
-                cursor_add.execute("SELECT duration, thumbnail_path, phash FROM clips LIMIT 1")
+                cursor_add.execute("SELECT duration, thumbnail_path, phash, path FROM clips LIMIT 1") # Added path
                 first_clip_meta = cursor_add.fetchone()
                 if first_clip_meta:
+                    # Construct a plausible unique path for the copy
+                    original_path = Path(first_clip_meta['path'])
+                    new_path = original_path.parent / second_clip_name # Use the new filename
+                    
+                    # Use a different thumbnail path to avoid deleting the same one twice
+                    original_thumb_rel = first_clip_meta['thumbnail_path']
+                    new_thumb_rel = None
+                    if original_thumb_rel:
+                        thumb_p = Path(original_thumb_rel)
+                        new_thumb_rel = str(thumb_p.with_stem(f"{thumb_p.stem}_copy"))
+                    
                     cursor_add.execute("""
                         INSERT INTO clips (path, filename, duration, thumbnail_path, phash)
                         VALUES (?, ?, ?, ?, ?)
                     """, (
-                        str(second_clip_path.resolve()),
+                        str(new_path.resolve()), # Use constructed new path
                         second_clip_name,
                         first_clip_meta['duration'],
-                        first_clip_meta['thumbnail_path'], # Reuse thumb for simplicity
+                        new_thumb_rel, # Use new thumb path if available
                         first_clip_meta['phash'] # Reuse hash for simplicity
                     ))
                     conn_add.commit()

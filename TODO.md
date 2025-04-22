@@ -35,8 +35,8 @@
 - [x] **TUI:** Add `<Space>` key binding to toggle a 'starred' flag in the database.
 - [x] **TUI:** Add `t` key binding to open an input field for editing free-text tags (store in DB).
 - [x] **TUI:** Add `d` key binding to mark a clip for deletion (or delete immediately - decide strategy). Handle file deletion and DB update.
-- [ ] **Export:** Implement command/feature to query starred clips from the database.
-- [ ] **Export:** Write the paths of starred clips to `keepers.txt`.
+- [x] **Export:** Implement command/feature to query starred clips from the database.
+- [x] **Export:** Write the paths of starred clips to `keepers.txt`.
 
 ## Stretch Goals
 - [ ] **Duplicates:** Implement logic to find near-duplicates based on stored pHash values.
