@@ -1,0 +1,19 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# LoopSleuth UI & Dependencies
+
+**User Interface:**
+*   The primary user interface is a Terminal User Interface (TUI) built with the [Textual](mdc:https:/textual.textualize.io) framework, located in `[src/loopsleuth/tui.py](mdc:src/loopsleuth/tui.py)`.
+*   A Command Line Interface (CLI) using [Typer](mdc:https:/typer.tiangolo.com) is planned for operations like scanning directories and exporting data (likely in `src/loopsleuth/cli.py`, not yet created).
+
+**Key Dependencies:**
+*   **External Program:** `ffmpeg` and `ffprobe` must be installed and accessible in the system's PATH for video processing. See `[README.md](mdc:README.md)` for setup details.
+*   **Python Packages:** All required Python packages are listed in `[requirements.txt](mdc:requirements.txt)`. Key packages include `textual`, `pillow`, `imagehash`, `typer` (when added), `rich` (via Textual).
+
+**Project Management:**
+*   Tasks are tracked in `[TODO.md](mdc:TODO.md)`.
+*   Session status is sometimes summarized in `[STARTUP_MESSAGE.md](mdc:STARTUP_MESSAGE.md)`.
+

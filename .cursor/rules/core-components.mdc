@@ -1,0 +1,19 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# LoopSleuth Core Components
+
+Key Python modules and their roles:
+
+*   **TUI:** `[src/loopsleuth/tui.py](mdc:src/loopsleuth/tui.py)` - Implements the main Textual user interface for browsing and interacting with clips.
+*   **Database:** `[src/loopsleuth/db.py](mdc:src/loopsleuth/db.py)` - Defines the SQLite database schema and provides functions for adding, querying, updating, and deleting clip metadata. The main database is typically named `loopsleuth.db` (or similar) in the root, with `[temp_thumb_test.db](mdc:temp_thumb_test.db)` used for testing.
+*   **Thumbnailer:** `[src/loopsleuth/thumbnailer.py](mdc:src/loopsleuth/thumbnailer.py)` - Uses `ffmpeg` to extract a frame from a video file and saves it as a JPEG thumbnail.
+*   **Hasher:** `[src/loopsleuth/hasher.py](mdc:src/loopsleuth/hasher.py)` - Calculates the perceptual hash (pHash) of thumbnail images using `imagehash`.
+*   **Exporter:** `[src/loopsleuth/exporter.py](mdc:src/loopsleuth/exporter.py)` - Handles exporting data, currently focused on writing starred clip paths to a text file (`[keepers.txt](mdc:keepers.txt)`).
+
+**Data Storage:**
+*   Thumbnails are stored in `[.loopsleuth_data/thumbnails/](mdc:.loopsleuth_data/thumbnails)`.
+*   Metadata is stored in an SQLite database file.
+

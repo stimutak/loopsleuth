@@ -38,15 +38,40 @@
 - [x] **Export:** Implement command/feature to query starred clips from the database.
 - [x] **Export:** Write the paths of starred clips to `keepers.txt`.
 
-## Stretch Goals
-- [ ] **Duplicates:** Implement logic to find near-duplicates based on stored pHash values.
-- [ ] **Duplicates:** Add UI element/feature to view and manage duplicate sets (e.g., collapse, select best).
-- [ ] **Auto-Tags:** Research and integrate CLIP (or similar model) for generating automatic tags from thumbnails.
-- [ ] **Auto-Tags:** Store generated tags in the database.
-- [ ] **TOX Export:** Design `.tox` structure for importing `keepers.txt` into TouchDesigner.
-- [ ] **TOX Export:** Implement functionality to generate the `.tox` file.
+## Stretch Goals (next sprint)
 
-## Testing
-- [ ] Set up testing framework (e.g., `pytest`).
-- [ ] Add tests for core utilities (DB interaction, ffmpeg/ffprobe calls, hashing).
-- [ ] Add tests for TUI interactions if feasible.
+### 1  TUI Thumbnails & UX polish
+- [ ] Add `Image` widget (Textual ≥ 0.60) for inline JPEG render  
+- [ ] Detect client capability → **Kitty/Sixel/ANSI** fallback
+- [ ] Generate ANSI fallback spritesheet once per run (avoid Pillow in loop)
+- [ ] **Lazy‑load:** only decode thumbs for rows in viewport
+- [ ] Hover / focus info pane (resolution, codec, duration)
+- [ ] Key‑hints footer & help modal (`?`)
+
+### 2  Duplicate‑Finder Workflow
+- [ ] Add `duplicates` table `(clip_id, dup_id, distance)`
+- [ ] Batch compare pHash (≤8 Hamming) with fast bit‑ops
+- [ ] UI “Dup sets” sidebar → cycle with `Tab`
+- [ ] Keep / Drop hotkeys; drop removes file & DB row
+- [ ] Auto‑collapse view option (`--collapse-dupes`)
+
+### 3  Smart Auto‑Tagging
+- [ ] Integrate OpenAI CLIP or `open_clip` local model
+- [ ] Embed thumb → top‑N keywords (score ≥ 0.18)  
+- [ ] Store → `auto_tags` column (comma‑sep)
+- [ ] UI suggestions panel (`s` key) → ⏎ to accept into `tags`
+- [ ] Add `--search tag1 tag2` filter to CLI `ui`
+
+### 4  TouchDesigner Export v2
+- [ ] Define `.tox` JSON (COMP, Replicator DAT, Movie File In TOP)
+- [ ] Script to build `.tox` using `tdjson` or TD .toe template
+- [ ] Embed custom parameter page (“Next clip”, “Random”)
+- [ ] Option: auto‑copy thumbs folder next to .tox for previews
+
+### 5  Testing & CI
+- [ ] `pytest` unit: `probe_video`, `hash`, DB insert, export
+- [ ] Parametrised test set with tiny sample videos
+- [ ] Textual snapshot test using `textual-dev` recorder
+- [ ] CLI e2e test (`scan → star → export`) with tmp dir
+- [ ] GitHub Actions: Windows + macOS matrix, Python 3.10–3.12
+
