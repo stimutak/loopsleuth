@@ -48,7 +48,13 @@ def grid(request: Request):
             ORDER BY filename ASC
         """)
         for row in cursor.fetchall():
-            clips.append(dict(row))
+            clip = dict(row)
+            thumb_path = clip.get('thumbnail_path', '')
+            if thumb_path:
+                clip['thumb_filename'] = thumb_path.replace('\\', '/').split('/')[-1]
+            else:
+                clip['thumb_filename'] = ''
+            clips.append(clip)
     except Exception as e:
         print(f"[Error] Could not load clips: {e}")
     finally:
