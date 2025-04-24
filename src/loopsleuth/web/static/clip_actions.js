@@ -65,12 +65,17 @@ const showTagSuggestions = debounce(function(input, currentTags) {
  * Add a tag to the input field, avoiding duplicates.
  */
 function addTagToInput(input, tag) {
-    let tags = input.value.split(',').map(t => t.trim()).filter(t => t.length > 0);
-    if (!tags.includes(tag)) {
-        tags.push(tag);
-        input.value = tags.join(', ');
-        input.dispatchEvent(new Event('input'));
+    let tags = input.value.split(',').map(t => t.trim());
+    // Replace the last (possibly partial) tag with the selected suggestion
+    if (tags.length === 0) {
+        tags = [tag];
+    } else {
+        tags[tags.length - 1] = tag;
     }
+    // Remove duplicates
+    tags = tags.filter((t, i) => t.length > 0 && tags.indexOf(t) === i);
+    input.value = tags.join(', ');
+    input.dispatchEvent(new Event('input'));
 }
 
 /**
@@ -107,6 +112,7 @@ function editTags(event) {
     const clipId = event.target.getAttribute('data-clip-id');
     document.getElementById(`tags-text-${clipId}`).style.display = 'none';
     document.getElementById(`tag-input-${clipId}`).style.display = '';
+    document.getElementById(`tags-edit-${clipId}`).style.display = '';
     document.getElementById(`save-tag-btn-${clipId}`).style.display = '';
     document.getElementById(`tag-input-${clipId}`).focus();
     renderEditableTagChips(clipId);
@@ -150,6 +156,25 @@ function renderTagChips(clipId, tags) {
             const chip = document.createElement('span');
             chip.className = 'tag-chip';
             chip.textContent = tag;
+            // Add X for deletion
+            const x = document.createElement('span');
+            x.className = 'tag-chip-x';
+            x.textContent = '×';
+            x.onclick = () => {
+                // Remove tag and update input if in edit mode
+                const input = document.getElementById(`tag-input-${clipId}`);
+                if (input && input.style.display !== 'none') {
+                    removeTagFromInput(input, tag);
+                } else {
+                    // If not in edit mode, switch to edit mode and remove tag
+                    editTags({target: {getAttribute: () => clipId}, stopPropagation: () => {}});
+                    setTimeout(() => {
+                        const input = document.getElementById(`tag-input-${clipId}`);
+                        removeTagFromInput(input, tag);
+                    }, 0);
+                }
+            };
+            chip.appendChild(x);
             tagsText.appendChild(chip);
         });
     }
@@ -179,6 +204,7 @@ function saveTags(event) {
         }
         document.getElementById(`tags-text-${clipId}`).style.display = '';
         input.style.display = 'none';
+        document.getElementById(`tags-edit-${clipId}`).style.display = 'none';
         document.getElementById(`save-tag-btn-${clipId}`).style.display = 'none';
     })
     .catch(err => {
@@ -191,11 +217,11 @@ function saveTags(event) {
  */
 function renderEditableTagChips(clipId) {
     const input = document.getElementById(`tag-input-${clipId}`);
-    const tagsText = document.getElementById(`tags-text-${clipId}`);
+    const tagsEdit = document.getElementById(`tags-edit-${clipId}`);
     let tags = input.value.split(',').map(t => t.trim()).filter(t => t.length > 0);
-    tagsText.innerHTML = '';
+    tagsEdit.innerHTML = '';
     if (tags.length === 0) {
-        tagsText.innerHTML = '<span class="tag-chip tag-empty">No tags</span>';
+        tagsEdit.innerHTML = '<span class="tag-chip tag-empty">No tags</span>';
     } else {
         tags.forEach(tag => {
             const chip = document.createElement('span');
@@ -206,7 +232,7 @@ function renderEditableTagChips(clipId) {
             x.textContent = '×';
             x.onclick = () => removeTagFromInput(input, tag);
             chip.appendChild(x);
-            tagsText.appendChild(chip);
+            tagsEdit.appendChild(chip);
         });
     }
 } 
