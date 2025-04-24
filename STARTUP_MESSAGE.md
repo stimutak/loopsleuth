@@ -13,8 +13,10 @@
 ### ✅ What's Implemented
 - Batch selection UI: Checkbox, click, shift+click, ctrl/cmd+click for multi/range selection. Visual highlight for selected cards.
 - Batch action bar: <div id="batch-action-bar"> present in grid.html template. CSS for floating bar and controls in style.css. JS logic for rendering the bar and handling selection in clip_actions.js.
-- Tag editing UI: Add tags, remove tags, clear all tags (UI only, not backend). Keyboard accessibility and ARIA for tag editing.
+- Tag editing UI: Add tags, remove tags, clear all tags (UI and backend). Keyboard accessibility and ARIA for tag editing.
 - Batch tag autocomplete: Autocomplete dropdown for batch add/remove tag fields in the batch bar, matching single-clip tag UX.
+- **Batch tag input now uses chip-style input with autocomplete, keyboard navigation, and removable chips, matching the single-clip edit UX.**
+- **Batch add/remove/clear is fully accessible and visually consistent.**
 - README: Updated with tag editing and batch editing UX, keyboard shortcuts, and accessibility.
 
 ### 🟡 What's NOT Done

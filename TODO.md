@@ -48,7 +48,9 @@
 ### NEXT: Batch Editing & Filtering (after autocomplete/deletion)
 - [x] Design and implement multi-select in grid view.
 - [x] Add batch action controls (add/remove tags, star/unstar, delete) UI.
-- [x] Add batch tag autocomplete to batch bar inputs.
+- [x] Batch tag autocomplete to batch bar inputs.
+- [x] Batch tag input uses chip-style input with autocomplete, keyboard navigation, and removable chips, matching single-clip edit UX.
+- [x] Batch add/remove/clear is fully accessible and visually consistent.
 - [ ] Backend: Add endpoints for batch tag/star actions and filtering.
 - [ ] Wire up frontend batch actions to backend.
 - [ ] Add tag filter UI to filter visible clips.
