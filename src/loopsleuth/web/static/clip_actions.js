@@ -469,10 +469,17 @@ function renderBatchTagChips(type) {
             x.onclick = () => {
                 tags.splice(idx, 1);
                 renderBatchTagChips(type);
+                // Debug: log chip removal
+                if (type === 'add') console.log('[BatchAdd] chip removed:', tag, 'tags:', tags);
             };
             chip.appendChild(x);
             container.appendChild(chip);
         });
+    }
+    // Enable/disable Add button based on chip count
+    if (type === 'add') {
+        const addBtn = document.getElementById('batch-add-btn');
+        if (addBtn) addBtn.disabled = tags.length === 0;
     }
 }
 
@@ -480,6 +487,8 @@ function handleBatchTagInput(type) {
     const input = document.getElementById(`batch-${type}-tags-input`);
     const tags = type === 'add' ? batchAddTagsState : batchRemoveTagsState;
     input.addEventListener('keydown', function(e) {
+        // Debug: log key events
+        if (type === 'add') console.log('[BatchAdd] keydown:', e.key, 'input:', input.value, 'tags:', tags);
         if (e.key === 'Backspace' && input.value === '') {
             if (tags.length > 0) {
                 tags.pop();
@@ -540,7 +549,29 @@ function handleBatchTagInput(type) {
             }
         }
     });
-    input.addEventListener('input', () => showBatchTagSuggestions(input, type));
+    input.addEventListener('input', function() {
+        if (type === 'add') console.log('[BatchAdd] input event:', input.value, 'tags:', tags);
+        showBatchTagSuggestions(input, type);
+    });
+    // Prevent dropdown from hiding on blur if a suggestion is being clicked
+    input.addEventListener('blur', function() {
+        setTimeout(() => {
+            let dropdown = document.getElementById('batch-tag-suggestions-dropdown');
+            if (dropdown) dropdown.style.display = 'none';
+        }, 180);
+    });
+}
+
+function addBatchTagFromAutocomplete(input, type, tag) {
+    const tags = type === 'add' ? batchAddTagsState : batchRemoveTagsState;
+    if (!tags.map(t => t.toLowerCase()).includes(tag.toLowerCase())) {
+        tags.push(tag);
+        renderBatchTagChips(type);
+    }
+    input.value = '';
+    input._highlighted = -1;
+    showBatchTagSuggestions(input, type);
+    if (type === 'add') console.log('[BatchAdd] tag added from autocomplete:', tag, 'tags:', tags);
 }
 
 function showBatchTagSuggestions(input, type) {
@@ -572,6 +603,50 @@ function showBatchTagSuggestions(input, type) {
         input.setAttribute('aria-expanded', 'false');
         return;
     }
+    if (type === 'remove') {
+        // Only suggest tags present in the selection and not already chips
+        const suggestionsSource = getUnionTagsOfSelectedClips();
+        const present = tags.map(t => t.toLowerCase());
+        const filtered = suggestionsSource.filter(tag => tag.toLowerCase().startsWith(inputVal) && !present.includes(tag.toLowerCase()));
+        console.log('[BatchAutocomplete] REMOVE suggestions:', filtered);
+        if (filtered.length === 0) {
+            dropdown.style.display = 'none';
+            input._suggestions = [];
+            input._highlighted = -1;
+            input.setAttribute('aria-expanded', 'false');
+            return;
+        }
+        input._suggestions = filtered;
+        input._highlighted = (typeof input._highlighted === 'number' && input._highlighted >= 0) ? input._highlighted : -1;
+        filtered.forEach((tag, idx) => {
+            const item = document.createElement('div');
+            item.className = 'tag-suggestion-item';
+            item.textContent = tag;
+            item.setAttribute('role', 'option');
+            item.setAttribute('id', `batch-tag-suggestion-${type}-${idx}`);
+            item.setAttribute('aria-selected', input._highlighted === idx ? 'true' : 'false');
+            if (input._highlighted === idx) {
+                item.style.background = '#2a3a3a';
+                item.style.color = '#fff';
+                setTimeout(() => { item.scrollIntoView({block: 'nearest'}); }, 0);
+                input.setAttribute('aria-activedescendant', item.id);
+            }
+            item.onmouseenter = () => {
+                input._highlighted = idx;
+                showBatchTagSuggestions(input, type);
+            };
+            item.onmousedown = (e) => {
+                e.preventDefault();
+                addBatchTagFromAutocomplete(input, type, tag);
+                dropdown.style.display = 'none';
+            };
+            dropdown.appendChild(item);
+        });
+        dropdown.style.display = 'block';
+        input.setAttribute('aria-expanded', 'true');
+        return;
+    }
+    // Default: add mode, fetch from backend
     fetch(`/tags?q=${encodeURIComponent(inputVal)}`)
         .then(r => r.json())
         .then(data => {
@@ -585,6 +660,7 @@ function showBatchTagSuggestions(input, type) {
             // Filter out tags already present (case-insensitive)
             const present = tags.map(t => t.toLowerCase());
             const filtered = data.tags.filter(tag => !present.includes(tag.toLowerCase()));
+            console.log('[BatchAutocomplete] ADD suggestions:', filtered);
             if (filtered.length === 0) {
                 dropdown.style.display = 'none';
                 input._suggestions = [];
@@ -623,15 +699,34 @@ function showBatchTagSuggestions(input, type) {
         });
 }
 
-function addBatchTagFromAutocomplete(input, type, tag) {
-    const tags = type === 'add' ? batchAddTagsState : batchRemoveTagsState;
-    if (!tags.map(t => t.toLowerCase()).includes(tag.toLowerCase())) {
-        tags.push(tag);
-        renderBatchTagChips(type);
+function getUnionTagsOfSelectedClips() {
+    const tagSet = new Set();
+    selectedClipIds.forEach(clipId => {
+        const tagsText = document.getElementById(`tags-text-${clipId}`);
+        if (tagsText) {
+            tagsText.querySelectorAll('.tag-chip:not(.tag-empty)').forEach(chip => {
+                tagSet.add(chip.textContent.trim());
+            });
+        }
+    });
+    return Array.from(tagSet).sort((a, b) => a.localeCompare(b));
+}
+
+function syncBatchRemoveTagsWithSelection() {
+    const unionTags = getUnionTagsOfSelectedClips();
+    // Only add tags that are not already in the remove state
+    unionTags.forEach(tag => {
+        if (!batchRemoveTagsState.map(t => t.toLowerCase()).includes(tag.toLowerCase())) {
+            batchRemoveTagsState.push(tag);
+        }
+    });
+    // Remove tags from batchRemoveTagsState that are no longer present in the selection
+    for (let i = batchRemoveTagsState.length - 1; i >= 0; i--) {
+        if (!unionTags.map(t => t.toLowerCase()).includes(batchRemoveTagsState[i].toLowerCase())) {
+            batchRemoveTagsState.splice(i, 1);
+        }
     }
-    input.value = '';
-    input._highlighted = -1;
-    showBatchTagSuggestions(input, type);
+    renderBatchTagChips('remove');
 }
 
 function renderBatchActionBar() {
@@ -676,12 +771,16 @@ function renderBatchActionBar() {
     handleBatchTagInput('add');
     handleBatchTagInput('remove');
     // Wire up events (backend integration next)
-    document.getElementById('batch-add-btn').onclick = () => {
+    document.getElementById('batch-add-btn').onclick = (e) => {
+        e.preventDefault(); // Prevent accidental form submission
+        // Debug: log state before check
+        console.log('[BatchAdd] Add button clicked. Current tags:', batchAddTagsState);
         if (batchAddTagsState.length === 0) {
             showToast('Enter tag(s) to add.', true);
             return;
         }
         const clipIds = Array.from(selectedClipIds).map(Number);
+        console.log('[BatchAdd] Sending to backend:', {clip_ids: clipIds, add_tags: batchAddTagsState});
         fetch('/batch_tag', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
@@ -700,9 +799,11 @@ function renderBatchActionBar() {
             batchAddTagsState.length = 0;
             renderBatchTagChips('add');
             document.getElementById('batch-add-tags-input').value = '';
+            console.log('[BatchAdd] Success, cleared chips/input.');
         })
         .catch(err => {
             showToast('Batch add error: ' + err, true);
+            console.error('[BatchAdd] Error:', err);
         });
     };
     document.getElementById('batch-remove-btn').onclick = () => {
@@ -759,6 +860,23 @@ function renderBatchActionBar() {
     };
 }
 
+function updateCardSelectionUI() {
+    document.querySelectorAll('.card[data-clip-id]').forEach(card => {
+        const clipId = card.getAttribute('data-clip-id');
+        const checkbox = card.querySelector('.select-clip-checkbox');
+        if (selectedClipIds.has(clipId)) {
+            card.classList.add('selected');
+            checkbox.checked = true;
+        } else {
+            card.classList.remove('selected');
+            checkbox.checked = false;
+        }
+    });
+    // Show/hide batch action bar and render controls
+    renderBatchActionBar();
+    syncBatchRemoveTagsWithSelection();
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     // Make all grid cards focusable and add keyboard listeners
     const cards = document.querySelectorAll('.card[data-clip-id]');
@@ -805,22 +923,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function getCardElements() {
         return Array.from(document.querySelectorAll('.card[data-clip-id]'));
-    }
-
-    function updateCardSelectionUI() {
-        document.querySelectorAll('.card[data-clip-id]').forEach(card => {
-            const clipId = card.getAttribute('data-clip-id');
-            const checkbox = card.querySelector('.select-clip-checkbox');
-            if (selectedClipIds.has(clipId)) {
-                card.classList.add('selected');
-                checkbox.checked = true;
-            } else {
-                card.classList.remove('selected');
-                checkbox.checked = false;
-            }
-        });
-        // Show/hide batch action bar and render controls
-        renderBatchActionBar();
     }
 
     document.querySelectorAll('.card[data-clip-id]').forEach((card, idx, allCards) => {

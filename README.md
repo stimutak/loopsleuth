@@ -83,6 +83,7 @@ See code comments for further details and next steps.
 - Tag editing UI: Add tags, remove tags, clear all tags (UI and backend). Keyboard accessibility and ARIA for tag editing.
 - **Batch tag input now uses chip-style input with autocomplete, keyboard navigation, and removable chips, matching the single-clip edit UX.**
 - **Batch add/remove/clear is fully accessible and visually consistent.**
+- **Batch remove field is now chip-based:** Chips represent tags present on selected clips, are removable with ×, and only chips in the remove field are removed. Autocomplete suggests only tags present on selected clips and not already chips. UX matches single-clip edit for clarity and accessibility.
 - README: Updated with tag editing and batch editing UX, keyboard shortcuts, and accessibility.
 
 ### 🟡 What's NOT Done
