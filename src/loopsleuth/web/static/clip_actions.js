@@ -1,28 +1,21 @@
 // LoopSleuth: Shared JS for starring and tag editing (grid & detail views)
 // All actions use data-clip-id attributes for robust event handling.
 
-let allTagSuggestions = [];
-let tagSuggestionsLoaded = false;
-
 /**
- * Fetch all tag suggestions from the backend (once per session).
+ * Debounce utility for limiting function calls.
  */
-function loadTagSuggestions() {
-    if (tagSuggestionsLoaded) return;
-    fetch('/tags')
-        .then(r => r.json())
-        .then(data => {
-            if (data.tags) {
-                allTagSuggestions = data.tags;
-                tagSuggestionsLoaded = true;
-            }
-        });
+function debounce(func, wait) {
+    let timeout;
+    return function(...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), wait);
+    };
 }
 
 /**
- * Show autocomplete suggestions for the tag input.
+ * Show autocomplete suggestions for the tag input, fetching from backend by prefix.
  */
-function showTagSuggestions(input, currentTags) {
+const showTagSuggestions = debounce(function(input, currentTags) {
     let dropdown = document.getElementById('tag-suggestions-dropdown');
     if (!dropdown) {
         dropdown = document.createElement('div');
@@ -41,23 +34,32 @@ function showTagSuggestions(input, currentTags) {
         dropdown.style.display = 'none';
         return;
     }
-    const filtered = allTagSuggestions.filter(tag => tag.toLowerCase().includes(inputVal) && !currentTags.includes(tag));
-    if (filtered.length === 0) {
-        dropdown.style.display = 'none';
-        return;
-    }
-    filtered.forEach(tag => {
-        const item = document.createElement('div');
-        item.className = 'tag-suggestion-item';
-        item.textContent = tag;
-        item.onclick = () => {
-            addTagToInput(input, tag);
-            dropdown.style.display = 'none';
-        };
-        dropdown.appendChild(item);
-    });
-    dropdown.style.display = 'block';
-}
+    fetch(`/tags?q=${encodeURIComponent(inputVal)}`)
+        .then(r => r.json())
+        .then(data => {
+            if (!data.tags || data.tags.length === 0) {
+                dropdown.style.display = 'none';
+                return;
+            }
+            // Filter out tags already present
+            const filtered = data.tags.filter(tag => !currentTags.includes(tag));
+            if (filtered.length === 0) {
+                dropdown.style.display = 'none';
+                return;
+            }
+            filtered.forEach(tag => {
+                const item = document.createElement('div');
+                item.className = 'tag-suggestion-item';
+                item.textContent = tag;
+                item.onclick = () => {
+                    addTagToInput(input, tag);
+                    dropdown.style.display = 'none';
+                };
+                dropdown.appendChild(item);
+            });
+            dropdown.style.display = 'block';
+        });
+}, 120);
 
 /**
  * Add a tag to the input field, avoiding duplicates.
@@ -107,7 +109,6 @@ function editTags(event) {
     document.getElementById(`tag-input-${clipId}`).style.display = '';
     document.getElementById(`save-tag-btn-${clipId}`).style.display = '';
     document.getElementById(`tag-input-${clipId}`).focus();
-    loadTagSuggestions();
     renderEditableTagChips(clipId);
     const input = document.getElementById(`tag-input-${clipId}`);
     input.addEventListener('input', () => renderEditableTagChips(clipId));

@@ -182,11 +182,12 @@ class TagUpdate(BaseModel):
     tags: List[str]
 
 @app.post("/tag/{clip_id}")
-def update_tags(clip_id: int, tag_update: TagUpdate):
+def update_tags(clip_id: int, tag_update: TagUpdate = Body(...)):
     """
     Update the tags for a clip. Accepts JSON {"tags": ["tag1", "tag2", ...]}.
     Updates the tags and clip_tags tables. Returns the new tag list as JSON.
     """
+    print(f"[DEBUG] Received tag update for clip {clip_id}: {tag_update}")
     tags = [t.strip() for t in tag_update.tags if t.strip()]
     conn = None
     try:
@@ -217,13 +218,17 @@ def update_tags(clip_id: int, tag_update: TagUpdate):
             conn.close()
 
 @app.get("/tags")
-def get_all_tags():
-    """Return a list of all tag names for autocomplete/suggestions."""
+def get_all_tags(q: str = None):
+    """Return a list of all tag names for autocomplete/suggestions. If 'q' is provided, return only tags starting with the prefix (case-insensitive)."""
     conn = None
     try:
         conn = get_db_connection(DEFAULT_DB_PATH)
         cursor = conn.cursor()
-        cursor.execute("SELECT name FROM tags ORDER BY name ASC")
+        if q:
+            # Use parameterized LIKE for case-insensitive prefix search
+            cursor.execute("SELECT name FROM tags WHERE LOWER(name) LIKE ? ORDER BY name ASC", (q.lower() + '%',))
+        else:
+            cursor.execute("SELECT name FROM tags ORDER BY name ASC")
         tags = [row[0] for row in cursor.fetchall()]
         return JSONResponse({"tags": tags})
     except Exception as e:
@@ -231,6 +236,12 @@ def get_all_tags():
     finally:
         if conn:
             conn.close()
+
+@app.post("/test_tag/{clip_id}")
+async def test_tag(clip_id: int, request: Request):
+    data = await request.json()
+    print("[DEBUG] /test_tag received:", data)
+    return {"received": data}
 
 # TODO: Add API endpoints for clips, tagging, starring, etc.
 # TODO: Add video playback route 
