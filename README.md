@@ -43,6 +43,10 @@ Python ≥ 3.10, ffmpeg/ffprobe, SQLite, Pillow, imagehash, FastAPI, Jinja2, Tex
 - All AJAX actions for starring and tag editing are handled by a shared static JS file (`src/loopsleuth/web/static/clip_actions.js`).
 - Both the grid and detail views include this file for consistent, maintainable behavior.
 
+### Tag System (vNext)
+- Tags are now stored in a normalized schema: a `tags` table (unique tag names) and a `clip_tags` join table (many-to-many: clips <-> tags).
+- This enables tag reuse, autocomplete, and efficient tag-based search/filtering.
+
 ## Installation & Setup
 
 1.  **Clone the repository:**

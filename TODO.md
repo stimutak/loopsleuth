@@ -101,3 +101,10 @@
 - [x] Documentation and check-in practices reviewed for sync with .cursor/rules.
 - [x] Note: HTML5 video playbar seeking is supported by default for compatible files.
 
+- [ ] Tag system upgrade: normalized schema (clips <-> tags, clip_tags)
+    - [x] Add tags and clip_tags tables to DB schema
+    - [ ] Write migration script to move existing tags to new tables
+    - [ ] Update backend to use new tag tables for all tag operations
+    - [ ] Update API endpoints for tag assignment and tag list
+    - [ ] Update UI to use tag list widget and show tags as chips
+

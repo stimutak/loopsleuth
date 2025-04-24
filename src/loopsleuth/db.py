@@ -47,6 +47,24 @@ def create_table(conn: sqlite3.Connection):
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_clips_path ON clips (path)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_clips_starred ON clips (starred)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_clips_phash ON clips (phash)")
+
+    # Create normalized tag tables
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS tags (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS clip_tags (
+            clip_id INTEGER NOT NULL,
+            tag_id INTEGER NOT NULL,
+            PRIMARY KEY (clip_id, tag_id),
+            FOREIGN KEY (clip_id) REFERENCES clips(id) ON DELETE CASCADE,
+            FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
+        )
+    """)
+
     conn.commit()
 
 # Example usage (optional, can be removed or moved to a main script)
