@@ -104,44 +104,145 @@ function toggleStar(event) {
         });
 }
 
-/**
- * Show the tag input for editing, hide static tag text.
- */
+// --- Standard Tag Input State ---
+// Store tag arrays for each clip in edit mode
+const editTagsState = {};
+
 function editTags(event) {
     event.stopPropagation();
     const clipId = event.target.getAttribute('data-clip-id');
-    // Hide static chips, show input and editable chips
+    // Get initial tags from static chips
+    const staticChips = document.querySelectorAll(`#tags-text-${clipId} .tag-chip:not(.tag-empty)`);
+    editTagsState[clipId] = Array.from(staticChips).map(chip => chip.textContent.trim());
+    // Hide static chips, show edit mode
     document.getElementById(`tags-text-${clipId}`).style.display = 'none';
-    document.getElementById(`tag-input-${clipId}`).style.display = '';
     document.getElementById(`tags-edit-${clipId}`).style.display = '';
+    document.getElementById(`tag-input-new-${clipId}`).style.display = '';
     document.getElementById(`save-tag-btn-${clipId}`).style.display = '';
-    document.getElementById(`tag-input-${clipId}`).focus();
     renderEditableTagChips(clipId);
-    const input = document.getElementById(`tag-input-${clipId}`);
-    // Remove any previous listeners to avoid stacking
+    const input = document.getElementById(`tag-input-new-${clipId}`);
+    input.value = '';
+    input.focus();
+    // Remove previous listeners
     input.oninput = null;
-    input.onkeyup = null;
-    input.addEventListener('input', () => renderEditableTagChips(clipId));
-    input.addEventListener('keyup', (e) => {
-        if (e.key.length === 1 || e.key === 'Backspace') {
-            let tags = input.value.split(',').map(t => t.trim()).filter(t => t.length > 0);
-            showTagSuggestions(input, tags);
-        } else if (e.key === 'Escape') {
-            let dropdown = document.getElementById('tag-suggestions-dropdown');
-            if (dropdown) dropdown.style.display = 'none';
+    input.onkeydown = null;
+    // Autocomplete and add tag on Enter/Tab/Comma
+    input.addEventListener('input', () => showTagSuggestionsStandard(input, clipId));
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === 'Tab' || e.key === ',') {
+            e.preventDefault();
+            const val = input.value.trim();
+            if (val && !editTagsState[clipId].includes(val)) {
+                editTagsState[clipId].push(val);
+                input.value = '';
+                renderEditableTagChips(clipId);
+            }
+        } else if (e.key === 'Backspace' && input.value === '') {
+            // Remove last tag if input is empty
+            editTagsState[clipId].pop();
+            renderEditableTagChips(clipId);
         }
     });
 }
 
-/**
- * Handle Enter key in tag input to trigger save.
- */
-function tagInputKey(event) {
-    if (event.key === 'Enter') {
-        event.preventDefault();
-        event.stopPropagation();
-        saveTags(event);
+function renderEditableTagChips(clipId) {
+    const tagsEdit = document.getElementById(`tags-edit-${clipId}`);
+    const tags = editTagsState[clipId] || [];
+    tagsEdit.innerHTML = '';
+    if (tags.length === 0) {
+        tagsEdit.innerHTML = '<span class="tag-chip tag-empty">No tags</span>';
+    } else {
+        tags.forEach(tag => {
+            const chip = document.createElement('span');
+            chip.className = 'tag-chip tag-edit';
+            chip.textContent = tag;
+            const x = document.createElement('span');
+            x.className = 'tag-chip-x';
+            x.textContent = '×';
+            x.onclick = () => {
+                editTagsState[clipId] = editTagsState[clipId].filter(t => t !== tag);
+                renderEditableTagChips(clipId);
+            };
+            chip.appendChild(x);
+            tagsEdit.appendChild(chip);
+        });
     }
+}
+
+function showTagSuggestionsStandard(input, clipId) {
+    let dropdown = document.getElementById('tag-suggestions-dropdown');
+    if (!dropdown) {
+        dropdown = document.createElement('div');
+        dropdown.id = 'tag-suggestions-dropdown';
+        dropdown.className = 'tag-suggestions-dropdown';
+        document.body.appendChild(dropdown);
+    }
+    const rect = input.getBoundingClientRect();
+    dropdown.style.position = 'absolute';
+    dropdown.style.left = `${rect.left + window.scrollX}px`;
+    dropdown.style.top = `${rect.bottom + window.scrollY}px`;
+    dropdown.style.width = `${rect.width}px`;
+    dropdown.innerHTML = '';
+    const inputVal = input.value.trim().toLowerCase();
+    if (!inputVal) {
+        dropdown.style.display = 'none';
+        return;
+    }
+    fetch(`/tags?q=${encodeURIComponent(inputVal)}`)
+        .then(r => r.json())
+        .then(data => {
+            if (!data.tags || data.tags.length === 0) {
+                dropdown.style.display = 'none';
+                return;
+            }
+            // Filter out tags already present
+            const filtered = data.tags.filter(tag => !editTagsState[clipId].includes(tag));
+            if (filtered.length === 0) {
+                dropdown.style.display = 'none';
+                return;
+            }
+            filtered.forEach(tag => {
+                const item = document.createElement('div');
+                item.className = 'tag-suggestion-item';
+                item.textContent = tag;
+                item.onclick = () => {
+                    editTagsState[clipId].push(tag);
+                    input.value = '';
+                    renderEditableTagChips(clipId);
+                    dropdown.style.display = 'none';
+                };
+                dropdown.appendChild(item);
+            });
+            dropdown.style.display = 'block';
+        });
+}
+
+function saveTags(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    const clipId = event.target.getAttribute('data-clip-id');
+    const tags = editTagsState[clipId] || [];
+    fetch(`/tag/${clipId}`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({tags: tags})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.tags !== undefined) {
+            renderTagChips(clipId, data.tags);
+        } else if (data.error) {
+            alert('Error saving tags: ' + data.error);
+        }
+        // Hide edit mode, show static chips
+        document.getElementById(`tags-text-${clipId}`).style.display = '';
+        document.getElementById(`tags-edit-${clipId}`).style.display = 'none';
+        document.getElementById(`tag-input-new-${clipId}`).style.display = 'none';
+        document.getElementById(`save-tag-btn-${clipId}`).style.display = 'none';
+    })
+    .catch(err => {
+        alert('Error saving tags: ' + err);
+    });
 }
 
 /**
@@ -180,64 +281,6 @@ function renderTagChips(clipId, tags) {
             };
             chip.appendChild(x);
             tagsText.appendChild(chip);
-        });
-    }
-}
-
-/**
- * Save the edited tags via AJAX, update UI on success.
- */
-function saveTags(event) {
-    event.preventDefault();
-    event.stopPropagation();
-    const clipId = event.target.getAttribute('data-clip-id');
-    const input = document.getElementById(`tag-input-${clipId}`);
-    // Always send tags as an array
-    const tags = input.value.split(',').map(t => t.trim()).filter(t => t.length > 0);
-    fetch(`/tag/${clipId}`, {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({tags: tags})
-    })
-    .then(r => r.json())
-    .then(data => {
-        if (data.tags !== undefined) {
-            renderTagChips(clipId, data.tags);
-        } else if (data.error) {
-            alert('Error saving tags: ' + data.error);
-        }
-        // Hide edit mode, show static chips
-        document.getElementById(`tags-text-${clipId}`).style.display = '';
-        input.style.display = 'none';
-        document.getElementById(`tags-edit-${clipId}`).style.display = 'none';
-        document.getElementById(`save-tag-btn-${clipId}`).style.display = 'none';
-    })
-    .catch(err => {
-        alert('Error saving tags: ' + err);
-    });
-}
-
-/**
- * Render editable tag chips with X for removal.
- */
-function renderEditableTagChips(clipId) {
-    const input = document.getElementById(`tag-input-${clipId}`);
-    const tagsEdit = document.getElementById(`tags-edit-${clipId}`);
-    let tags = input.value.split(',').map(t => t.trim()).filter(t => t.length > 0);
-    tagsEdit.innerHTML = '';
-    if (tags.length === 0) {
-        tagsEdit.innerHTML = '<span class="tag-chip tag-empty">No tags</span>';
-    } else {
-        tags.forEach(tag => {
-            const chip = document.createElement('span');
-            chip.className = 'tag-chip tag-edit';
-            chip.textContent = tag;
-            const x = document.createElement('span');
-            x.className = 'tag-chip-x';
-            x.textContent = '×';
-            x.onclick = () => removeTagFromInput(input, tag);
-            chip.appendChild(x);
-            tagsEdit.appendChild(chip);
         });
     }
 } 

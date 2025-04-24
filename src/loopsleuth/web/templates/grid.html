@@ -46,9 +46,9 @@ LoopSleuth Web: Grid View Template
                                 {% endfor %}
                             </span>
                             <button type="button" class="edit-tag-btn" data-clip-id="{{ clip.id }}" onclick="editTags(event)" style="margin-left:0.5em; font-size:0.9em;">✎</button>
-                            <!-- Tag input is only shown when editing -->
-                            <input type="text" class="tag-input" id="tag-input-{{ clip.id }}" value="{{ clip.tags | join(', ') }}" style="display:none; width:80%; margin-top:0.3em;" onkeyup="tagInputKey(event)" data-clip-id="{{ clip.id }}" placeholder="tag1, tag2, ..." />
+                            <!-- Standard tag input: chips + input for new tag, only in edit mode -->
                             <span class="tags-edit" id="tags-edit-{{ clip.id }}" style="display:none;"></span>
+                            <input type="text" class="tag-input-new" id="tag-input-new-{{ clip.id }}" style="display:none; width:40%; margin-top:0.3em;" data-clip-id="{{ clip.id }}" placeholder="Add tag..." autocomplete="off" />
                             <button type="button" class="save-tag-btn" id="save-tag-btn-{{ clip.id }}" style="display:none; margin-left:0.3em; font-size:0.9em;" data-clip-id="{{ clip.id }}" onclick="saveTags(event)">💾</button>
                         </div>
                     </div>
