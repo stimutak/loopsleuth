@@ -108,33 +108,24 @@ function toggleStar(event) {
 // Store tag arrays for each clip in edit mode
 const editTagsState = {};
 
+// Store original tags for cancel
+const originalTagsState = {};
+
 function editTags(event) {
     event.stopPropagation();
     const clipId = event.target.getAttribute('data-clip-id');
     // Get initial tags from static chips
     const staticChips = document.querySelectorAll(`#tags-text-${clipId} .tag-chip:not(.tag-empty)`);
-    editTagsState[clipId] = Array.from(staticChips).map(chip => chip.textContent.trim());
+    const tagsArr = Array.from(staticChips).map(chip => chip.textContent.trim());
+    editTagsState[clipId] = [...tagsArr];
+    originalTagsState[clipId] = [...tagsArr]; // Store for cancel
     // Hide static chips, show edit mode
     document.getElementById(`tags-text-${clipId}`).style.display = 'none';
     document.getElementById(`tags-edit-${clipId}`).style.display = 'inline-block';
     document.getElementById(`tag-input-new-${clipId}`).style.display = 'inline-block';
     document.getElementById(`save-tag-btn-${clipId}`).style.display = 'inline-block';
-    // Add or show cancel button
     let cancelBtn = document.getElementById(`cancel-tag-btn-${clipId}`);
-    if (!cancelBtn) {
-        cancelBtn = document.createElement('button');
-        cancelBtn.type = 'button';
-        cancelBtn.className = 'cancel-tag-btn';
-        cancelBtn.id = `cancel-tag-btn-${clipId}`;
-        cancelBtn.style.marginLeft = '0.3em';
-        cancelBtn.style.fontSize = '0.9em';
-        cancelBtn.textContent = '✖';
-        cancelBtn.setAttribute('data-clip-id', clipId);
-        cancelBtn.onclick = cancelEditTags;
-        document.getElementById(`save-tag-btn-${clipId}`).after(cancelBtn);
-    } else {
-        cancelBtn.style.display = 'inline-block';
-    }
+    if (cancelBtn) cancelBtn.style.display = 'inline-block';
     renderEditableTagChips(clipId);
     const input = document.getElementById(`tag-input-new-${clipId}`);
     input.value = '';
@@ -142,29 +133,41 @@ function editTags(event) {
     // Remove previous listeners
     input.oninput = null;
     input.onkeydown = null;
-    // Autocomplete and add tag on Enter/Tab/Comma
     input.addEventListener('input', () => showTagSuggestionsStandard(input, clipId));
-    input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === 'Tab' || e.key === ',') {
+    input.addEventListener('keydown', function(e) {
+        const suggestions = input._suggestions || [];
+        let highlighted = typeof input._highlighted === 'number' ? input._highlighted : -1;
+        if (e.key === 'ArrowDown') {
             e.preventDefault();
-            const val = input.value.trim();
-            if (val && !editTagsState[clipId].includes(val)) {
-                editTagsState[clipId].push(val);
-                input.value = '';
-                renderEditableTagChips(clipId);
+            if (suggestions.length > 0) {
+                highlighted = (highlighted + 1) % suggestions.length;
+                input._highlighted = highlighted;
+                showTagSuggestionsStandard(input, clipId);
             }
-        } else if (e.key === 'Backspace' && input.value === '') {
-            // Remove last tag if input is empty
-            editTagsState[clipId].pop();
-            renderEditableTagChips(clipId);
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (suggestions.length > 0) {
+                highlighted = (highlighted - 1 + suggestions.length) % suggestions.length;
+                input._highlighted = highlighted;
+                showTagSuggestionsStandard(input, clipId);
+            }
+        } else if (e.key === 'Tab' || e.key === 'Enter') {
+            if (suggestions.length > 0 && highlighted >= 0) {
+                e.preventDefault();
+                addTagFromAutocomplete(input, clipId, suggestions[highlighted]);
+                return;
+            }
+            // Otherwise, fall through to default add
         } else if (e.key === 'Escape') {
             cancelEditTags({target: {getAttribute: () => clipId}});
         }
-    });
+    }, {capture: true});
 }
 
 function cancelEditTags(event) {
     const clipId = event.target.getAttribute('data-clip-id');
+    // Restore static chips to original tags
+    renderTagChips(clipId, originalTagsState[clipId] || []);
     document.getElementById(`tags-text-${clipId}`).style.display = '';
     document.getElementById(`tags-edit-${clipId}`).style.display = 'none';
     document.getElementById(`tag-input-new-${clipId}`).style.display = 'none';
@@ -273,40 +276,6 @@ function addTagFromAutocomplete(input, clipId, tag) {
     showTagSuggestionsStandard(input, clipId);
 }
 
-// Patch editTags to handle arrow keys and improved Tab/Enter
-const originalEditTags = editTags;
-editTags = function(event) {
-    originalEditTags(event);
-    const clipId = event.target.getAttribute('data-clip-id');
-    const input = document.getElementById(`tag-input-new-${clipId}`);
-    input.addEventListener('keydown', function(e) {
-        const suggestions = input._suggestions || [];
-        let highlighted = typeof input._highlighted === 'number' ? input._highlighted : -1;
-        if (e.key === 'ArrowDown') {
-            e.preventDefault();
-            if (suggestions.length > 0) {
-                highlighted = (highlighted + 1) % suggestions.length;
-                input._highlighted = highlighted;
-                showTagSuggestionsStandard(input, clipId);
-            }
-        } else if (e.key === 'ArrowUp') {
-            e.preventDefault();
-            if (suggestions.length > 0) {
-                highlighted = (highlighted - 1 + suggestions.length) % suggestions.length;
-                input._highlighted = highlighted;
-                showTagSuggestionsStandard(input, clipId);
-            }
-        } else if (e.key === 'Tab' || e.key === 'Enter') {
-            if (suggestions.length > 0 && highlighted >= 0) {
-                e.preventDefault();
-                addTagFromAutocomplete(input, clipId, suggestions[highlighted]);
-                return;
-            }
-            // Otherwise, fall through to default add
-        }
-    }, {capture: true});
-};
-
 function saveTags(event) {
     event.preventDefault();
     event.stopPropagation();
@@ -321,6 +290,7 @@ function saveTags(event) {
     .then(data => {
         if (data.tags !== undefined) {
             renderTagChips(clipId, data.tags);
+            originalTagsState[clipId] = [...data.tags]; // Update original tags after save
         } else if (data.error) {
             alert('Error saving tags: ' + data.error);
         }
