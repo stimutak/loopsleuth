@@ -110,6 +110,7 @@ function toggleStar(event) {
 function editTags(event) {
     event.stopPropagation();
     const clipId = event.target.getAttribute('data-clip-id');
+    // Hide static chips, show input and editable chips
     document.getElementById(`tags-text-${clipId}`).style.display = 'none';
     document.getElementById(`tag-input-${clipId}`).style.display = '';
     document.getElementById(`tags-edit-${clipId}`).style.display = '';
@@ -117,6 +118,9 @@ function editTags(event) {
     document.getElementById(`tag-input-${clipId}`).focus();
     renderEditableTagChips(clipId);
     const input = document.getElementById(`tag-input-${clipId}`);
+    // Remove any previous listeners to avoid stacking
+    input.oninput = null;
+    input.onkeyup = null;
     input.addEventListener('input', () => renderEditableTagChips(clipId));
     input.addEventListener('keyup', (e) => {
         if (e.key.length === 1 || e.key === 'Backspace') {
@@ -202,6 +206,7 @@ function saveTags(event) {
         } else if (data.error) {
             alert('Error saving tags: ' + data.error);
         }
+        // Hide edit mode, show static chips
         document.getElementById(`tags-text-${clipId}`).style.display = '';
         input.style.display = 'none';
         document.getElementById(`tags-edit-${clipId}`).style.display = 'none';
