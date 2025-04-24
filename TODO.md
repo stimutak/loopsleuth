@@ -25,86 +25,37 @@
 - [ ] export_td: write absolute paths, newline‑delimited
 <!-- CURSOR:KEEP_END -->
 
-### AI suggestions (safe to overwrite below)
+### Tag Autocomplete & Deletion Implementation Plan
 
+#### Tag Autocomplete
+- [x] Backend: `/tags` endpoint returns all tag names (already implemented).
+- [x] Backend: Add `/tags?q=prefix` endpoint for prefix search (now implemented).
+- [x] Frontend: On tag input, fetch suggestions from `/tags` (debounced, filter as user types).
+- [x] Frontend: Show dropdown of suggestions below the input.
+- [x] Frontend: Allow keyboard/mouse selection of suggestions; on select, add tag chip.
+- [x] Testing: Verify with similar prefix tags, new tags, and UX polish (pending user feedback).
 
-## Setup & Foundation
-- [x] Initialize Python project (e.g., using Poetry or `venv` + `requirements.txt`).
-- [x] Add core dependencies: `Pillow`, `imagehash`, `Textual`, `Typer`.
-- [x] Set up basic project structure (e.g., `src/loopsleuth`, `tests/`).
-- [x] Ensure `ffmpeg` and `ffprobe` are accessible (document installation/path).
-- [x] Define SQLite database schema.
-- [x] Implement basic database connection and table creation logic.
+#### Tag Deletion (chip X)
+- [x] Frontend: Render editable tag chips with X for removal (already implemented in JS, but ensure UX is robust).
+- [x] Frontend: On X click, remove tag from input and update chips live.
+- [x] Frontend: On save, persist tag removal via AJAX to backend.
+- [x] Testing: Remove tags, verify persistence and UI update (pending user feedback).
 
-## MVP (v0.1)
-- [x] **Scan:** Implement directory walking to find video files.
-- [x] **Scan:** Integrate `ffprobe` execution to extract duration and other relevant metadata.
-- [x] **Scan:** Save clip path and metadata to the SQLite database.
-- [x] **Thumb:** Implement `ffmpeg` call to extract a frame at 25% duration.
-- [x] **Thumb:** Use `Pillow` to resize the frame to 256px width and save as JPEG.
-- [x] **Thumb:** Store thumbnail path or blob in the database.
-- [x] **Hash:** Calculate perceptual hash (pHash) using `imagehash`.
-- [x] **Hash:** Store pHash in the database.
-- [x] **TUI:** Create basic Textual app structure.
-- [x] **TUI:** Implement grid view to display thumbnails and metadata from the database.
-- [x] **TUI:** Add `<Space>` key binding to toggle a 'starred' flag in the database.
-- [x] **TUI:** Add `t` key binding to open an input field for editing free-text tags (store in DB).
-- [x] **TUI:** Add `d` key binding to mark a clip for deletion (or delete immediately - decide strategy). Handle file deletion and DB update.
-- [x] **Export:** Implement command/feature to query starred clips from the database.
-- [x] **Export:** Write the paths of starred clips to `keepers.txt`.
+---
 
-## Stretch Goals (next sprint)
+**[2024-06-14] Tag autocomplete and deletion changes committed and pushed. Next step: user testing and UX polish as needed.**
 
-### 1  TUI Thumbnails & UX polish
-- [x] Attempted to add `Image` widget for inline JPEG render — **Blocked: Image widget not available in Textual 0.76.0 on this platform/environment.**
-- [x] Fallback: Static placeholder used for thumbnails in TUI grid.
-- [ ] Detect client capability → **Kitty/Sixel/ANSI** fallback (**future: if/when image support is available**)
-- [ ] Generate ANSI fallback spritesheet once per run (avoid Pillow in loop)
-- [ ] **Lazy‑load:** only decode thumbs for rows in viewport (**future: if/when image support is available**)
-- [ ] Hover / focus info pane (resolution, codec, duration)
-- [ ] Key‑hints footer & help modal (`?`)
+### NEXT: Batch Editing & Filtering (after autocomplete/deletion)
+- [x] Design and implement multi-select in grid view.
+- [x] Add batch action controls (add/remove tags, star/unstar, delete) UI.
+- [x] Add batch tag autocomplete to batch bar inputs.
+- [ ] Backend: Add endpoints for batch tag/star actions and filtering.
+- [ ] Wire up frontend batch actions to backend.
+- [ ] Add tag filter UI to filter visible clips.
+- [ ] Testing: Select multiple clips, apply actions, verify DB and UI.
 
-### 2  Duplicate‑Finder Workflow
-- [ ] Add `duplicates` table `(clip_id, dup_id, distance)`
-- [ ] Batch compare pHash (≤8 Hamming) with fast bit‑ops
-- [ ] UI "Dup sets" sidebar → cycle with `Tab`
-- [ ] Keep / Drop hotkeys; drop removes file & DB row
-- [ ] Auto‑collapse view option (`--collapse-dupes`)
-
-### 3  Smart Auto‑Tagging
-- [ ] Integrate OpenAI CLIP or `open_clip` local model
-- [ ] Embed thumb → top‑N keywords (score ≥ 0.18)  
-- [ ] Store → `auto_tags` column (comma‑sep)
-- [ ] UI suggestions panel (`s` key) → ⏎ to accept into `tags`
-- [ ] Add `--search tag1 tag2` filter to CLI `ui`
-
-### 4  TouchDesigner Export v2
-- [ ] Define `.tox` JSON (COMP, Replicator DAT, Movie File In TOP)
-- [ ] Script to build `.tox` using `tdjson` or TD .toe template
-- [ ] Embed custom parameter page ("Next clip", "Random")
-- [ ] Option: auto‑copy thumbs folder next to .tox for previews
-
-### 5  Testing & CI
-- [ ] `pytest` unit: `probe_video`, `hash`, DB insert, export
-- [ ] Parametrised test set with tiny sample videos
-- [ ] Textual snapshot test using `textual-dev` recorder
-- [ ] CLI e2e test (`scan → star → export`) with tmp dir
-- [ ] GitHub Actions: Windows + macOS matrix, Python 3.10–3.12
-
-- [ ] Add option to transcode unsupported video formats (e.g., .mov, .avi) to MP4 (H.264/AAC) for browser playback. Consider using FFmpeg for batch conversion.
-- [x] Add fallback message and download link for unsupported video formats in the web UI (clip detail page).
-
-- [x] AJAX tag editing now works reliably in both grid and detail views.
-- [x] /tag/{clip_id} endpoint updated for JSON payloads.
-- [x] Tag editing UX improved: static text always visible, Enter and save button both work, no navigation or reload.
-- [x] Star and tag controls are now robust and consistent.
-- [x] Documentation and check-in practices reviewed for sync with .cursor/rules.
-- [x] Note: HTML5 video playbar seeking is supported by default for compatible files.
-
-- [ ] Tag system upgrade: normalized schema (clips <-> tags, clip_tags)
-    - [x] Add tags and clip_tags tables to DB schema
-    - [ ] Write migration script to move existing tags to new tables
-    - [ ] Update backend to use new tag tables for all tag operations
-    - [ ] Update API endpoints for tag assignment and tag list
-    - [ ] Update UI to use tag list widget and show tags as chips
+### Troubleshooting
+- Batch bar and batch tag autocomplete are working in the UI.
+- Backend and DB schema are correct; `/test_tag/{clip_id}` endpoint works with valid JSON.
+- Browser AJAX requests for single-clip tag editing are working; batch actions backend integration is next.
 

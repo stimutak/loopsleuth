@@ -1,19 +1,36 @@
 # LoopSleuth Startup Message
 
 ## Project State (2024-06)
-- **Web UI** is now the primary interface (FastAPI + Jinja2).
-- **Grid and detail views**: Show all clips with thumbnails, video playback, starring, and tag editing.
-- **AJAX tag editing**: Now reliable in both grid and detail views. Tags persist and are visible after edits.
-- **/tag/{clip_id} endpoint**: Fixed to use a Pydantic model for JSON payloads, resolving 422 errors and ensuring tag persistence.
-- **Media serving**: Thumbnails and videos are served via FastAPI routes for robust access.
-- **Folder scan**: User can ingest new videos from any folder via the web UI.
-- **All major changes are committed and documented.**
+- **Web UI** is the primary interface (FastAPI + Jinja2).
+- **Tag system is normalized** (tags/clip_tags tables), and tag editing via the web UI is working for single clips. Batch tag autocomplete is now implemented in the batch action bar.
+- **All other core features** (grid, detail, starring, thumbnailing, scanning) are working.
+- **Recent debugging**: Confirmed backend and DB schema are correct; single-clip tag editing and batch bar UI are working. Batch actions backend integration is next.
+- **Next steps**: Implement backend for batch tag actions, wire up frontend, then add feedback and polish.
+- **See TODO.md** for precise next actions and troubleshooting notes.
 
-## Next Steps
-- [ ] Add a "Clear Grid" or batch action option.
-- [ ] Add advanced search/filtering and batch tagging.
-- [ ] Add video format transcoding for browser compatibility (optional).
-- [ ] Continue UI/UX polish and documentation.
+## Batch Editing Handoff Checklist
+
+### ✅ What's Implemented
+- Batch selection UI: Checkbox, click, shift+click, ctrl/cmd+click for multi/range selection. Visual highlight for selected cards.
+- Batch action bar: <div id="batch-action-bar"> present in grid.html template. CSS for floating bar and controls in style.css. JS logic for rendering the bar and handling selection in clip_actions.js.
+- Tag editing UI: Add tags, remove tags, clear all tags (UI only, not backend). Keyboard accessibility and ARIA for tag editing.
+- Batch tag autocomplete: Autocomplete dropdown for batch add/remove tag fields in the batch bar, matching single-clip tag UX.
+- README: Updated with tag editing and batch editing UX, keyboard shortcuts, and accessibility.
+
+### 🟡 What's NOT Done
+- [ ] Backend integration for batch tag add/remove/clear (no /batch_tag endpoint yet).
+- [ ] No toast/snackbar feedback after batch operations.
+
+### 🚦 Next Steps
+- [ ] Implement /batch_tag endpoint in backend.
+- [ ] Wire up frontend batch actions to backend.
+- [ ] Add feedback (toast/snackbar) after batch actions.
+
+### 📄 File Locations
+- Grid template: src/loopsleuth/web/templates/grid.html
+- Batch bar JS: src/loopsleuth/web/static/clip_actions.js
+- Batch bar CSS: src/loopsleuth/web/static/style.css
+- README: Project root
 
 ## How to Resume
 - All recent fixes and context are documented in `TODO.md` and this message.
@@ -21,4 +38,4 @@
 - For any new features, review the last commits and TODOs for guidance.
 
 ---
-_Last update: 2024-06-13_ 
+_Last update: 2024-06-14_ 
