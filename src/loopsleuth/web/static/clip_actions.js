@@ -197,6 +197,7 @@ function renderEditableTagChips(clipId) {
     }
 }
 
+// --- Enhanced Autocomplete UX ---
 function showTagSuggestionsStandard(input, clipId) {
     let dropdown = document.getElementById('tag-suggestions-dropdown');
     if (!dropdown) {
@@ -214,6 +215,8 @@ function showTagSuggestionsStandard(input, clipId) {
     const inputVal = input.value.trim().toLowerCase();
     if (!inputVal) {
         dropdown.style.display = 'none';
+        input._suggestions = [];
+        input._highlighted = -1;
         return;
     }
     fetch(`/tags?q=${encodeURIComponent(inputVal)}`)
@@ -221,22 +224,35 @@ function showTagSuggestionsStandard(input, clipId) {
         .then(data => {
             if (!data.tags || data.tags.length === 0) {
                 dropdown.style.display = 'none';
+                input._suggestions = [];
+                input._highlighted = -1;
                 return;
             }
-            // Filter out tags already present
-            const filtered = data.tags.filter(tag => !editTagsState[clipId].includes(tag));
+            // Filter out tags already present (case-insensitive)
+            const present = (editTagsState[clipId] || []).map(t => t.toLowerCase());
+            const filtered = data.tags.filter(tag => !present.includes(tag.toLowerCase()));
             if (filtered.length === 0) {
                 dropdown.style.display = 'none';
+                input._suggestions = [];
+                input._highlighted = -1;
                 return;
             }
-            filtered.forEach(tag => {
+            input._suggestions = filtered;
+            input._highlighted = (typeof input._highlighted === 'number' && input._highlighted >= 0) ? input._highlighted : -1;
+            filtered.forEach((tag, idx) => {
                 const item = document.createElement('div');
                 item.className = 'tag-suggestion-item';
                 item.textContent = tag;
+                if (input._highlighted === idx) {
+                    item.style.background = '#2a3a3a';
+                    item.style.color = '#fff';
+                }
+                item.onmouseenter = () => {
+                    input._highlighted = idx;
+                    showTagSuggestionsStandard(input, clipId);
+                };
                 item.onclick = () => {
-                    editTagsState[clipId].push(tag);
-                    input.value = '';
-                    renderEditableTagChips(clipId);
+                    addTagFromAutocomplete(input, clipId, tag);
                     dropdown.style.display = 'none';
                 };
                 dropdown.appendChild(item);
@@ -244,6 +260,52 @@ function showTagSuggestionsStandard(input, clipId) {
             dropdown.style.display = 'block';
         });
 }
+
+function addTagFromAutocomplete(input, clipId, tag) {
+    // Prevent duplicates (case-insensitive)
+    const tags = editTagsState[clipId] || [];
+    if (!tags.map(t => t.toLowerCase()).includes(tag.toLowerCase())) {
+        editTagsState[clipId].push(tag);
+        renderEditableTagChips(clipId);
+    }
+    input.value = '';
+    input._highlighted = -1;
+    showTagSuggestionsStandard(input, clipId);
+}
+
+// Patch editTags to handle arrow keys and improved Tab/Enter
+const originalEditTags = editTags;
+editTags = function(event) {
+    originalEditTags(event);
+    const clipId = event.target.getAttribute('data-clip-id');
+    const input = document.getElementById(`tag-input-new-${clipId}`);
+    input.addEventListener('keydown', function(e) {
+        const suggestions = input._suggestions || [];
+        let highlighted = typeof input._highlighted === 'number' ? input._highlighted : -1;
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            if (suggestions.length > 0) {
+                highlighted = (highlighted + 1) % suggestions.length;
+                input._highlighted = highlighted;
+                showTagSuggestionsStandard(input, clipId);
+            }
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (suggestions.length > 0) {
+                highlighted = (highlighted - 1 + suggestions.length) % suggestions.length;
+                input._highlighted = highlighted;
+                showTagSuggestionsStandard(input, clipId);
+            }
+        } else if (e.key === 'Tab' || e.key === 'Enter') {
+            if (suggestions.length > 0 && highlighted >= 0) {
+                e.preventDefault();
+                addTagFromAutocomplete(input, clipId, suggestions[highlighted]);
+                return;
+            }
+            // Otherwise, fall through to default add
+        }
+    }, {capture: true});
+};
 
 function saveTags(event) {
     event.preventDefault();
