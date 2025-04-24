@@ -33,11 +33,17 @@ LoopSleuth Web: Clip Detail Page
         <div class="star" style="cursor:pointer; font-size:2em;" data-clip-id="{{ clip.id }}" onclick="toggleStar(event)" title="Toggle star">{% if clip.starred %}★{% else %}☆{% endif %}</div>
         <div class="tags" style="margin-top:1em;">
             <span style="color:#aaa;">Tags:</span>
-            <!-- Tags are always visible as static text -->
-            <span class="tags-text" id="tags-text-{{ clip.id }}">{{ clip.tags or '' }}</span>
+            <!-- Tags are always visible as static chips -->
+            <span class="tags-text" id="tags-text-{{ clip.id }}">
+                {% for tag in clip.tags %}
+                    <span class="tag-chip">{{ tag }}</span>
+                {% else %}
+                    <span class="tag-chip tag-empty">No tags</span>
+                {% endfor %}
+            </span>
             <button type="button" class="edit-tag-btn" data-clip-id="{{ clip.id }}" onclick="editTags(event)" style="margin-left:0.5em; font-size:0.9em;">✎</button>
             <!-- Tag input is only shown when editing -->
-            <input type="text" class="tag-input" id="tag-input-{{ clip.id }}" value="{{ clip.tags or '' }}" style="display:none; width:60%; margin-top:0.3em;" onkeyup="tagInputKey(event)" data-clip-id="{{ clip.id }}" />
+            <input type="text" class="tag-input" id="tag-input-{{ clip.id }}" value="{{ clip.tags | join(', ') }}" style="display:none; width:60%; margin-top:0.3em;" onkeyup="tagInputKey(event)" data-clip-id="{{ clip.id }}" placeholder="tag1, tag2, ..." />
             <button type="button" class="save-tag-btn" id="save-tag-btn-{{ clip.id }}" style="display:none; margin-left:0.3em; font-size:0.9em;" data-clip-id="{{ clip.id }}" onclick="saveTags(event)">💾</button>
         </div>
     </div>

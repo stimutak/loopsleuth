@@ -41,6 +41,27 @@ function tagInputKey(event) {
 }
 
 /**
+ * Render tag chips into the tags-text span for a given clip.
+ * @param {string} clipId
+ * @param {Array<string>} tags
+ */
+function renderTagChips(clipId, tags) {
+    const tagsText = document.getElementById(`tags-text-${clipId}`);
+    if (!tagsText) return;
+    tagsText.innerHTML = '';
+    if (tags.length === 0) {
+        tagsText.innerHTML = '<span class="tag-chip tag-empty">No tags</span>';
+    } else {
+        tags.forEach(tag => {
+            const chip = document.createElement('span');
+            chip.className = 'tag-chip';
+            chip.textContent = tag;
+            tagsText.appendChild(chip);
+        });
+    }
+}
+
+/**
  * Save the edited tags via AJAX, update UI on success.
  */
 function saveTags(event) {
@@ -48,7 +69,8 @@ function saveTags(event) {
     event.stopPropagation();
     const clipId = event.target.getAttribute('data-clip-id');
     const input = document.getElementById(`tag-input-${clipId}`);
-    const tags = input.value;
+    // Parse comma-separated input into array
+    const tags = input.value.split(',').map(t => t.trim()).filter(t => t.length > 0);
     fetch(`/tag/${clipId}`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -57,7 +79,7 @@ function saveTags(event) {
     .then(r => r.json())
     .then(data => {
         if (data.tags !== undefined) {
-            document.getElementById(`tags-text-${clipId}`).textContent = data.tags;
+            renderTagChips(clipId, data.tags);
         }
         document.getElementById(`tags-text-${clipId}`).style.display = '';
         input.style.display = 'none';
