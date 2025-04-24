@@ -50,6 +50,7 @@ LoopSleuth Web: Grid View Template
                             <span class="tags-edit" id="tags-edit-{{ clip.id }}" style="display:none;"></span>
                             <input type="text" class="tag-input-new" id="tag-input-new-{{ clip.id }}" style="display:none; width:40%; margin-top:0.3em;" data-clip-id="{{ clip.id }}" placeholder="Add tag..." autocomplete="off" />
                             <button type="button" class="save-tag-btn" id="save-tag-btn-{{ clip.id }}" style="display:none; margin-left:0.3em; font-size:0.9em;" data-clip-id="{{ clip.id }}" onclick="saveTags(event)">💾</button>
+                            <button type="button" class="cancel-tag-btn" id="cancel-tag-btn-{{ clip.id }}" style="display:none; margin-left:0.3em; font-size:0.9em;" data-clip-id="{{ clip.id }}" onclick="cancelEditTags(event)">✖</button>
                         </div>
                     </div>
                 </div>

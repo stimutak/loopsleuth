@@ -116,9 +116,25 @@ function editTags(event) {
     editTagsState[clipId] = Array.from(staticChips).map(chip => chip.textContent.trim());
     // Hide static chips, show edit mode
     document.getElementById(`tags-text-${clipId}`).style.display = 'none';
-    document.getElementById(`tags-edit-${clipId}`).style.display = '';
-    document.getElementById(`tag-input-new-${clipId}`).style.display = '';
-    document.getElementById(`save-tag-btn-${clipId}`).style.display = '';
+    document.getElementById(`tags-edit-${clipId}`).style.display = 'inline-block';
+    document.getElementById(`tag-input-new-${clipId}`).style.display = 'inline-block';
+    document.getElementById(`save-tag-btn-${clipId}`).style.display = 'inline-block';
+    // Add or show cancel button
+    let cancelBtn = document.getElementById(`cancel-tag-btn-${clipId}`);
+    if (!cancelBtn) {
+        cancelBtn = document.createElement('button');
+        cancelBtn.type = 'button';
+        cancelBtn.className = 'cancel-tag-btn';
+        cancelBtn.id = `cancel-tag-btn-${clipId}`;
+        cancelBtn.style.marginLeft = '0.3em';
+        cancelBtn.style.fontSize = '0.9em';
+        cancelBtn.textContent = '✖';
+        cancelBtn.setAttribute('data-clip-id', clipId);
+        cancelBtn.onclick = cancelEditTags;
+        document.getElementById(`save-tag-btn-${clipId}`).after(cancelBtn);
+    } else {
+        cancelBtn.style.display = 'inline-block';
+    }
     renderEditableTagChips(clipId);
     const input = document.getElementById(`tag-input-new-${clipId}`);
     input.value = '';
@@ -141,8 +157,20 @@ function editTags(event) {
             // Remove last tag if input is empty
             editTagsState[clipId].pop();
             renderEditableTagChips(clipId);
+        } else if (e.key === 'Escape') {
+            cancelEditTags({target: {getAttribute: () => clipId}});
         }
     });
+}
+
+function cancelEditTags(event) {
+    const clipId = event.target.getAttribute('data-clip-id');
+    document.getElementById(`tags-text-${clipId}`).style.display = '';
+    document.getElementById(`tags-edit-${clipId}`).style.display = 'none';
+    document.getElementById(`tag-input-new-${clipId}`).style.display = 'none';
+    document.getElementById(`save-tag-btn-${clipId}`).style.display = 'none';
+    let cancelBtn = document.getElementById(`cancel-tag-btn-${clipId}`);
+    if (cancelBtn) cancelBtn.style.display = 'none';
 }
 
 function renderEditableTagChips(clipId) {
@@ -239,6 +267,8 @@ function saveTags(event) {
         document.getElementById(`tags-edit-${clipId}`).style.display = 'none';
         document.getElementById(`tag-input-new-${clipId}`).style.display = 'none';
         document.getElementById(`save-tag-btn-${clipId}`).style.display = 'none';
+        let cancelBtn = document.getElementById(`cancel-tag-btn-${clipId}`);
+        if (cancelBtn) cancelBtn.style.display = 'none';
     })
     .catch(err => {
         alert('Error saving tags: ' + err);
