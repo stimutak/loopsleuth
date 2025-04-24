@@ -186,7 +186,7 @@ function renderEditableTagChips(clipId) {
         tags.forEach(tag => {
             const chip = document.createElement('span');
             chip.className = 'tag-chip tag-edit';
-            chip.textContent = tag;
+            chip.appendChild(document.createTextNode(tag));
             const x = document.createElement('span');
             x.className = 'tag-chip-x';
             x.textContent = '×';
@@ -322,26 +322,8 @@ function renderTagChips(clipId, tags) {
         tags.forEach(tag => {
             const chip = document.createElement('span');
             chip.className = 'tag-chip';
-            chip.textContent = tag;
-            // Add X for deletion
-            const x = document.createElement('span');
-            x.className = 'tag-chip-x';
-            x.textContent = '×';
-            x.onclick = () => {
-                // Remove tag and update input if in edit mode
-                const input = document.getElementById(`tag-input-${clipId}`);
-                if (input && input.style.display !== 'none') {
-                    removeTagFromInput(input, tag);
-                } else {
-                    // If not in edit mode, switch to edit mode and remove tag
-                    editTags({target: {getAttribute: () => clipId}, stopPropagation: () => {}});
-                    setTimeout(() => {
-                        const input = document.getElementById(`tag-input-${clipId}`);
-                        removeTagFromInput(input, tag);
-                    }, 0);
-                }
-            };
-            chip.appendChild(x);
+            chip.appendChild(document.createTextNode(tag));
+            // Add X for deletion (only in edit mode, not static view)
             tagsText.appendChild(chip);
         });
     }
