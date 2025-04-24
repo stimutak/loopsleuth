@@ -17,6 +17,7 @@ from urllib.parse import unquote
 from loopsleuth.scanner import ingest_directory
 import mimetypes  # <-- Add this import
 from pydantic import BaseModel
+from typing import List
 
 # --- App setup ---
 # For development/demo: use the test DB with clips
@@ -46,12 +47,21 @@ def grid(request: Request):
         conn = get_db_connection(DEFAULT_DB_PATH)
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT id, filename, duration, thumbnail_path, starred, tags
+            SELECT id, filename, duration, thumbnail_path, starred
             FROM clips
             ORDER BY filename ASC
         """)
         for row in cursor.fetchall():
             clip = dict(row)
+            # Fetch tags for this clip
+            cursor.execute("""
+                SELECT t.name FROM tags t
+                JOIN clip_tags ct ON t.id = ct.tag_id
+                WHERE ct.clip_id = ?
+                ORDER BY t.name ASC
+            """, (clip['id'],))
+            tag_list = [r[0] for r in cursor.fetchall()]
+            clip['tags'] = tag_list
             thumb_path = clip.get('thumbnail_path', '')
             if thumb_path:
                 clip['thumb_filename'] = thumb_path.replace('\\', '/').split('/')[-1]
@@ -79,12 +89,21 @@ def clip_detail(request: Request, clip_id: int):
         conn = get_db_connection(DEFAULT_DB_PATH)
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT id, filename, path, thumbnail_path, starred, tags
+            SELECT id, filename, path, thumbnail_path, starred
             FROM clips WHERE id = ?
         """, (clip_id,))
         row = cursor.fetchone()
         if row:
             clip = dict(row)
+            # Fetch tags for this clip
+            cursor.execute("""
+                SELECT t.name FROM tags t
+                JOIN clip_tags ct ON t.id = ct.tag_id
+                WHERE ct.clip_id = ?
+                ORDER BY t.name ASC
+            """, (clip['id'],))
+            tag_list = [r[0] for r in cursor.fetchall()]
+            clip['tags'] = tag_list
             # Guess MIME type from filename
             mime, _ = mimetypes.guess_type(clip['path'])
             if mime and mime.startswith('video/'):
@@ -160,18 +179,52 @@ def toggle_star(clip_id: int):
             conn.close()
 
 class TagUpdate(BaseModel):
-    tags: str
+    tags: List[str]
 
 @app.post("/tag/{clip_id}")
 def update_tags(clip_id: int, tag_update: TagUpdate):
-    """Update the 'tags' field for a clip. Accepts JSON {"tags": ...}. Returns new tags as JSON."""
-    tags = tag_update.tags
+    """
+    Update the tags for a clip. Accepts JSON {"tags": ["tag1", "tag2", ...]}.
+    Updates the tags and clip_tags tables. Returns the new tag list as JSON.
+    """
+    tags = [t.strip() for t in tag_update.tags if t.strip()]
     conn = None
     try:
         conn = get_db_connection(DEFAULT_DB_PATH)
         cursor = conn.cursor()
-        cursor.execute("UPDATE clips SET tags = ? WHERE id = ?", (tags, clip_id))
+        # Insert new tags into tags table if not present
+        tag_ids = []
+        for tag in tags:
+            cursor.execute("SELECT id FROM tags WHERE name = ?", (tag,))
+            row = cursor.fetchone()
+            if row:
+                tag_id = row[0]
+            else:
+                cursor.execute("INSERT INTO tags (name) VALUES (?)", (tag,))
+                tag_id = cursor.lastrowid
+            tag_ids.append(tag_id)
+        # Remove all existing tag links for this clip
+        cursor.execute("DELETE FROM clip_tags WHERE clip_id = ?", (clip_id,))
+        # Add new tag links
+        for tag_id in tag_ids:
+            cursor.execute("INSERT INTO clip_tags (clip_id, tag_id) VALUES (?, ?)", (clip_id, tag_id))
         conn.commit()
+        return JSONResponse({"tags": tags})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+    finally:
+        if conn:
+            conn.close()
+
+@app.get("/tags")
+def get_all_tags():
+    """Return a list of all tag names for autocomplete/suggestions."""
+    conn = None
+    try:
+        conn = get_db_connection(DEFAULT_DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT name FROM tags ORDER BY name ASC")
+        tags = [row[0] for row in cursor.fetchall()]
         return JSONResponse({"tags": tags})
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
