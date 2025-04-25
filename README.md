@@ -202,3 +202,33 @@ _Stretch:_ .tox export, multi-user/concurrent edits, creative integrations (Touc
 - All templates now use robust dictionary access (`clip.get('field')`) to prevent errors from missing keys.
 - If file sizes are not formatted, ensure the custom `filesizeformat` filter is registered in `app.py`.
 
+---
+
+## 🚦 Handoff & Path Forward (2024-06)
+
+### Current State
+- Playlist management is robust: create, rename, delete, reorder, and export playlists from the sidebar.
+- Playlist badges in the detail view are now fully interactive:
+  - Clicking a badge highlights it, selects the playlist in the sidebar, and auto-scrolls the sidebar to the selected playlist.
+  - Visual feedback is immediate and robust for both badge and sidebar selection.
+- Batch tag editing, selection bar, and all core grid/detail UX are production-ready.
+
+### Path Forward
+- **For new contributors or maintainers:**
+  1. Review the sidebar and detail view playlist sync logic in `clip_detail.html` and `clip_actions.js`.
+  2. For further UX polish, consider:
+     - Keyboard navigation for playlist badges and sidebar
+     - Drag-and-drop playlist reordering in the sidebar
+     - Multi-clip add/remove to playlists from both grid and detail views
+     - Playlist export as .zip or TouchDesigner .tox
+  3. See `TODO.md` for granular next steps and open issues.
+  4. All code is modular and documented for rapid onboarding.
+
+### Onboarding Checklist
+- [x] All playlist and tag features are tested and robust
+- [x] UI is modern, accessible, and responsive
+- [x] All major user flows are documented in this README and `STARTUP_MESSAGE.md`
+- [x] See `src/loopsleuth/web/templates/clip_detail.html` for the latest playlist UX logic
+
+_Last update: 2024-06-14_
+

@@ -525,4 +525,51 @@ body {
     content: "";
     display: table;
     clear: both;
+}
+
+.playlist-badge {
+    display: inline-block;
+    background: #1a2633;
+    color: #3fa7ff;
+    border-radius: 8px;
+    padding: 0.08em 0.6em;
+    margin: 0 0.08em 0.08em 0;
+    font-size: 0.83em;
+    line-height: 1.3;
+    font-weight: 600;
+    border: 1.5px solid #3fa7ff;
+    letter-spacing: 0.01em;
+}
+.playlist-badge.playlist-empty {
+    background: #181a1b;
+    color: #888;
+    border: 1.5px solid #23232a;
+    font-style: italic;
+}
+.playlist-badge.playlist-member {
+    background: #3fa7ff;
+    color: #181a1b;
+    border: 2px solid #3fa7ff;
+    font-weight: 700;
+}
+.playlist-badge.playlist-nonmember {
+    background: #23232a;
+    color: #888;
+    border: 1.5px solid #23232a;
+    opacity: 0.7;
+}
+.playlist-badge.selected {
+    background: #3fa7ff !important;
+    color: #181a1b !important;
+    border: 2px solid #3fa7ff !important;
+    font-weight: 800;
+    box-shadow: 0 0 0 2px #3fa7ff44;
+}
+
+.meta .playlists {
+    margin-top: 0.25em;
+}
+
+.detail-sidebar .playlists {
+    margin-top: 0.5em;
 } 

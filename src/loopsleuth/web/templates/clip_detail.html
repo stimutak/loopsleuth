@@ -127,13 +127,27 @@ LoopSleuth Web: Clip Detail Page (DaVinci-inspired)
             </div>
             <div class="sidebar-section">
                 <div style="margin-bottom:0.4em; color:#aaa;">Playlists:</div>
-                <!-- Placeholder: List playlists this clip is in, with add/remove UI -->
-                <div id="clip-playlists-list">(Coming soon)</div>
+                <div class="playlists">
+                    {% if all_playlists and all_playlists|length > 0 %}
+                        {% for pl in all_playlists %}
+                            <span class="playlist-badge{% if pl.is_member %} playlist-member{% else %} playlist-nonmember{% endif %}"
+                                  data-playlist-id="{{ pl.id }}"
+                                  tabindex="0"
+                                  onclick="selectPlaylistFromBadge('{{ pl.id }}', '{{ pl.name|e }}')"
+                                  onkeydown="if(event.key==='Enter'){selectPlaylistFromBadge('{{ pl.id }}', '{{ pl.name|e }}')}"
+                            >{{ pl.name|escape }}</span>
+                        {% endfor %}
+                    {% else %}
+                        <span class="playlist-badge playlist-empty">No playlists</span>
+                    {% endif %}
+                </div>
                 <button class="sidebar-btn" style="margin-top:0.7em;">Add to Playlist</button>
             </div>
             <div class="sidebar-section sidebar-actions">
                 <button class="sidebar-btn" onclick="window.open('/media/{{ clip.path | urlencode }}', '_blank')">Download</button>
-                <button class="sidebar-btn" onclick="window.open('file:///{{ clip.path }}')">Open in System</button>
+                <form method="post" action="/open_in_system/{{ clip.id }}" style="display:inline;" target="_blank">
+                    <button class="sidebar-btn" type="submit">Open in System</button>
+                </form>
             </div>
         </div>
         <div class="detail-main">
@@ -158,7 +172,33 @@ LoopSleuth Web: Clip Detail Page (DaVinci-inspired)
             </div>
         </div>
     </div>
+    <script src="/static/clip_actions.js"></script>
+    <script>
+    // Patch: Ensure playlist badges in detail view are always selectable and visually indicate selection
+    window.selectPlaylistFromBadge = function(playlistId, playlistName) {
+        // Remove 'selected' class from all badges in the sidebar
+        document.querySelectorAll('.detail-sidebar .playlist-badge').forEach(badge => {
+            badge.classList.remove('selected');
+        });
+        // Add 'selected' class to the clicked badge
+        const badge = document.querySelector('.detail-sidebar .playlist-badge[data-playlist-id="' + playlistId + '"]');
+        if (badge) badge.classList.add('selected');
+        // Also highlight the corresponding playlist in the sidebar and scroll into view
+        document.querySelectorAll('#playlist-list .playlist-item').forEach(item => {
+            const isSelected = item.dataset.playlistId == playlistId;
+            item.classList.toggle('selected', isSelected);
+            if (isSelected) {
+                item.scrollIntoView({block: 'nearest', behavior: 'smooth'});
+            }
+        });
+        // Trigger sidebar playlist selection and toast
+        if (window.selectPlaylist) {
+            window.selectPlaylist(Number(playlistId));
+            if (window.showToast) window.showToast('Selected playlist: ' + playlistName);
+        } else {
+            alert('Playlist: ' + playlistName);
+        }
+    };
+    </script>
 </body>
-<script src="/static/clip_actions.js"></script>
-<!-- TODO: Add custom JS for playback bar, playlist membership, keyboard shortcuts -->
 </html> 

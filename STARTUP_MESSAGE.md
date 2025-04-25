@@ -1,5 +1,10 @@
 # LoopSleuth Startup Message
 
+## Handoff & Path Forward (2024-06)
+- Playlist badges in the detail view are now fully interactive and visually synced with the sidebar.
+- Selecting a badge highlights it, selects and scrolls to the playlist in the sidebar, and provides immediate feedback.
+- See the README for a full onboarding checklist and next steps for playlist/UX polish.
+
 ## Handoff Note (2024-06)
 - **Production-ready:** Modern dark UI, batch selection/tagging, export (keepers.txt), and copy-to-folder for selected clips. Custom checkboxes, grid scroll restore, robust batch UX.
 - **Next steps for dev:** Playlist management (create, name, reorder, export), advanced export (zip, .tox, etc.), further UX polish (keyboard shortcuts, accessibility, creative/visual features), gather user feedback and iterate.
