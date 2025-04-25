@@ -21,6 +21,7 @@ LoopSleuth Web: Grid View Template
         <div class="grid">
             {% for clip in clips %}
                 <div class="card" data-clip-id="{{ clip.id }}">
+                    <input type="checkbox" class="select-clip-checkbox" aria-label="Select clip {{ clip.filename }}" style="position:absolute; left:1em; top:1em; z-index:2;" />
                     {% if clip.thumbnail_path %}
                         <a class="card-link" href="/clip/{{ clip.id }}">
                             <img class="thumb" src="/thumbs/{{ clip.thumb_filename }}" alt="Thumbnail for {{ clip.filename }}" />
@@ -45,17 +46,14 @@ LoopSleuth Web: Grid View Template
                                     <span class="tag-chip tag-empty">No tags</span>
                                 {% endfor %}
                             </span>
-                            <button type="button" class="edit-tag-btn" data-clip-id="{{ clip.id }}" onclick="editTags(event)" style="margin-left:0.5em; font-size:0.9em;">✎</button>
-                            <!-- Standard tag input: chips + input for new tag, only in edit mode -->
-                            <span class="tags-edit" id="tags-edit-{{ clip.id }}" style="display:none;"></span>
-                            <input type="text" class="tag-input-new" id="tag-input-new-{{ clip.id }}" style="display:none; width:40%; margin-top:0.3em;" data-clip-id="{{ clip.id }}" placeholder="Add tag..." autocomplete="off" />
-                            <button type="button" class="save-tag-btn" id="save-tag-btn-{{ clip.id }}" style="display:none; margin-left:0.3em; font-size:0.9em;" data-clip-id="{{ clip.id }}" onclick="saveTags(event)">💾</button>
-                            <button type="button" class="cancel-tag-btn" id="cancel-tag-btn-{{ clip.id }}" style="display:none; margin-left:0.3em; font-size:0.9em;" data-clip-id="{{ clip.id }}" onclick="cancelEditTags(event)">✖</button>
+                            <a href="/clip/{{ clip.id }}" class="edit-tag-btn-link" style="margin-left:0.5em; font-size:0.9em; text-decoration:none;" title="Edit tags in detail view">✎</a>
                         </div>
                     </div>
                 </div>
             {% endfor %}
         </div>
+        <!-- Floating batch action bar -->
+        <div id="batch-action-bar" style="display:none;"></div>
     {% else %}
         <p>No clips found. (This is a placeholder page.)</p>
     {% endif %}

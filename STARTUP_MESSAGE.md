@@ -7,6 +7,7 @@
 - **Recent debugging**: Confirmed backend and DB schema are correct; single-clip tag editing and batch bar UI are working. Batch actions backend integration is next.
 - **Next steps**: Implement backend for batch tag actions, wire up frontend, then add feedback and polish.
 - **See TODO.md** for precise next actions and troubleshooting notes.
+- Per-clip tag editing is now only available in the detail (single-clip) view. The grid view uses the batch bar for all tag editing. The per-clip tag editor has been removed from the grid for clarity and workflow consistency.
 
 ## Batch Editing Handoff Checklist
 

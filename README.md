@@ -49,6 +49,8 @@ Python ≥ 3.10, ffmpeg/ffprobe, SQLite, Pillow, imagehash, FastAPI, Jinja2, Tex
 
 ### Tag Editing UX (2024-06)
 
+- Per-clip tag editing is now only available in the detail (single-clip) view. The grid view uses the batch bar for all tag editing.
+- The per-clip tag editor has been removed from the grid for a cleaner, more unified workflow.
 - **Keyboard Shortcuts:**
   - `e` or `Enter` focuses tag input for editing (when tag area is focused)
   - Arrow keys navigate autocomplete suggestions
