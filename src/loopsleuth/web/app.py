@@ -416,5 +416,184 @@ def copy_selected(copy_req: CopySelectedRequest = Body(...)):
         if conn:
             conn.close()
 
+# --- Playlist Management Models ---
+class PlaylistCreateRequest(BaseModel):
+    name: str
+
+class PlaylistRenameRequest(BaseModel):
+    name: str
+
+class PlaylistClipUpdateRequest(BaseModel):
+    clip_ids: List[int]
+
+class PlaylistReorderRequest(BaseModel):
+    clip_ids: List[int]  # New order for this playlist
+
+class PlaylistExportFormat(str):
+    pass  # For future: enum for 'txt', 'zip', 'tox'
+
+# --- Playlist Endpoints ---
+@app.post("/playlists")
+def create_playlist(req: PlaylistCreateRequest):
+    """Create a new playlist with the given name."""
+    conn = None
+    try:
+        conn = get_db_connection(DEFAULT_DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("INSERT INTO playlists (name) VALUES (?)", (req.name,))
+        playlist_id = cursor.lastrowid
+        conn.commit()
+        return {"id": playlist_id, "name": req.name}
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+    finally:
+        if conn:
+            conn.close()
+
+@app.patch("/playlists/{playlist_id}")
+def rename_playlist(playlist_id: int, req: PlaylistRenameRequest):
+    """Rename a playlist."""
+    conn = None
+    try:
+        conn = get_db_connection(DEFAULT_DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("UPDATE playlists SET name = ? WHERE id = ?", (req.name, playlist_id))
+        if cursor.rowcount == 0:
+            return JSONResponse({"error": "Playlist not found"}, status_code=404)
+        conn.commit()
+        return {"id": playlist_id, "name": req.name}
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+    finally:
+        if conn:
+            conn.close()
+
+@app.delete("/playlists/{playlist_id}")
+def delete_playlist(playlist_id: int):
+    """Delete a playlist and its associations."""
+    conn = None
+    try:
+        conn = get_db_connection(DEFAULT_DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM playlists WHERE id = ?", (playlist_id,))
+        if cursor.rowcount == 0:
+            return JSONResponse({"error": "Playlist not found"}, status_code=404)
+        conn.commit()
+        return {"id": playlist_id, "deleted": True}
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+    finally:
+        if conn:
+            conn.close()
+
+@app.get("/playlists")
+def list_playlists():
+    """List all playlists (id, name, created_at)."""
+    conn = None
+    try:
+        conn = get_db_connection(DEFAULT_DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, name, created_at FROM playlists ORDER BY created_at DESC")
+        playlists = [dict(row) for row in cursor.fetchall()]
+        return {"playlists": playlists}
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+    finally:
+        if conn:
+            conn.close()
+
+@app.get("/playlists/{playlist_id}")
+def get_playlist(playlist_id: int):
+    """Get playlist details: id, name, created_at, and ordered clips."""
+    conn = None
+    try:
+        conn = get_db_connection(DEFAULT_DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, name, created_at FROM playlists WHERE id = ?", (playlist_id,))
+        playlist = cursor.fetchone()
+        if not playlist:
+            return JSONResponse({"error": "Playlist not found"}, status_code=404)
+        cursor.execute("""
+            SELECT c.id, c.filename, c.thumbnail_path, c.duration, pc.position
+            FROM playlist_clips pc
+            JOIN clips c ON pc.clip_id = c.id
+            WHERE pc.playlist_id = ?
+            ORDER BY pc.position ASC
+        """, (playlist_id,))
+        clips = [dict(row) for row in cursor.fetchall()]
+        return {"id": playlist[0], "name": playlist[1], "created_at": playlist[2], "clips": clips}
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+    finally:
+        if conn:
+            conn.close()
+
+@app.post("/playlists/{playlist_id}/clips")
+def add_clips_to_playlist(playlist_id: int, req: PlaylistClipUpdateRequest):
+    """Add one or more clips to a playlist (appends to end)."""
+    conn = None
+    try:
+        conn = get_db_connection(DEFAULT_DB_PATH)
+        cursor = conn.cursor()
+        # Get current max position
+        cursor.execute("SELECT MAX(position) FROM playlist_clips WHERE playlist_id = ?", (playlist_id,))
+        row = cursor.fetchone()
+        start_pos = (row[0] + 1) if row and row[0] is not None else 0
+        for i, clip_id in enumerate(req.clip_ids):
+            cursor.execute("""
+                INSERT OR IGNORE INTO playlist_clips (playlist_id, clip_id, position)
+                VALUES (?, ?, ?)
+            """, (playlist_id, clip_id, start_pos + i))
+        conn.commit()
+        return {"playlist_id": playlist_id, "added": req.clip_ids}
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+    finally:
+        if conn:
+            conn.close()
+
+@app.post("/playlists/{playlist_id}/clips/remove")
+def remove_clips_from_playlist(playlist_id: int, req: PlaylistClipUpdateRequest):
+    """Remove one or more clips from a playlist (POST for batch remove)."""
+    conn = None
+    try:
+        conn = get_db_connection(DEFAULT_DB_PATH)
+        cursor = conn.cursor()
+        for clip_id in req.clip_ids:
+            cursor.execute("DELETE FROM playlist_clips WHERE playlist_id = ? AND clip_id = ?", (playlist_id, clip_id))
+        conn.commit()
+        return {"playlist_id": playlist_id, "removed": req.clip_ids}
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+    finally:
+        if conn:
+            conn.close()
+
+@app.patch("/playlists/{playlist_id}/reorder")
+def reorder_playlist_clips(playlist_id: int, req: PlaylistReorderRequest):
+    """Reorder clips in a playlist. Accepts new clip_id order."""
+    conn = None
+    try:
+        conn = get_db_connection(DEFAULT_DB_PATH)
+        cursor = conn.cursor()
+        for pos, clip_id in enumerate(req.clip_ids):
+            cursor.execute("""
+                UPDATE playlist_clips SET position = ?
+                WHERE playlist_id = ? AND clip_id = ?
+            """, (pos, playlist_id, clip_id))
+        conn.commit()
+        return {"playlist_id": playlist_id, "order": req.clip_ids}
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+    finally:
+        if conn:
+            conn.close()
+
+@app.get("/playlists/{playlist_id}/export")
+def export_playlist(playlist_id: int, format: str = "txt"):
+    """Export playlist in the requested format (txt, zip, tox). Stub for now."""
+    # TODO: Implement export logic for txt, zip, tox
+    return JSONResponse({"message": f"Export for playlist {playlist_id} as {format} not yet implemented."}, status_code=501)
+
 # TODO: Add API endpoints for clips, tagging, starring, etc.
 # TODO: Add video playback route 

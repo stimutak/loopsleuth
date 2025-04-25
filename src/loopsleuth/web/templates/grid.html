@@ -11,6 +11,13 @@ LoopSleuth Web: Grid View Template
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
+    <!-- Playlist Sidebar -->
+    <div id="playlist-sidebar">
+        <div class="sidebar-header">Playlists</div>
+        <div id="playlist-list"></div>
+        <button id="playlist-create-btn" class="sidebar-btn">+ New Playlist</button>
+        <div id="playlist-details"></div>
+    </div>
     <div class="container">
         <h1>LoopSleuth - Clip Grid (Web UI)</h1>
         <form method="post" action="/scan_folder" style="margin-bottom:2em;">

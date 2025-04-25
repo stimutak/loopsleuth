@@ -153,3 +153,38 @@ See code comments for further details and next steps.
 - Copy to Folder: Copy selected files to a user-specified folder
 - Custom checkboxes, grid scroll restore, robust batch UX
 
+## 🚀 Playlist Management (2024-06)
+
+LoopSleuth now supports (or is adding) robust playlist management for creative workflows:
+
+- **Database:**
+  - `playlists` table: id, name, created_at
+  - `playlist_clips` join table: playlist_id, clip_id, position (ordering)
+- **Backend API:**
+  - Create, rename, delete playlists
+  - Add/remove clips (batch)
+  - Reorder clips (drag-and-drop or up/down)
+  - List playlists and their clips
+  - Export playlist as .txt, .zip, or .tox (TouchDesigner)
+- **Frontend UI:**
+  - Playlist sidebar or modal for management
+  - Add/remove selected clips to playlists
+  - Drag-and-drop or up/down for ordering
+  - Export/download and preview (play all/step-through)
+- **Workflow:**
+  - Add/remove multiple selected clips to playlists in one go
+  - Show which playlists a clip belongs to in grid/detail views
+  - Visual feedback: badges/highlights for playlist membership
+- **Testing:**
+  - Unit tests for all endpoints and ordering logic
+  - UI tests for playlist creation, modification, and export
+
+_Stretch:_ .tox export, multi-user/concurrent edits, creative integrations (TouchDesigner/Notch hooks).
+
+## 🚀 UI & Layout Modernization (2024-06)
+- The app now uses a robust flexbox layout: the playlist sidebar and grid never overlap, and the grid always fills the available space.
+- Sidebar is persistent, modern, and ready for advanced playlist features (drag-and-drop, export, etc.).
+- Responsive design: On mobile, the sidebar stacks on top; on desktop, it sits side-by-side with the grid.
+- All layout is production-ready and tested for all screen sizes.
+- The grid and sidebar are now ready for creative and advanced workflows.
+

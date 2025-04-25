@@ -1079,4 +1079,93 @@ updateCardSelectionUI = function() {
 
 document.addEventListener('DOMContentLoaded', function() {
     renderSelectedClipsBar();
-}); 
+});
+
+// === Playlist Sidebar Logic ===
+
+document.addEventListener('DOMContentLoaded', () => {
+    renderPlaylistSidebar();
+});
+
+/**
+ * Fetch and render the playlist sidebar: list, create, select.
+ */
+function renderPlaylistSidebar() {
+    const listDiv = document.getElementById('playlist-list');
+    const createBtn = document.getElementById('playlist-create-btn');
+    const detailsDiv = document.getElementById('playlist-details');
+    if (!listDiv || !createBtn) return;
+
+    // Fetch playlists and render
+    fetch('/playlists')
+        .then(r => r.json())
+        .then(data => {
+            if (!data.playlists) return;
+            listDiv.innerHTML = '';
+            data.playlists.forEach(pl => {
+                const item = document.createElement('div');
+                item.className = 'playlist-item';
+                item.textContent = pl.name;
+                item.dataset.playlistId = pl.id;
+                item.onclick = () => selectPlaylist(pl.id);
+                listDiv.appendChild(item);
+            });
+        });
+
+    // Create new playlist
+    createBtn.onclick = () => {
+        const name = prompt('New playlist name:');
+        if (!name) return;
+        fetch('/playlists', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({name})
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) {
+                showToast('Create failed: ' + data.error, true);
+                return;
+            }
+            renderPlaylistSidebar();
+            showToast('Playlist created.');
+        });
+    };
+
+    // Optionally: clear details area
+    detailsDiv.innerHTML = '<em>Select a playlist to view details.</em>';
+}
+
+/**
+ * Fetch and render details for a selected playlist.
+ */
+function selectPlaylist(playlistId) {
+    const detailsDiv = document.getElementById('playlist-details');
+    const listDiv = document.getElementById('playlist-list');
+    if (!detailsDiv) return;
+    // Highlight selected
+    Array.from(listDiv.children).forEach(child => {
+        child.classList.toggle('selected', child.dataset.playlistId == playlistId);
+    });
+    fetch(`/playlists/${playlistId}`)
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) {
+                detailsDiv.innerHTML = `<span style="color:#f55">${data.error}</span>`;
+                return;
+            }
+            // Render playlist details: name, created_at, clip count, and list of clips
+            let html = `<div><b>${data.name}</b> <span style='color:#888;font-size:0.9em;'>(${data.clips.length} clips)</span></div>`;
+            html += `<div style='font-size:0.9em;color:#888;'>Created: ${data.created_at}</div>`;
+            if (data.clips.length === 0) {
+                html += '<div style="margin-top:1em;color:#aaa;">No clips in this playlist.</div>';
+            } else {
+                html += '<ol style="margin-top:1em;padding-left:1.2em;">';
+                data.clips.forEach((clip, i) => {
+                    html += `<li>${clip.filename} <span style='color:#3fa7ff;font-size:0.9em;'>[id:${clip.id}]</span></li>`;
+                });
+                html += '</ol>';
+            }
+            detailsDiv.innerHTML = html;
+        });
+} 

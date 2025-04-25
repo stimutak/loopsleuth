@@ -65,6 +65,27 @@ def create_table(conn: sqlite3.Connection):
         )
     """)
 
+    # --- Playlist tables ---
+    # playlists: stores playlist metadata (name, created_at)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS playlists (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    # playlist_clips: join table for ordered clips in playlists
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS playlist_clips (
+            playlist_id INTEGER NOT NULL,
+            clip_id INTEGER NOT NULL,
+            position INTEGER NOT NULL, -- 0-based ordering in playlist
+            PRIMARY KEY (playlist_id, clip_id),
+            FOREIGN KEY (playlist_id) REFERENCES playlists(id) ON DELETE CASCADE,
+            FOREIGN KEY (clip_id) REFERENCES clips(id) ON DELETE CASCADE
+        )
+    """)
+
     conn.commit()
 
 # Example usage (optional, can be removed or moved to a main script)
