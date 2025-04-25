@@ -3,6 +3,17 @@
 > **Note (2024-06-13): LoopSleuth is now web-first!**
 > The web UI (FastAPI + Jinja2) is the primary interface for browsing, tagging, and managing video loops. See `STARTUP_MESSAGE.md` for the latest project state, usage, and next steps.
 
+## 🚦 Handoff & Next Steps (2024-06)
+- **Production-ready:**
+  - Modern, dark, Cursor-inspired UI with always-visible action and batch bars
+  - Batch selection, tagging, export (keepers.txt), and copy-to-folder for selected clips
+  - Custom checkboxes, grid scroll restore, robust batch UX
+- **Next steps for dev:**
+  - Playlist management (create, name, reorder, export playlists)
+  - Advanced export (zip, TouchDesigner .tox, etc.)
+  - Further UX polish (keyboard shortcuts, accessibility, creative/visual features)
+  - Gather user feedback and iterate
+
 ---
 
 ## 🚦 Clean Handoff
@@ -27,12 +38,19 @@ A web-first (formerly terminal-first) librarian for video loops.
 - ⭐ flag keepers, tag with free text, delete duds
 - Export a `keepers.txt` list for a TouchDesigner Replicator
 
+## Web UI Modernization (2024-06)
+- The UI is being redesigned for a modern, compact, high-contrast look with blue accents (#3fa7ff).
+- All cards, bars, and controls are denser, with less padding and smaller text for information-rich browsing.
+- A persistent selection bar floats at the bottom, showing selected count and actions (export, copy, clear, playlist coming soon).
+- Accessibility and keyboard navigation are maintained.
+- Responsive design: grid and controls scale for smaller screens.
+
 ## MVP (v0.1)
 1. **Scan**: walk folder → SQLite row per clip (`ffprobe`)
 2. **Thumb**: grab frame @ 25 % duration → 256 px JPEG
 3. **Hash**: perceptual pHash → find near‑dupes later
-4. **Web UI**: Grid and detail views for browsing, starring, tagging, and playback
-5. **Export**: write `keepers.txt` with starred clip paths
+4. **Web UI**: Grid and detail views for browsing, starring, tagging, selection, and playback
+5. **Export**: write `keepers.txt` with starred or selected clip paths
 
 _Stretch_: duplicate‑collapse, CLIP auto‑tags, .tox export.
 
@@ -126,4 +144,12 @@ See code comments for further details and next steps.
 - Automated tests for batch tag actions are present and passing (see `tests/test_batch_tag.py`).
 - The test suite uses a production-matching schema and covers all batch tag actions for multiple clips.
 - The batch tag workflow is now fully production-ready and tested as of this commit.
+
+## Features
+- Modern dark UI (Cursor-inspired, blue only for focus/active)
+- Always-visible action and batch bars (stacked, seamless, compact)
+- Batch selection, tagging, and per-clip detail view
+- Export List: Download keepers.txt with selected clip paths
+- Copy to Folder: Copy selected files to a user-specified folder
+- Custom checkboxes, grid scroll restore, robust batch UX
 

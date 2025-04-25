@@ -17,7 +17,10 @@ from urllib.parse import unquote
 from loopsleuth.scanner import ingest_directory
 import mimetypes  # <-- Add this import
 from pydantic import BaseModel
-from typing import List
+from typing import List, Dict, Optional
+import tempfile
+import os
+import shutil
 
 # --- App setup ---
 # For development/demo: use the test DB with clips
@@ -209,6 +212,14 @@ def update_tags(clip_id: int, tag_update: TagUpdate = Body(...)):
         # Add new tag links
         for tag_id in tag_ids:
             cursor.execute("INSERT INTO clip_tags (clip_id, tag_id) VALUES (?, ?)", (clip_id, tag_id))
+        
+        # --- Remove orphaned tags (tags not referenced by any clip) ---
+        cursor.execute("""
+            DELETE FROM tags
+            WHERE id NOT IN (SELECT tag_id FROM clip_tags)
+        """)
+        # ------------------------------------------------------------
+        
         conn.commit()
         return JSONResponse({"tags": tags})
     except Exception as e:
@@ -242,6 +253,168 @@ async def test_tag(clip_id: int, request: Request):
     data = await request.json()
     print("[DEBUG] /test_tag received:", data)
     return {"received": data}
+
+class BatchTagUpdate(BaseModel):
+    clip_ids: List[int]
+    add_tags: Optional[List[str]] = None
+    remove_tags: Optional[List[str]] = None
+    clear: Optional[bool] = False
+
+@app.post("/batch_tag")
+def batch_tag_update(batch_update: BatchTagUpdate = Body(...)):
+    """
+    Batch tag editing endpoint. Accepts JSON with:
+      - clip_ids: list of clip IDs
+      - add_tags: tags to add (optional)
+      - remove_tags: tags to remove (optional)
+      - clear: if true, remove all tags from selected clips
+    Returns: {clip_id: [updated tags, ...], ...}
+    """
+    conn = None
+    try:
+        conn = get_db_connection(DEFAULT_DB_PATH)
+        cursor = conn.cursor()
+        add_tags = [t.strip() for t in (batch_update.add_tags or []) if t.strip()]
+        remove_tags = [t.strip() for t in (batch_update.remove_tags or []) if t.strip()]
+        result: Dict[int, List[str]] = {}
+        for clip_id in batch_update.clip_ids:
+            # Fetch current tag IDs and names for this clip
+            cursor.execute("""
+                SELECT t.id, t.name FROM tags t
+                JOIN clip_tags ct ON t.id = ct.tag_id
+                WHERE ct.clip_id = ?
+            """, (clip_id,))
+            tag_rows = cursor.fetchall()
+            current_tag_ids = {row[0]: row[1] for row in tag_rows}
+            current_tag_names = set(current_tag_ids.values())
+            if batch_update.clear:
+                # Remove all tags for this clip
+                cursor.execute("DELETE FROM clip_tags WHERE clip_id = ?", (clip_id,))
+                result[clip_id] = []
+                continue
+            # Remove tags if specified
+            if remove_tags:
+                remove_tag_ids = []
+                for tag in remove_tags:
+                    cursor.execute("SELECT id FROM tags WHERE name = ?", (tag,))
+                    row = cursor.fetchone()
+                    if row:
+                        remove_tag_ids.append(row[0])
+                for tag_id in remove_tag_ids:
+                    cursor.execute("DELETE FROM clip_tags WHERE clip_id = ? AND tag_id = ?", (clip_id, tag_id))
+            # Add tags if specified
+            if add_tags:
+                for tag in add_tags:
+                    # Insert tag if not present
+                    cursor.execute("SELECT id FROM tags WHERE name = ?", (tag,))
+                    row = cursor.fetchone()
+                    if row:
+                        tag_id = row[0]
+                    else:
+                        cursor.execute("INSERT INTO tags (name) VALUES (?)", (tag,))
+                        tag_id = cursor.lastrowid
+                    # Add link if not already present
+                    cursor.execute("SELECT 1 FROM clip_tags WHERE clip_id = ? AND tag_id = ?", (clip_id, tag_id))
+                    if not cursor.fetchone():
+                        cursor.execute("INSERT INTO clip_tags (clip_id, tag_id) VALUES (?, ?)", (clip_id, tag_id))
+            # Fetch updated tags for this clip
+            cursor.execute("""
+                SELECT t.name FROM tags t
+                JOIN clip_tags ct ON t.id = ct.tag_id
+                WHERE ct.clip_id = ?
+                ORDER BY t.name ASC
+            """, (clip_id,))
+            updated_tags = [row[0] for row in cursor.fetchall()]
+            result[clip_id] = updated_tags
+        # Remove orphaned tags (tags not referenced by any clip)
+        cursor.execute("""
+            DELETE FROM tags
+            WHERE id NOT IN (SELECT tag_id FROM clip_tags)
+        """)
+        conn.commit()
+        return JSONResponse(result)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+    finally:
+        if conn:
+            conn.close()
+
+class ExportSelectedRequest(BaseModel):
+    clip_ids: List[int]
+
+@app.post("/export_selected")
+def export_selected(export_req: ExportSelectedRequest = Body(...)):
+    """
+    Export the absolute paths of selected clips as a downloadable keepers.txt file.
+    Accepts JSON: {"clip_ids": [1,2,3,...]}
+    Returns: keepers.txt (text/plain, one absolute path per line)
+    """
+    conn = None
+    try:
+        conn = get_db_connection(DEFAULT_DB_PATH)
+        cursor = conn.cursor()
+        paths = []
+        for clip_id in export_req.clip_ids:
+            cursor.execute("SELECT path FROM clips WHERE id = ?", (clip_id,))
+            row = cursor.fetchone()
+            if row and row[0]:
+                paths.append(str(row[0]))
+        if not paths:
+            return JSONResponse({"error": "No valid paths for selected clips."}, status_code=400)
+        # Write to a temporary file
+        with tempfile.NamedTemporaryFile("w", delete=False, encoding="utf-8", suffix=".txt") as tmp:
+            for p in paths:
+                tmp.write(p + "\n")
+            tmp_path = tmp.name
+        # Return as a downloadable file
+        return FileResponse(tmp_path, filename="keepers.txt", media_type="text/plain")
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+    finally:
+        if conn:
+            conn.close()
+        # Clean up temp file after response (handled by OS, but can add background task if needed)
+
+class CopySelectedRequest(BaseModel):
+    clip_ids: List[int]
+    dest_folder: str
+
+@app.post("/copy_selected")
+def copy_selected(copy_req: CopySelectedRequest = Body(...)):
+    """
+    Copy the selected clips to the specified destination folder.
+    Accepts JSON: {"clip_ids": [1,2,3,...], "dest_folder": "/path/to/folder"}
+    Returns: {"results": {filename: "ok"|"error: ...", ...}}
+    """
+    conn = None
+    results = {}
+    try:
+        dest = Path(copy_req.dest_folder)
+        if not dest.exists() or not dest.is_dir():
+            return JSONResponse({"error": f"Destination folder does not exist: {dest}"}, status_code=400)
+        conn = get_db_connection(DEFAULT_DB_PATH)
+        cursor = conn.cursor()
+        for clip_id in copy_req.clip_ids:
+            cursor.execute("SELECT filename, path FROM clips WHERE id = ?", (clip_id,))
+            row = cursor.fetchone()
+            if not row or not row[1]:
+                results[str(clip_id)] = "error: missing path"
+                continue
+            src = Path(row[1])
+            if not src.exists():
+                results[row[0]] = f"error: source not found ({src})"
+                continue
+            try:
+                shutil.copy2(src, dest / src.name)
+                results[row[0]] = "ok"
+            except Exception as e:
+                results[row[0]] = f"error: {e}"
+        return JSONResponse({"results": results})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+    finally:
+        if conn:
+            conn.close()
 
 # TODO: Add API endpoints for clips, tagging, starring, etc.
 # TODO: Add video playback route 

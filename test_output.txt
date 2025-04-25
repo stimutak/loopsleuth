@@ -1,0 +1,12 @@
+============================= test session starts =============================
+platform win32 -- Python 3.11.9, pytest-8.3.5, pluggy-1.5.0 -- E:\Projects\loopsleuth\.venv\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: E:\Projects\loopsleuth
+plugins: anyio-4.9.0
+collecting ... collected 3 items
+
+tests/test_batch_tag.py::test_batch_add_tags PASSED                      [ 33%]
+tests/test_batch_tag.py::test_batch_remove_tags PASSED                   [ 66%]
+tests/test_batch_tag.py::test_batch_clear_tags PASSED                    [100%]
+
+============================== 3 passed in 0.57s ==============================

@@ -1,7 +1,8 @@
 # LoopSleuth Startup Message
 
 ## Handoff Note (2024-06)
-- The codebase is ready for handoff or onboarding. All per-clip and batch tag editing is robust and consistent. See README.md and TODO.md for the latest state and next steps.
+- **Production-ready:** Modern dark UI, batch selection/tagging, export (keepers.txt), and copy-to-folder for selected clips. Custom checkboxes, grid scroll restore, robust batch UX.
+- **Next steps for dev:** Playlist management (create, name, reorder, export), advanced export (zip, .tox, etc.), further UX polish (keyboard shortcuts, accessibility, creative/visual features), gather user feedback and iterate.
 
 ## Project State (2024-06)
 - **Web UI** is the primary interface (FastAPI + Jinja2).

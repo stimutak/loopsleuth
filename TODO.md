@@ -1,11 +1,68 @@
 # Project TODOs
 
+## 🚦 Handoff & Next Steps (2024-06)
+- **Production-ready:**
+  - Modern dark UI, always-visible action/batch bars, batch selection/tagging
+  - Export List and Copy to Folder for selected clips (fully implemented)
+  - Custom checkboxes, grid scroll restore, robust batch UX
+- **Next steps for dev:**
+  - Playlist management (create, name, reorder, export playlists)
+  - Advanced export (zip, TouchDesigner .tox, etc.)
+  - Further UX polish (keyboard shortcuts, accessibility, creative/visual features)
+  - Gather user feedback and iterate
+
+## ✅ Completed
+- Grid scroll position restore
+- Modern dark UI
+- Always-visible batch/action bars
+- Custom checkboxes
+- Export List: User can export selected clip paths as keepers.txt
+- Copy to Folder: User can copy selected files to a user-specified folder
+
+## 🚀 Next Implementation Steps (2024-06)
+
+### ⏭️ Next Planned Features
+- Playlist management for selected clips
+- Advanced export (.zip, .tox, etc.)
+- Further UX polish and creative integrations
+
+## 🚀 UI Modernization (2024-06)
+- In progress: Modern, compact, high-contrast look with blue accents (#3fa7ff)
+- All cards, bars, and controls are denser, with less padding and smaller text
+- Persistent selection bar at the bottom for selected count and actions (export, copy, clear, playlist coming soon)
+- Accessibility and keyboard navigation maintained
+- Responsive design for grid and controls
+
 ## ✅ Batch Tag Editing: Production-Ready (2024-06)
 - Batch tag add, remove, and clear actions are fully implemented and robust in both backend and frontend.
 - The batch action bar UI is reliable, immediate, and accessible for all tag changes.
 - Automated tests for batch tag actions are present and passing (see `tests/test_batch_tag.py`).
 - The test suite uses a production-matching schema and covers all batch tag actions for multiple clips.
 - The batch tag workflow is now fully production-ready and tested as of this commit.
+
+## 🚀 Next Major Feature: Selection, Export, and Playlists (2024-06)
+
+### (A) Stage 1: Selected Clips Bar & Export/Copy Actions
+- [x] UI modernization: compact, blue-accented, persistent selection bar (in progress)
+- [ ] Implement a persistent 'Selected Clips' bar in the grid UI, showing the number of selected clips and offering actions:
+    - [ ] Export selected clip paths to a text file (e.g., for TouchDesigner Replicator)
+    - [ ] Copy/move selected files to a user-specified folder (with overwrite/skip options)
+    - [ ] Clear selection button
+    - [ ] Toast/snackbar feedback for actions
+- [ ] Backend endpoints:
+    - [ ] /export_selected (POST): Export selected clip paths as a downloadable file
+    - [ ] /copy_selected (POST): Copy/move selected files to a folder
+- [ ] UI/UX polish: Selection persists across navigation, clear visual feedback, keyboard accessibility
+- [ ] Tests: Automated tests for export/copy endpoints and selection logic
+
+### (B) Stage 2: Playlists (Named, Ordered, Advanced Export)
+- [ ] Allow users to create, name, and manage multiple playlists
+- [ ] Support drag-and-drop reordering of clips within a playlist
+- [ ] Playlist preview: Play all or step through clips in sequence
+- [ ] Export playlist as .txt, .zip, or other formats (e.g., .tox for TouchDesigner)
+- [ ] Backend endpoints for playlist CRUD and export
+- [ ] UI/UX: Playlist management interface, ordering, and feedback
+- [ ] Tests: Automated tests for playlist creation, modification, and export
 
 <!-- CURSOR:KEEP_START -->
 ### 🚀 Web-Based Migration Plan (2024-06)
@@ -35,40 +92,4 @@
 ### Tag Autocomplete & Deletion Implementation Plan
 
 #### Tag Autocomplete
-- [x] Backend: `/tags` endpoint returns all tag names (already implemented).
-- [x] Backend: Add `/tags?q=prefix` endpoint for prefix search (now implemented).
-- [x] Frontend: On tag input, fetch suggestions from `/tags` (debounced, filter as user types).
-- [x] Frontend: Show dropdown of suggestions below the input.
-- [x] Frontend: Allow keyboard/mouse selection of suggestions; on select, add tag chip.
-- [x] Testing: Verify with similar prefix tags, new tags, and UX polish (pending user feedback).
-
-#### Tag Deletion (chip X)
-- [x] Frontend: Render editable tag chips with X for removal (already implemented in JS, but ensure UX is robust).
-- [x] Frontend: On X click, remove tag from input and update chips live.
-- [x] Frontend: On save, persist tag removal via AJAX to backend.
-- [x] Testing: Remove tags, verify persistence and UI update (pending user feedback).
-
----
-
-**[2024-06-14] Tag autocomplete and deletion changes committed and pushed. Next step: user testing and UX polish as needed.**
-
-### NEXT: Batch Editing & Filtering (after autocomplete/deletion)
-- [x] Design and implement multi-select in grid view.
-- [x] Add batch action controls (add/remove tags, star/unstar, delete) UI.
-- [x] Batch tag autocomplete to batch bar inputs.
-- [x] Batch tag input uses chip-style input with autocomplete, keyboard navigation, and removable chips, matching single-clip edit UX.
-- [x] Batch add/remove/clear is fully accessible and visually consistent.
-- [x] Batch remove field is now chip-based: chips represent tags present on selected clips, are removable with ×, and only chips in the remove field are removed. Autocomplete suggests only tags present on selected clips and not already chips. UX matches single-clip edit for clarity and accessibility.
-- [x] Per-clip tag editing in the detail view is now fully consistent with the batch editor (chip-style input, autocomplete, keyboard/ARIA UX). Tag saving is robust and persists to the database.
-- [x] Codebase is ready for handoff and onboarding. See STARTUP_MESSAGE.md and README.md for latest state and next steps.
-- [x] Backend: Add endpoints for batch tag/star actions and filtering.
-- [x] Wire up frontend batch actions to backend.
-- [x] Add batch tag autocomplete and polish.
-- [x] Testing: Select multiple clips, apply actions, verify DB and UI.
-
-### Troubleshooting
-- Batch bar and batch tag autocomplete are working in the UI.
-- Backend and DB schema are correct; `/test_tag/{clip_id}` endpoint works with valid JSON.
-- Browser AJAX requests for single-clip tag editing are working; batch actions backend integration is next.
-- [x] [2024-06-14] Batch bar tag add/remove/autocomplete now robust to DOM state. Toast feedback restored. Selection logic fixed. Batch bar is now resilient to rapid selection/deselection and DOM changes.
-
+- [x] Backend: `/tags`

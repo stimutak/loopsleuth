@@ -11,55 +11,69 @@ LoopSleuth Web: Grid View Template
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-    <h1>LoopSleuth - Clip Grid (Web UI)</h1>
-    <form method="post" action="/scan_folder" style="margin-bottom:2em;">
-        <label for="folder_path">Scan folder for videos:</label>
-        <input type="text" id="folder_path" name="folder_path" placeholder="E:/downloads" size="40" required style="margin:0 1em;" />
-        <button type="submit">Scan</button>
-    </form>
-    {% if clips %}
-        <div class="grid">
-            {% for clip in clips %}
-                <div class="card" data-clip-id="{{ clip.id }}">
-                    <input type="checkbox" class="select-clip-checkbox" aria-label="Select clip {{ clip.filename }}" style="position:absolute; left:1em; top:1em; z-index:2;" />
-                    {% if clip.thumbnail_path %}
-                        <a class="card-link" href="/clip/{{ clip.id }}">
-                            <img class="thumb" src="/thumbs/{{ clip.thumb_filename }}" alt="Thumbnail for {{ clip.filename }}" />
-                        </a>
-                    {% else %}
-                        <div class="thumb placeholder">No Thumbnail</div>
-                    {% endif %}
-                    <div class="meta">
-                        <a class="card-link" href="/clip/{{ clip.id }}">
-                            <div class="filename">{{ clip.filename }}</div>
-                        </a>
-                        {% if clip.duration %}
-                            <div class="duration">{{ (clip.duration // 60)|int }}:{{ '%02d' % (clip.duration % 60) }} min</div>
+    <div class="container">
+        <h1>LoopSleuth - Clip Grid (Web UI)</h1>
+        <form method="post" action="/scan_folder" style="margin-bottom:2em;">
+            <label for="folder_path">Scan folder for videos:</label>
+            <input type="text" id="folder_path" name="folder_path" placeholder="E:/downloads" size="40" required style="margin:0 1em;" />
+            <button type="submit">Scan</button>
+        </form>
+        {% if clips %}
+            <div class="grid">
+                {% for clip in clips %}
+                    <div class="card" data-clip-id="{{ clip.id }}">
+                        <label class="custom-checkbox-label">
+                            <input type="checkbox" class="select-clip-checkbox" aria-label="Select clip {{ clip.filename }}" />
+                            <span class="custom-checkbox"></span>
+                        </label>
+                        {% if clip.thumbnail_path %}
+                            <a class="card-link" href="/clip/{{ clip.id }}">
+                                <img class="thumb" src="/thumbs/{{ clip.thumb_filename }}" alt="Thumbnail for {{ clip.filename }}" />
+                            </a>
+                        {% else %}
+                            <div class="thumb placeholder">No Thumbnail</div>
                         {% endif %}
-                        <div class="star" style="cursor:pointer;" data-clip-id="{{ clip.id }}" onclick="toggleStar(event)" title="Toggle star">{% if clip.starred %}★{% else %}☆{% endif %}</div>
-                        <div class="tags">
-                            <!-- Tags are always visible as static chips -->
-                            <span class="tags-text" id="tags-text-{{ clip.id }}">
-                                {% for tag in clip.tags %}
-                                    <span class="tag-chip">{{ tag }}</span>
-                                {% else %}
-                                    <span class="tag-chip tag-empty">No tags</span>
-                                {% endfor %}
-                            </span>
-                            <a href="/clip/{{ clip.id }}" class="edit-tag-btn-link" style="margin-left:0.5em; font-size:0.9em; text-decoration:none;" title="Edit tags in detail view">✎</a>
+                        <div class="meta">
+                            <a class="card-link" href="/clip/{{ clip.id }}">
+                                <div class="filename">{{ clip.filename }}</div>
+                            </a>
+                            {% if clip.duration %}
+                                <div class="duration">{{ (clip.duration // 60)|int }}:{{ '%02d' % (clip.duration % 60) }} min</div>
+                            {% endif %}
+                            <div class="star" style="cursor:pointer;" data-clip-id="{{ clip.id }}" onclick="toggleStar(event)" title="Toggle star">{% if clip.starred %}★{% else %}☆{% endif %}</div>
+                            <div class="tags">
+                                <!-- Tags are always visible as static chips -->
+                                <span class="tags-text" id="tags-text-{{ clip.id }}">
+                                    {% for tag in clip.tags %}
+                                        <span class="tag-chip">{{ tag }}</span>
+                                    {% else %}
+                                        <span class="tag-chip tag-empty">No tags</span>
+                                    {% endfor %}
+                                </span>
+                                <a href="/clip/{{ clip.id }}" class="edit-tag-btn-link" style="margin-left:0.5em; font-size:0.9em; text-decoration:none;" title="Edit tags in detail view">✎</a>
+                            </div>
                         </div>
                     </div>
-                </div>
-            {% endfor %}
-        </div>
-        <!-- Floating batch action bar -->
-        <div id="batch-action-bar" style="display:none;"></div>
-    {% else %}
-        <p>No clips found. (This is a placeholder page.)</p>
-    {% endif %}
+                {% endfor %}
+            </div>
+            <!-- Floating batch action bar -->
+            <div id="batch-action-bar" style="display:none;"></div>
+        {% else %}
+            <p>No clips found. (This is a placeholder page.)</p>
+        {% endif %}
+    </div>
+    <div id="selected-clips-bar"><!-- Persistent selection bar (populated by JS) --></div>
 </body>
 <script src="/static/clip_actions.js"></script>
 <script>
+// Restore scroll position if returning from detail view
+window.addEventListener('DOMContentLoaded', function() {
+    const scrollY = sessionStorage.getItem('gridScrollY');
+    if (scrollY !== null) {
+        window.scrollTo(0, parseInt(scrollY, 10));
+        sessionStorage.removeItem('gridScrollY');
+    }
+});
 // Reload the grid if restored from bfcache (e.g., browser back button)
 window.addEventListener('pageshow', function(event) {
     if (event.persisted) {

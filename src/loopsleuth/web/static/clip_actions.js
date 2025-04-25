@@ -399,6 +399,10 @@ function addTagFromAutocomplete(input, clipId, tag) {
 const batchAddTagsState = [];
 const batchRemoveTagsState = [];
 
+// --- Global selection state for both bars ---
+const selectedClipIds = new Set();
+let lastSelectedIndex = null;
+
 // --- Toast/snackbar feedback for user actions ---
 function showToast(message, isError = false) {
     let toast = document.getElementById('toast-snackbar');
@@ -427,9 +431,6 @@ function showToast(message, isError = false) {
 
 if (document.getElementById('batch-action-bar')) {
     // --- Batch selection: checkbox and card click
-    const selectedClipIds = new Set();
-    let lastSelectedIndex = null;
-
     function renderBatchTagChips(type) {
         const container = document.getElementById(`batch-${type}-tags-chips`);
         if (!container) return; // Prevent error if batch bar is not visible
@@ -718,39 +719,32 @@ if (document.getElementById('batch-action-bar')) {
     }
     function renderBatchActionBar() {
         const bar = document.getElementById('batch-action-bar');
-        console.log('[BatchBar] renderBatchActionBar called. Bar:', bar);
         if (!bar) {
             console.error('[BatchBar] #batch-action-bar not found in DOM');
             return;
         }
-        console.log('[BatchBar] selectedClipIds:', Array.from(selectedClipIds));
-        if (selectedClipIds.size === 0) {
-            bar.style.display = 'none';
-            bar.innerHTML = '';
-            console.log('[BatchBar] No selection, hiding bar');
-            return;
-        }
-        // --- Batch bar UI ---
-        bar.style.display = '';
+        // Always show the bar, but disable actions if nothing is selected
+        bar.style.display = 'flex';
+        const count = selectedClipIds.size;
         bar.innerHTML = `
             <div class="batch-bar-section">
-                <span class="batch-bar-label">${selectedClipIds.size} selected</span>
+                <span class="batch-bar-label">${count} selected</span>
             </div>
             <div class="batch-bar-section">
                 <span class="batch-bar-label">Add tags:</span>
                 <span id="batch-add-tags-chips" class="tags-edit" style="display:inline-block;"></span>
-                <input type="text" class="batch-bar-input" id="batch-add-tags-input" placeholder="Add tag..." autocomplete="off" style="width:160px; margin-top:0.3em; display:inline-block;" />
-                <button class="batch-bar-btn" id="batch-add-btn">Add</button>
+                <input type="text" class="batch-bar-input" id="batch-add-tags-input" placeholder="Add tag..." autocomplete="off" style="width:120px; margin-top:0.2em; display:inline-block;" />
+                <button class="batch-bar-btn" id="batch-add-btn" ${count === 0 ? 'disabled' : ''}>Add</button>
             </div>
             <div class="batch-bar-section">
                 <span class="batch-bar-label">Remove tags:</span>
                 <span id="batch-remove-tags-chips" class="tags-edit" style="display:inline-block;"></span>
-                <input type="text" class="batch-bar-input" id="batch-remove-tags-input" placeholder="Remove tag..." autocomplete="off" style="width:160px; margin-top:0.3em; display:inline-block;" />
-                <button class="batch-bar-btn" id="batch-remove-btn" title="Removes only the tags shown as chips from all selected clips">Remove</button>
-                <span class="batch-bar-help" style="font-size:0.95em; color:#aaa; margin-left:0.7em;" title="Select tags to remove, then press Remove to apply to all selected clips. Removing a chip only removes it from this list, not from the clips until you press Remove.">?</span>
+                <input type="text" class="batch-bar-input" id="batch-remove-tags-input" placeholder="Remove tag..." autocomplete="off" style="width:120px; margin-top:0.2em; display:inline-block;" />
+                <button class="batch-bar-btn" id="batch-remove-btn" title="Removes only the tags shown as chips from all selected clips" ${count === 0 ? 'disabled' : ''}>Remove</button>
+                <span class="batch-bar-help" style="font-size:0.85em; color:#aaa; margin-left:0.5em;" title="Select tags to remove, then press Remove to apply to all selected clips. Removing a chip only removes it from this list, not from the clips until you press Remove.">?</span>
             </div>
             <div class="batch-bar-section">
-                <button class="batch-bar-btn" id="batch-clear-btn">Clear all tags</button>
+                <button class="batch-bar-btn" id="batch-clear-btn" ${count === 0 ? 'disabled' : ''}>Clear all tags</button>
             </div>
             <span class="batch-bar-help" title="Shift+Click: range select, Ctrl/Cmd+Click: multi-select. Add/Remove tags for all selected clips.">?</span>
         `;
@@ -761,12 +755,11 @@ if (document.getElementById('batch-action-bar')) {
         // Wire up events (backend integration next)
         document.getElementById('batch-add-btn').onclick = (e) => {
             e.preventDefault();
-            if (batchAddTagsState.length === 0) {
-                showToast('Enter tag(s) to add.', true);
+            if (count === 0 || batchAddTagsState.length === 0) {
+                showToast('Select clips and enter tag(s) to add.', true);
                 return;
             }
             const clipIds = Array.from(selectedClipIds).map(Number);
-            console.log('[BatchAdd] sending to backend:', batchAddTagsState, 'clipIds:', clipIds);
             fetch('/batch_tag', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
@@ -776,7 +769,6 @@ if (document.getElementById('batch-action-bar')) {
             .then(data => {
                 if (data.error) {
                     showToast('Batch add failed: ' + data.error, true);
-                    console.error('[BatchAdd] backend error:', data.error);
                     return;
                 }
                 for (const [clipId, tags] of Object.entries(data)) {
@@ -790,14 +782,13 @@ if (document.getElementById('batch-action-bar')) {
             })
             .catch(err => {
                 showToast('Batch add error: ' + err, true);
-                console.error('[BatchAdd] fetch error:', err);
             });
         };
         const removeBtn = document.getElementById('batch-remove-btn');
-        removeBtn.disabled = batchRemoveTagsState.length === 0;
+        removeBtn.disabled = count === 0 || batchRemoveTagsState.length === 0;
         removeBtn.onclick = () => {
-            if (batchRemoveTagsState.length === 0) {
-                showToast('No tags selected for removal. Add tags to the remove field first.', true);
+            if (count === 0 || batchRemoveTagsState.length === 0) {
+                showToast('Select clips and tags to remove.', true);
                 return;
             }
             const clipIds = Array.from(selectedClipIds).map(Number);
@@ -824,7 +815,10 @@ if (document.getElementById('batch-action-bar')) {
                 showToast('Batch remove error: ' + err, true);
             });
         };
-        document.getElementById('batch-clear-btn').onclick = () => {
+        const clearBtn = document.getElementById('batch-clear-btn');
+        clearBtn.disabled = count === 0;
+        clearBtn.onclick = () => {
+            if (count === 0) return;
             if (!confirm('Clear all tags from selected clips?')) return;
             const clipIds = Array.from(selectedClipIds).map(Number);
             fetch('/batch_tag', {
@@ -928,6 +922,8 @@ if (document.getElementById('batch-action-bar')) {
             // Card click (not on links/buttons/inputs)
             card.addEventListener('click', function(e) {
                 if (e.target.closest('a,button,input')) return;
+                // Save scroll position before navigating to detail
+                sessionStorage.setItem('gridScrollY', window.scrollY);
                 console.log('[DEBUG] Card clicked for clip', clipId);
                 const isCtrl = e.ctrlKey || e.metaKey;
                 const isShift = e.shiftKey;
@@ -959,6 +955,12 @@ if (document.getElementById('batch-action-bar')) {
                 }
                 updateCardSelectionUI();
             });
+            // Save scroll position on thumbnail or filename link click
+            card.querySelectorAll('.card-link').forEach(link => {
+                link.addEventListener('click', function(e) {
+                    sessionStorage.setItem('gridScrollY', window.scrollY);
+                });
+            });
         });
         updateCardSelectionUI();
     });
@@ -979,4 +981,102 @@ function renderTagChips(clipId, tags) {
             tagsText.appendChild(chip);
         });
     }
-} 
+}
+
+// --- Selected Clips Bar: Always Visible, Responsive ---
+function renderSelectedClipsBar() {
+    const bar = document.getElementById('selected-clips-bar');
+    if (!bar) return;
+    const count = selectedClipIds.size;
+    // Always show the bar, but disable actions if nothing is selected
+    bar.style.display = '';
+    bar.innerHTML = `
+        <span class="selected-bar-label">${count} selected</span>
+        <button class="selected-bar-btn" id="selected-export-btn" ${count === 0 ? 'disabled' : ''} title="Export selected clip paths">
+            <span class="selected-bar-icon">📄</span> Export List
+        </button>
+        <button class="selected-bar-btn" id="selected-copy-btn" ${count === 0 ? 'disabled' : ''} title="Copy/move selected files">
+            <span class="selected-bar-icon">📁</span> Copy to Folder
+        </button>
+        <button class="selected-bar-btn" id="selected-clear-btn" ${count === 0 ? 'disabled' : ''} title="Clear selection">
+            <span class="selected-bar-icon">✖️</span> Clear
+        </button>
+    `;
+    // Wire up actions (placeholders for now)
+    document.getElementById('selected-export-btn').onclick = async (e) => {
+        if (count === 0) return;
+        const ids = Array.from(selectedClipIds).map(Number);
+        try {
+            const resp = await fetch('/export_selected', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({clip_ids: ids})
+            });
+            if (!resp.ok) {
+                const err = await resp.json();
+                showToast('Export failed: ' + (err.error || resp.status), true);
+                return;
+            }
+            const blob = await resp.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'keepers.txt';
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => {
+                window.URL.revokeObjectURL(url);
+                a.remove();
+            }, 100);
+            showToast('Exported keepers.txt');
+        } catch (err) {
+            showToast('Export error: ' + err, true);
+        }
+    };
+    document.getElementById('selected-copy-btn').onclick = async (e) => {
+        if (count === 0) return;
+        let dest = prompt('Copy selected files to which folder? (absolute path)');
+        if (!dest) return;
+        const ids = Array.from(selectedClipIds).map(Number);
+        try {
+            const resp = await fetch('/copy_selected', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({clip_ids: ids, dest_folder: dest})
+            });
+            const data = await resp.json();
+            if (!resp.ok || data.error) {
+                showToast('Copy failed: ' + (data.error || resp.status), true);
+                return;
+            }
+            // Summarize results
+            const ok = Object.values(data.results).filter(v => v === 'ok').length;
+            const err = Object.values(data.results).length - ok;
+            let msg = `Copied ${ok} file(s)`;
+            if (err > 0) msg += `, ${err} error(s)`;
+            showToast(msg + '.');
+            if (err > 0) {
+                // Optionally show details in console
+                console.warn('[Copy] Errors:', data.results);
+            }
+        } catch (err) {
+            showToast('Copy error: ' + err, true);
+        }
+    };
+    document.getElementById('selected-clear-btn').onclick = (e) => {
+        if (count === 0) return;
+        selectedClipIds.clear();
+        updateCardSelectionUI();
+    };
+}
+
+// Patch updateCardSelectionUI to always call renderSelectedClipsBar
+const origUpdateCardSelectionUI = updateCardSelectionUI;
+updateCardSelectionUI = function() {
+    origUpdateCardSelectionUI.apply(this, arguments);
+    renderSelectedClipsBar();
+};
+
+document.addEventListener('DOMContentLoaded', function() {
+    renderSelectedClipsBar();
+}); 
