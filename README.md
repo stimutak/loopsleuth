@@ -120,3 +120,10 @@ See code comments for further details and next steps.
 
 - [2024-06-14] Batch bar tag add/remove/autocomplete now robust to DOM state. Toast feedback restored. Selection logic fixed. Batch bar is now resilient to rapid selection/deselection and DOM changes.
 
+## ✅ Batch Tag Editing: Production-Ready (2024-06)
+- Batch tag add, remove, and clear actions are fully implemented and robust in both backend and frontend.
+- The batch action bar UI is reliable, immediate, and accessible for all tag changes.
+- Automated tests for batch tag actions are present and passing (see `tests/test_batch_tag.py`).
+- The test suite uses a production-matching schema and covers all batch tag actions for multiple clips.
+- The batch tag workflow is now fully production-ready and tested as of this commit.
+

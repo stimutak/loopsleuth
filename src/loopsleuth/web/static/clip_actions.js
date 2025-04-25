@@ -476,7 +476,6 @@ if (document.getElementById('batch-action-bar')) {
         const input = document.getElementById(`batch-${type}-tags-input`);
         const tags = type === 'add' ? batchAddTagsState : batchRemoveTagsState;
         input.addEventListener('keydown', function(e) {
-            // Debug: log key events
             if (type === 'add') console.log('[BatchAdd] keydown:', e.key, 'input:', input.value, 'tags:', tags);
             if (e.key === 'Backspace' && input.value === '') {
                 if (tags.length > 0) {
@@ -486,7 +485,6 @@ if (document.getElementById('batch-action-bar')) {
                     return;
                 }
             }
-            // Keyboard navigation for autocomplete
             const dropdown = document.getElementById('batch-tag-suggestions-dropdown');
             let suggestions = input._suggestions || [];
             let highlighted = typeof input._highlighted === 'number' ? input._highlighted : -1;
@@ -504,24 +502,24 @@ if (document.getElementById('batch-action-bar')) {
                     input._highlighted = highlighted;
                     showBatchTagSuggestions(input, type);
                 }
-            } else if (e.key === 'Tab') {
+            } else if (e.key === 'Tab' || e.key === 'Enter') {
                 if (suggestions.length > 0 && highlighted >= 0) {
                     e.preventDefault();
                     addBatchTagFromAutocomplete(input, type, suggestions[highlighted]);
+                    setTimeout(() => input.focus(), 0);
                     return;
-                }
-            } else if (e.key === 'Enter') {
-                if (suggestions.length > 0 && highlighted >= 0) {
-                    e.preventDefault();
-                    addBatchTagFromAutocomplete(input, type, suggestions[highlighted]);
-                    return;
-                } else {
+                } else if (e.key === 'Enter' || e.key === 'Tab') {
                     // Add tag from input if not empty and not duplicate
                     const val = input.value.trim();
                     if (val && !tags.map(t => t.toLowerCase()).includes(val.toLowerCase())) {
                         tags.push(val);
+                        console.log('[BatchAdd] tag added from input:', val, 'tags:', tags);
                         renderBatchTagChips(type);
                         input.value = '';
+                        setTimeout(() => input.focus(), 0);
+                    } else {
+                        if (!val) console.log('[BatchAdd] ignored empty input');
+                        else console.log('[BatchAdd] ignored duplicate:', val);
                     }
                     input._highlighted = -1;
                     input._suggestions = [];
@@ -541,8 +539,10 @@ if (document.getElementById('batch-action-bar')) {
         input.addEventListener('input', function() {
             if (type === 'add') console.log('[BatchAdd] input event:', input.value, 'tags:', tags);
             showBatchTagSuggestions(input, type);
+            // Enable Add button if there is a non-empty input or at least one chip
+            const addBtn = document.getElementById('batch-add-btn');
+            if (addBtn) addBtn.disabled = !(tags.length > 0 || input.value.trim().length > 0);
         });
-        // Prevent dropdown from hiding on blur if a suggestion is being clicked
         input.addEventListener('blur', function() {
             setTimeout(() => {
                 let dropdown = document.getElementById('batch-tag-suggestions-dropdown');
@@ -554,12 +554,15 @@ if (document.getElementById('batch-action-bar')) {
         const tags = type === 'add' ? batchAddTagsState : batchRemoveTagsState;
         if (!tags.map(t => t.toLowerCase()).includes(tag.toLowerCase())) {
             tags.push(tag);
+            console.log('[BatchAdd] tag added from autocomplete:', tag, 'tags:', tags);
             renderBatchTagChips(type);
+        } else {
+            console.log('[BatchAdd] ignored duplicate from autocomplete:', tag);
         }
         input.value = '';
         input._highlighted = -1;
         showBatchTagSuggestions(input, type);
-        if (type === 'add') console.log('[BatchAdd] tag added from autocomplete:', tag, 'tags:', tags);
+        setTimeout(() => input.focus(), 0);
     }
     function showBatchTagSuggestions(input, type) {
         let dropdown = document.getElementById('batch-tag-suggestions-dropdown');
@@ -757,12 +760,13 @@ if (document.getElementById('batch-action-bar')) {
         handleBatchTagInput('remove');
         // Wire up events (backend integration next)
         document.getElementById('batch-add-btn').onclick = (e) => {
-            e.preventDefault(); // Prevent accidental form submission
+            e.preventDefault();
             if (batchAddTagsState.length === 0) {
                 showToast('Enter tag(s) to add.', true);
                 return;
             }
             const clipIds = Array.from(selectedClipIds).map(Number);
+            console.log('[BatchAdd] sending to backend:', batchAddTagsState, 'clipIds:', clipIds);
             fetch('/batch_tag', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
@@ -772,6 +776,7 @@ if (document.getElementById('batch-action-bar')) {
             .then(data => {
                 if (data.error) {
                     showToast('Batch add failed: ' + data.error, true);
+                    console.error('[BatchAdd] backend error:', data.error);
                     return;
                 }
                 for (const [clipId, tags] of Object.entries(data)) {
@@ -781,9 +786,11 @@ if (document.getElementById('batch-action-bar')) {
                 batchAddTagsState.length = 0;
                 renderBatchTagChips('add');
                 document.getElementById('batch-add-tags-input').value = '';
+                setTimeout(() => document.getElementById('batch-add-tags-input').focus(), 0);
             })
             .catch(err => {
                 showToast('Batch add error: ' + err, true);
+                console.error('[BatchAdd] fetch error:', err);
             });
         };
         const removeBtn = document.getElementById('batch-remove-btn');

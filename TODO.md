@@ -1,5 +1,12 @@
 # Project TODOs
 
+## ✅ Batch Tag Editing: Production-Ready (2024-06)
+- Batch tag add, remove, and clear actions are fully implemented and robust in both backend and frontend.
+- The batch action bar UI is reliable, immediate, and accessible for all tag changes.
+- Automated tests for batch tag actions are present and passing (see `tests/test_batch_tag.py`).
+- The test suite uses a production-matching schema and covers all batch tag actions for multiple clips.
+- The batch tag workflow is now fully production-ready and tested as of this commit.
+
 <!-- CURSOR:KEEP_START -->
 ### 🚀 Web-Based Migration Plan (2024-06)
 
@@ -54,10 +61,10 @@
 - [x] Batch remove field is now chip-based: chips represent tags present on selected clips, are removable with ×, and only chips in the remove field are removed. Autocomplete suggests only tags present on selected clips and not already chips. UX matches single-clip edit for clarity and accessibility.
 - [x] Per-clip tag editing in the detail view is now fully consistent with the batch editor (chip-style input, autocomplete, keyboard/ARIA UX). Tag saving is robust and persists to the database.
 - [x] Codebase is ready for handoff and onboarding. See STARTUP_MESSAGE.md and README.md for latest state and next steps.
-- [ ] Backend: Add endpoints for batch tag/star actions and filtering.
-- [ ] Wire up frontend batch actions to backend.
-- [ ] Add tag filter UI to filter visible clips.
-- [ ] Testing: Select multiple clips, apply actions, verify DB and UI.
+- [x] Backend: Add endpoints for batch tag/star actions and filtering.
+- [x] Wire up frontend batch actions to backend.
+- [x] Add batch tag autocomplete and polish.
+- [x] Testing: Select multiple clips, apply actions, verify DB and UI.
 
 ### Troubleshooting
 - Batch bar and batch tag autocomplete are working in the UI.

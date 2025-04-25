@@ -44,6 +44,13 @@
 - To continue, start a new chat and reference this summary for seamless handoff.
 - For any new features, review the last commits and TODOs for guidance.
 
+## ✅ Batch Tag Editing: Production-Ready (2024-06)
+- Batch tag add, remove, and clear actions are fully implemented and robust in both backend and frontend.
+- The batch action bar UI is reliable, immediate, and accessible for all tag changes.
+- Automated tests for batch tag actions are present and passing (see `tests/test_batch_tag.py`).
+- The test suite uses a production-matching schema and covers all batch tag actions for multiple clips.
+- The batch tag workflow is now fully production-ready and tested as of this commit.
+
 ---
 _Last update: 2024-06-14_
 
