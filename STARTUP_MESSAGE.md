@@ -42,4 +42,6 @@
 - For any new features, review the last commits and TODOs for guidance.
 
 ---
-_Last update: 2024-06-14_ 
+_Last update: 2024-06-14_
+
+[2024-06-14] Batch bar tag add/remove/autocomplete now robust to DOM state. Toast feedback restored. Selection logic fixed. Batch bar is now resilient to rapid selection/deselection and DOM changes. 

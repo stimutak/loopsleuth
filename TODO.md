@@ -62,4 +62,5 @@
 - Batch bar and batch tag autocomplete are working in the UI.
 - Backend and DB schema are correct; `/test_tag/{clip_id}` endpoint works with valid JSON.
 - Browser AJAX requests for single-clip tag editing are working; batch actions backend integration is next.
+- [x] [2024-06-14] Batch bar tag add/remove/autocomplete now robust to DOM state. Toast feedback restored. Selection logic fixed. Batch bar is now resilient to rapid selection/deselection and DOM changes.
 

@@ -134,3 +134,5 @@ See code comments for further details and next steps.
     pip install -r requirements.txt
     ```
 
+- [2024-06-14] Batch bar tag add/remove/autocomplete now robust to DOM state. Toast feedback restored. Selection logic fixed. Batch bar is now resilient to rapid selection/deselection and DOM changes.
+

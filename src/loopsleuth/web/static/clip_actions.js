@@ -139,9 +139,35 @@ function handleOutsideClick(e) {
 const batchAddTagsState = [];
 const batchRemoveTagsState = [];
 
+// --- Toast/snackbar feedback for user actions ---
+function showToast(message, isError = false) {
+    let toast = document.getElementById('toast-snackbar');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'toast-snackbar';
+        toast.style.position = 'fixed';
+        toast.style.left = '50%';
+        toast.style.bottom = '2.5em';
+        toast.style.transform = 'translateX(-50%)';
+        toast.style.background = isError ? '#c0392b' : '#23272a';
+        toast.style.color = '#fff';
+        toast.style.padding = '1em 2em';
+        toast.style.borderRadius = '8px';
+        toast.style.fontSize = '1.1em';
+        toast.style.zIndex = 3000;
+        toast.style.boxShadow = '0 2px 12px #000a';
+        toast.style.opacity = 0;
+        toast.style.transition = 'opacity 0.3s';
+        document.body.appendChild(toast);
+    }
+    toast.textContent = message;
+    toast.style.opacity = 1;
+    setTimeout(() => { toast.style.opacity = 0; }, 2200);
+}
+
 function renderBatchTagChips(type) {
-    // type: 'add' or 'remove'
     const container = document.getElementById(`batch-${type}-tags-chips`);
+    if (!container) return; // Prevent error if batch bar is not visible
     const tags = type === 'add' ? batchAddTagsState : batchRemoveTagsState;
     container.innerHTML = '';
     container.setAttribute('role', 'list');
@@ -569,6 +595,10 @@ function updateCardSelectionUI() {
     syncBatchRemoveTagsWithSelection();
 }
 
+// --- Batch selection: checkbox and card click
+const selectedClipIds = new Set();
+let lastSelectedIndex = null;
+
 document.addEventListener('DOMContentLoaded', function() {
     // Make all grid cards focusable and add keyboard listeners
     const cards = document.querySelectorAll('.card[data-clip-id]');
@@ -578,14 +608,10 @@ document.addEventListener('DOMContentLoaded', function() {
             // Only trigger if not typing in an input/textarea/contenteditable
             if (['INPUT', 'TEXTAREA'].includes(e.target.tagName) || e.target.isContentEditable) return;
             if (e.key === 'e' || e.key === 'Enter') {
-                const editBtn = card.querySelector('.edit-tag-btn');
-                if (editBtn) {
-                    editBtn.click();
-                    setTimeout(() => {
-                        const clipId = card.getAttribute('data-clip-id');
-                        const input = document.getElementById(`tag-input-new-${clipId}`);
-                        if (input) input.focus();
-                    }, 10);
+                const editLink = card.querySelector('.edit-tag-btn-link');
+                if (editLink) {
+                    // Navigate to detail view for tag editing
+                    window.location.href = editLink.href;
                     e.preventDefault();
                 }
             }
@@ -622,6 +648,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const checkbox = card.querySelector('.select-clip-checkbox');
         // Checkbox click
         checkbox.addEventListener('click', function(e) {
+            console.log('[DEBUG] Checkbox clicked for clip', clipId, 'checked:', checkbox.checked);
             e.stopPropagation();
             // FIX: Always toggle only this card, never clear others
             if (checkbox.checked) {
@@ -635,6 +662,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Card click (not on links/buttons/inputs)
         card.addEventListener('click', function(e) {
             if (e.target.closest('a,button,input')) return;
+            console.log('[DEBUG] Card clicked for clip', clipId);
             const isCtrl = e.ctrlKey || e.metaKey;
             const isShift = e.shiftKey;
             if (isShift && lastSelectedIndex !== null) {
