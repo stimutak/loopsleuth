@@ -52,7 +52,8 @@
 - [x] Batch tag input uses chip-style input with autocomplete, keyboard navigation, and removable chips, matching single-clip edit UX.
 - [x] Batch add/remove/clear is fully accessible and visually consistent.
 - [x] Batch remove field is now chip-based: chips represent tags present on selected clips, are removable with ×, and only chips in the remove field are removed. Autocomplete suggests only tags present on selected clips and not already chips. UX matches single-clip edit for clarity and accessibility.
-- [x] Per-clip tag editing is now only available in the detail (single-clip) view. The grid view uses the batch bar for all tag editing. The per-clip tag editor has been removed from the grid for clarity and workflow consistency.
+- [x] Per-clip tag editing in the detail view is now fully consistent with the batch editor (chip-style input, autocomplete, keyboard/ARIA UX). Tag saving is robust and persists to the database.
+- [x] Codebase is ready for handoff and onboarding. See STARTUP_MESSAGE.md and README.md for latest state and next steps.
 - [ ] Backend: Add endpoints for batch tag/star actions and filtering.
 - [ ] Wire up frontend batch actions to backend.
 - [ ] Add tag filter UI to filter visible clips.

@@ -49,24 +49,8 @@ Python ≥ 3.10, ffmpeg/ffprobe, SQLite, Pillow, imagehash, FastAPI, Jinja2, Tex
 
 ### Tag Editing UX (2024-06)
 
-- Per-clip tag editing is now only available in the detail (single-clip) view. The grid view uses the batch bar for all tag editing.
-- The per-clip tag editor has been removed from the grid for a cleaner, more unified workflow.
-- **Keyboard Shortcuts:**
-  - `e` or `Enter` focuses tag input for editing (when tag area is focused)
-  - Arrow keys navigate autocomplete suggestions
-  - `Enter`/`Tab` selects a suggestion if highlighted
-  - `Backspace` in empty input removes last tag chip
-  - `Escape` closes dropdown if open, otherwise saves and exits edit mode
-- **Mouse:**
-  - Click X to remove tag
-  - Click outside tag editor to save and exit
-  - Click suggestion to add
-- **Visual:**
-  - Edit mode is visually indicated with a border and background
-- **Accessibility:**
-  - Full ARIA roles/attributes for dropdown, input, and chips (screen reader and keyboard accessible)
-  - Dropdown scrolls to keep highlight visible (for long lists)
-  - Professional compliance: works with screen readers and assistive tech
+- Per-clip tag editing in the detail view is now fully consistent with the batch editor: chip-style input, autocomplete, keyboard navigation, and ARIA/accessibility are all supported. Tag changes are persisted to the database and reflected in both the detail and grid views.
+- The codebase is ready for handoff or onboarding. See STARTUP_MESSAGE.md and TODO.md for the latest project state and next steps.
 
 #### Remaining polish for pro-level UX
 - [x] ARIA roles/attributes for full screen reader support

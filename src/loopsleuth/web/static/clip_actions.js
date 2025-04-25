@@ -124,16 +124,276 @@ function handleOutsideClick(e) {
     }
 }
 
-// --- Per-clip tag editing functions removed: now handled only in detail view or via batch bar ---
-// The following functions were removed as per-clip tag editing is no longer available in the grid view:
-// - editTags
-// - cancelEditTags
-// - renderEditableTagChips
-// - showTagSuggestionsStandard
-// - addTagFromAutocomplete
-// - saveTags
-//
-// Batch bar and detail view tag editing logic remain below.
+// --- Per-clip tag editing logic for detail view (single-clip only) ---
+// This restores chip-style tag editing, autocomplete, and ARIA/keyboard UX for the detail view only.
+// These functions are not used in the grid or batch bar.
+
+function editTags(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    const clipId = event.target.getAttribute('data-clip-id');
+    const tagsText = document.getElementById(`tags-text-${clipId}`);
+    const tagsEdit = document.getElementById(`tags-edit-${clipId}`);
+    const input = document.getElementById(`tag-input-new-${clipId}`);
+    const saveBtn = document.getElementById(`save-tag-btn-${clipId}`);
+    const cancelBtn = document.getElementById(`cancel-tag-btn-${clipId}`);
+    if (!tagsText || !tagsEdit || !input || !saveBtn || !cancelBtn) return;
+    // Parse current tags from chips
+    const tags = Array.from(tagsText.querySelectorAll('.tag-chip:not(.tag-empty)')).map(chip => chip.textContent.trim());
+    editTagsState[clipId] = [...tags];
+    originalTagsState[clipId] = [...tags];
+    // Hide static, show editor
+    tagsText.style.display = 'none';
+    tagsEdit.style.display = 'inline-block';
+    input.style.display = 'inline-block';
+    saveBtn.style.display = 'inline-block';
+    cancelBtn.style.display = 'inline-block';
+    renderEditableTagChips(clipId);
+    input.value = '';
+    input.focus();
+    // Keyboard/ARIA/autocomplete
+    input.setAttribute('role', 'combobox');
+    input.setAttribute('aria-autocomplete', 'list');
+    input.setAttribute('aria-expanded', 'false');
+    input.setAttribute('aria-controls', 'tag-suggestions-dropdown');
+    input.setAttribute('aria-activedescendant', '');
+    input._highlighted = -1;
+    input._suggestions = [];
+    input.onkeydown = function(e) {
+        const dropdown = document.getElementById('tag-suggestions-dropdown');
+        let suggestions = input._suggestions || [];
+        let highlighted = typeof input._highlighted === 'number' ? input._highlighted : -1;
+        if (e.key === 'Backspace' && input.value === '') {
+            if (editTagsState[clipId].length > 0) {
+                editTagsState[clipId].pop();
+                renderEditableTagChips(clipId);
+                e.preventDefault();
+                return;
+            }
+        } else if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            if (suggestions.length > 0) {
+                highlighted = (highlighted + 1) % suggestions.length;
+                input._highlighted = highlighted;
+                showTagSuggestionsStandard(input, clipId);
+            }
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (suggestions.length > 0) {
+                highlighted = (highlighted - 1 + suggestions.length) % suggestions.length;
+                input._highlighted = highlighted;
+                showTagSuggestionsStandard(input, clipId);
+            }
+        } else if (e.key === 'Tab') {
+            if (suggestions.length > 0 && highlighted >= 0) {
+                e.preventDefault();
+                addTagFromAutocomplete(input, clipId, suggestions[highlighted]);
+                return;
+            }
+        } else if (e.key === 'Enter') {
+            if (suggestions.length > 0 && highlighted >= 0) {
+                e.preventDefault();
+                addTagFromAutocomplete(input, clipId, suggestions[highlighted]);
+                return;
+            } else {
+                // Add tag from input if not empty and not duplicate
+                const val = input.value.trim();
+                if (val && !editTagsState[clipId].map(t => t.toLowerCase()).includes(val.toLowerCase())) {
+                    editTagsState[clipId].push(val);
+                    renderEditableTagChips(clipId);
+                    input.value = '';
+                }
+                input._highlighted = -1;
+                input._suggestions = [];
+                showTagSuggestionsStandard(input, clipId);
+                e.preventDefault();
+            }
+        } else if (e.key === 'Escape') {
+            if (dropdown && dropdown.style.display === 'block') {
+                dropdown.style.display = 'none';
+                input._suggestions = [];
+                input._highlighted = -1;
+                e.preventDefault();
+                return;
+            }
+        }
+    };
+    input.oninput = function() {
+        showTagSuggestionsStandard(input, clipId);
+    };
+    input.onblur = function() {
+        setTimeout(() => {
+            let dropdown = document.getElementById('tag-suggestions-dropdown');
+            if (dropdown) dropdown.style.display = 'none';
+        }, 180);
+    };
+    document.addEventListener('mousedown', handleOutsideClick, true);
+}
+
+function cancelEditTags(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    const clipId = event.target.getAttribute('data-clip-id');
+    const tagsText = document.getElementById(`tags-text-${clipId}`);
+    const tagsEdit = document.getElementById(`tags-edit-${clipId}`);
+    const input = document.getElementById(`tag-input-new-${clipId}`);
+    const saveBtn = document.getElementById(`save-tag-btn-${clipId}`);
+    const cancelBtn = document.getElementById(`cancel-tag-btn-${clipId}`);
+    if (!tagsText || !tagsEdit || !input || !saveBtn || !cancelBtn) return;
+    // Restore original tags
+    renderTagChips(clipId, originalTagsState[clipId]);
+    // Hide editor, show static
+    tagsText.style.display = 'inline-block';
+    tagsEdit.style.display = 'none';
+    input.style.display = 'none';
+    saveBtn.style.display = 'none';
+    cancelBtn.style.display = 'none';
+    input.value = '';
+    document.removeEventListener('mousedown', handleOutsideClick, true);
+}
+
+function saveTags(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    const clipId = event.target.getAttribute('data-clip-id');
+    const tags = editTagsState[clipId] || [];
+    fetch(`/tag/${clipId}`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({tags})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.error) {
+            showToast('Tag update failed: ' + data.error, true);
+            return;
+        }
+        renderTagChips(clipId, data.tags);
+        // Hide editor, show static
+        const tagsText = document.getElementById(`tags-text-${clipId}`);
+        const tagsEdit = document.getElementById(`tags-edit-${clipId}`);
+        const input = document.getElementById(`tag-input-new-${clipId}`);
+        const saveBtn = document.getElementById(`save-tag-btn-${clipId}`);
+        const cancelBtn = document.getElementById(`cancel-tag-btn-${clipId}`);
+        if (!tagsText || !tagsEdit || !input || !saveBtn || !cancelBtn) return;
+        tagsText.style.display = 'inline-block';
+        tagsEdit.style.display = 'none';
+        input.style.display = 'none';
+        saveBtn.style.display = 'none';
+        cancelBtn.style.display = 'none';
+        input.value = '';
+        showToast('Tags updated.');
+        document.removeEventListener('mousedown', handleOutsideClick, true);
+    })
+    .catch(err => {
+        showToast('Tag update error: ' + err, true);
+    });
+}
+
+function renderEditableTagChips(clipId) {
+    const tagsEdit = document.getElementById(`tags-edit-${clipId}`);
+    if (!tagsEdit) return;
+    const tags = editTagsState[clipId] || [];
+    tagsEdit.innerHTML = '';
+    tagsEdit.setAttribute('role', 'list');
+    if (tags.length === 0) {
+        tagsEdit.innerHTML = '<span class="tag-chip tag-empty">No tags</span>';
+    } else {
+        tags.forEach((tag, idx) => {
+            const chip = document.createElement('span');
+            chip.className = 'tag-chip tag-edit';
+            chip.setAttribute('role', 'listitem');
+            chip.setAttribute('aria-label', `Tag: ${tag}`);
+            chip.appendChild(document.createTextNode(tag));
+            const x = document.createElement('span');
+            x.className = 'tag-chip-x';
+            x.textContent = '×';
+            x.setAttribute('aria-label', `Remove tag ${tag}`);
+            x.onclick = () => {
+                editTagsState[clipId].splice(idx, 1);
+                renderEditableTagChips(clipId);
+            };
+            chip.appendChild(x);
+            tagsEdit.appendChild(chip);
+        });
+    }
+}
+
+function showTagSuggestionsStandard(input, clipId) {
+    let dropdown = document.getElementById('tag-suggestions-dropdown');
+    if (!dropdown) {
+        dropdown = document.createElement('div');
+        dropdown.id = 'tag-suggestions-dropdown';
+        dropdown.className = 'tag-suggestions-dropdown';
+        document.body.appendChild(dropdown);
+    }
+    const rect = input.getBoundingClientRect();
+    dropdown.style.position = 'absolute';
+    dropdown.style.left = `${rect.left + window.scrollX}px`;
+    dropdown.style.top = `${rect.bottom + window.scrollY}px`;
+    dropdown.style.width = `${rect.width}px`;
+    dropdown.innerHTML = '';
+    const inputVal = input.value.trim().toLowerCase();
+    if (!inputVal) {
+        dropdown.style.display = 'none';
+        input._suggestions = [];
+        input._highlighted = -1;
+        input.setAttribute('aria-expanded', 'false');
+        return;
+    }
+    fetch(`/tags?q=${encodeURIComponent(inputVal)}`)
+        .then(r => r.json())
+        .then(data => {
+            if (!data.tags || data.tags.length === 0) {
+                dropdown.style.display = 'none';
+                input._suggestions = [];
+                input._highlighted = -1;
+                input.setAttribute('aria-expanded', 'false');
+                return;
+            }
+            // Filter out tags already present (case-insensitive)
+            const present = (editTagsState[clipId] || []).map(t => t.toLowerCase());
+            const filtered = data.tags.filter(tag => !present.includes(tag.toLowerCase()));
+            input._suggestions = filtered;
+            input._highlighted = (typeof input._highlighted === 'number' && input._highlighted >= 0) ? input._highlighted : -1;
+            filtered.forEach((tag, idx) => {
+                const item = document.createElement('div');
+                item.className = 'tag-suggestion-item';
+                item.textContent = tag;
+                item.setAttribute('role', 'option');
+                item.setAttribute('id', `tag-suggestion-${clipId}-${idx}`);
+                item.setAttribute('aria-selected', input._highlighted === idx ? 'true' : 'false');
+                if (input._highlighted === idx) {
+                    item.style.background = '#2a3a3a';
+                    item.style.color = '#fff';
+                    setTimeout(() => { item.scrollIntoView({block: 'nearest'}); }, 0);
+                    input.setAttribute('aria-activedescendant', item.id);
+                }
+                item.onmouseenter = () => {
+                    input._highlighted = idx;
+                    showTagSuggestionsStandard(input, clipId);
+                };
+                item.onmousedown = (e) => {
+                    e.preventDefault();
+                    addTagFromAutocomplete(input, clipId, tag);
+                    dropdown.style.display = 'none';
+                };
+                dropdown.appendChild(item);
+            });
+            dropdown.style.display = 'block';
+            input.setAttribute('aria-expanded', 'true');
+        });
+}
+
+function addTagFromAutocomplete(input, clipId, tag) {
+    if (!editTagsState[clipId].map(t => t.toLowerCase()).includes(tag.toLowerCase())) {
+        editTagsState[clipId].push(tag);
+        renderEditableTagChips(clipId);
+    }
+    input.value = '';
+    input._highlighted = -1;
+    showTagSuggestionsStandard(input, clipId);
+}
 
 // --- Batch Tag Input State ---
 const batchAddTagsState = [];
@@ -165,220 +425,177 @@ function showToast(message, isError = false) {
     setTimeout(() => { toast.style.opacity = 0; }, 2200);
 }
 
-function renderBatchTagChips(type) {
-    const container = document.getElementById(`batch-${type}-tags-chips`);
-    if (!container) return; // Prevent error if batch bar is not visible
-    const tags = type === 'add' ? batchAddTagsState : batchRemoveTagsState;
-    container.innerHTML = '';
-    container.setAttribute('role', 'list');
-    if (tags.length === 0) {
-        container.innerHTML = '<span class="tag-chip tag-empty">No tags</span>';
-    } else {
-        tags.forEach((tag, idx) => {
-            const chip = document.createElement('span');
-            chip.className = 'tag-chip tag-edit';
-            chip.setAttribute('role', 'listitem');
-            chip.setAttribute('aria-label', `Tag: ${tag}`);
-            chip.appendChild(document.createTextNode(tag));
-            const x = document.createElement('span');
-            x.className = 'tag-chip-x';
-            x.textContent = '×';
-            x.setAttribute('aria-label', `Remove tag ${tag}`);
-            x.onclick = () => {
-                tags.splice(idx, 1);
-                renderBatchTagChips(type);
-                // Debug: log chip removal
-                if (type === 'add') console.log('[BatchAdd] chip removed:', tag, 'tags:', tags);
-            };
-            chip.appendChild(x);
-            container.appendChild(chip);
+if (document.getElementById('batch-action-bar')) {
+    // --- Batch selection: checkbox and card click
+    const selectedClipIds = new Set();
+    let lastSelectedIndex = null;
+
+    function renderBatchTagChips(type) {
+        const container = document.getElementById(`batch-${type}-tags-chips`);
+        if (!container) return; // Prevent error if batch bar is not visible
+        const tags = type === 'add' ? batchAddTagsState : batchRemoveTagsState;
+        container.innerHTML = '';
+        container.setAttribute('role', 'list');
+        if (tags.length === 0) {
+            container.innerHTML = '<span class="tag-chip tag-empty">No tags</span>';
+        } else {
+            tags.forEach((tag, idx) => {
+                const chip = document.createElement('span');
+                chip.className = 'tag-chip tag-edit';
+                chip.setAttribute('role', 'listitem');
+                chip.setAttribute('aria-label', `Tag: ${tag}`);
+                chip.appendChild(document.createTextNode(tag));
+                const x = document.createElement('span');
+                x.className = 'tag-chip-x';
+                x.textContent = '×';
+                x.setAttribute('aria-label', `Remove tag ${tag}`);
+                x.onclick = () => {
+                    // Remove tag from state and re-render chips and button state
+                    tags.splice(idx, 1);
+                    renderBatchTagChips(type);
+                    // Also update Remove button state if this is the remove field
+                    if (type === 'remove') {
+                        const removeBtn = document.getElementById('batch-remove-btn');
+                        if (removeBtn) removeBtn.disabled = batchRemoveTagsState.length === 0;
+                    }
+                };
+                chip.appendChild(x);
+                container.appendChild(chip);
+            });
+        }
+        // Enable/disable Add/Remove button based on chip count
+        if (type === 'add') {
+            const addBtn = document.getElementById('batch-add-btn');
+            if (addBtn) addBtn.disabled = tags.length === 0;
+        } else if (type === 'remove') {
+            const removeBtn = document.getElementById('batch-remove-btn');
+            if (removeBtn) removeBtn.disabled = tags.length === 0;
+        }
+    }
+    function handleBatchTagInput(type) {
+        const input = document.getElementById(`batch-${type}-tags-input`);
+        const tags = type === 'add' ? batchAddTagsState : batchRemoveTagsState;
+        input.addEventListener('keydown', function(e) {
+            // Debug: log key events
+            if (type === 'add') console.log('[BatchAdd] keydown:', e.key, 'input:', input.value, 'tags:', tags);
+            if (e.key === 'Backspace' && input.value === '') {
+                if (tags.length > 0) {
+                    tags.pop();
+                    renderBatchTagChips(type);
+                    e.preventDefault();
+                    return;
+                }
+            }
+            // Keyboard navigation for autocomplete
+            const dropdown = document.getElementById('batch-tag-suggestions-dropdown');
+            let suggestions = input._suggestions || [];
+            let highlighted = typeof input._highlighted === 'number' ? input._highlighted : -1;
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                if (suggestions.length > 0) {
+                    highlighted = (highlighted + 1) % suggestions.length;
+                    input._highlighted = highlighted;
+                    showBatchTagSuggestions(input, type);
+                }
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                if (suggestions.length > 0) {
+                    highlighted = (highlighted - 1 + suggestions.length) % suggestions.length;
+                    input._highlighted = highlighted;
+                    showBatchTagSuggestions(input, type);
+                }
+            } else if (e.key === 'Tab') {
+                if (suggestions.length > 0 && highlighted >= 0) {
+                    e.preventDefault();
+                    addBatchTagFromAutocomplete(input, type, suggestions[highlighted]);
+                    return;
+                }
+            } else if (e.key === 'Enter') {
+                if (suggestions.length > 0 && highlighted >= 0) {
+                    e.preventDefault();
+                    addBatchTagFromAutocomplete(input, type, suggestions[highlighted]);
+                    return;
+                } else {
+                    // Add tag from input if not empty and not duplicate
+                    const val = input.value.trim();
+                    if (val && !tags.map(t => t.toLowerCase()).includes(val.toLowerCase())) {
+                        tags.push(val);
+                        renderBatchTagChips(type);
+                        input.value = '';
+                    }
+                    input._highlighted = -1;
+                    input._suggestions = [];
+                    showBatchTagSuggestions(input, type);
+                    e.preventDefault();
+                }
+            } else if (e.key === 'Escape') {
+                if (dropdown && dropdown.style.display === 'block') {
+                    dropdown.style.display = 'none';
+                    input._suggestions = [];
+                    input._highlighted = -1;
+                    e.preventDefault();
+                    return;
+                }
+            }
+        });
+        input.addEventListener('input', function() {
+            if (type === 'add') console.log('[BatchAdd] input event:', input.value, 'tags:', tags);
+            showBatchTagSuggestions(input, type);
+        });
+        // Prevent dropdown from hiding on blur if a suggestion is being clicked
+        input.addEventListener('blur', function() {
+            setTimeout(() => {
+                let dropdown = document.getElementById('batch-tag-suggestions-dropdown');
+                if (dropdown) dropdown.style.display = 'none';
+            }, 180);
         });
     }
-    // Enable/disable Add button based on chip count
-    if (type === 'add') {
-        const addBtn = document.getElementById('batch-add-btn');
-        if (addBtn) addBtn.disabled = tags.length === 0;
-    }
-}
-
-function handleBatchTagInput(type) {
-    const input = document.getElementById(`batch-${type}-tags-input`);
-    const tags = type === 'add' ? batchAddTagsState : batchRemoveTagsState;
-    input.addEventListener('keydown', function(e) {
-        // Debug: log key events
-        if (type === 'add') console.log('[BatchAdd] keydown:', e.key, 'input:', input.value, 'tags:', tags);
-        if (e.key === 'Backspace' && input.value === '') {
-            if (tags.length > 0) {
-                tags.pop();
-                renderBatchTagChips(type);
-                e.preventDefault();
-                return;
-            }
+    function addBatchTagFromAutocomplete(input, type, tag) {
+        const tags = type === 'add' ? batchAddTagsState : batchRemoveTagsState;
+        if (!tags.map(t => t.toLowerCase()).includes(tag.toLowerCase())) {
+            tags.push(tag);
+            renderBatchTagChips(type);
         }
-        // Keyboard navigation for autocomplete
-        const dropdown = document.getElementById('batch-tag-suggestions-dropdown');
-        let suggestions = input._suggestions || [];
-        let highlighted = typeof input._highlighted === 'number' ? input._highlighted : -1;
-        if (e.key === 'ArrowDown') {
-            e.preventDefault();
-            if (suggestions.length > 0) {
-                highlighted = (highlighted + 1) % suggestions.length;
-                input._highlighted = highlighted;
-                showBatchTagSuggestions(input, type);
-            }
-        } else if (e.key === 'ArrowUp') {
-            e.preventDefault();
-            if (suggestions.length > 0) {
-                highlighted = (highlighted - 1 + suggestions.length) % suggestions.length;
-                input._highlighted = highlighted;
-                showBatchTagSuggestions(input, type);
-            }
-        } else if (e.key === 'Tab') {
-            if (suggestions.length > 0 && highlighted >= 0) {
-                e.preventDefault();
-                addBatchTagFromAutocomplete(input, type, suggestions[highlighted]);
-                return;
-            }
-        } else if (e.key === 'Enter') {
-            if (suggestions.length > 0 && highlighted >= 0) {
-                e.preventDefault();
-                addBatchTagFromAutocomplete(input, type, suggestions[highlighted]);
-                return;
-            } else {
-                // Add tag from input if not empty and not duplicate
-                const val = input.value.trim();
-                if (val && !tags.map(t => t.toLowerCase()).includes(val.toLowerCase())) {
-                    tags.push(val);
-                    renderBatchTagChips(type);
-                    input.value = '';
-                }
-                input._highlighted = -1;
-                input._suggestions = [];
-                showBatchTagSuggestions(input, type);
-                e.preventDefault();
-            }
-        } else if (e.key === 'Escape') {
-            if (dropdown && dropdown.style.display === 'block') {
-                dropdown.style.display = 'none';
-                input._suggestions = [];
-                input._highlighted = -1;
-                e.preventDefault();
-                return;
-            }
-        }
-    });
-    input.addEventListener('input', function() {
-        if (type === 'add') console.log('[BatchAdd] input event:', input.value, 'tags:', tags);
-        showBatchTagSuggestions(input, type);
-    });
-    // Prevent dropdown from hiding on blur if a suggestion is being clicked
-    input.addEventListener('blur', function() {
-        setTimeout(() => {
-            let dropdown = document.getElementById('batch-tag-suggestions-dropdown');
-            if (dropdown) dropdown.style.display = 'none';
-        }, 180);
-    });
-}
-
-function addBatchTagFromAutocomplete(input, type, tag) {
-    const tags = type === 'add' ? batchAddTagsState : batchRemoveTagsState;
-    if (!tags.map(t => t.toLowerCase()).includes(tag.toLowerCase())) {
-        tags.push(tag);
-        renderBatchTagChips(type);
-    }
-    input.value = '';
-    input._highlighted = -1;
-    showBatchTagSuggestions(input, type);
-    if (type === 'add') console.log('[BatchAdd] tag added from autocomplete:', tag, 'tags:', tags);
-}
-
-function showBatchTagSuggestions(input, type) {
-    let dropdown = document.getElementById('batch-tag-suggestions-dropdown');
-    if (!dropdown) {
-        dropdown = document.createElement('div');
-        dropdown.id = 'batch-tag-suggestions-dropdown';
-        dropdown.className = 'tag-suggestions-dropdown';
-        dropdown.setAttribute('role', 'listbox');
-        document.body.appendChild(dropdown);
-    }
-    const rect = input.getBoundingClientRect();
-    dropdown.style.position = 'absolute';
-    dropdown.style.left = `${rect.left + window.scrollX}px`;
-    dropdown.style.top = `${rect.bottom + window.scrollY}px`;
-    dropdown.style.width = `${rect.width}px`;
-    dropdown.innerHTML = '';
-    input.setAttribute('role', 'combobox');
-    input.setAttribute('aria-autocomplete', 'list');
-    input.setAttribute('aria-expanded', dropdown.style.display === 'block' ? 'true' : 'false');
-    input.setAttribute('aria-controls', 'batch-tag-suggestions-dropdown');
-    input.setAttribute('aria-activedescendant', '');
-    const tags = type === 'add' ? batchAddTagsState : batchRemoveTagsState;
-    const inputVal = input.value.trim().toLowerCase();
-    if (!inputVal) {
-        dropdown.style.display = 'none';
-        input._suggestions = [];
+        input.value = '';
         input._highlighted = -1;
-        input.setAttribute('aria-expanded', 'false');
-        return;
+        showBatchTagSuggestions(input, type);
+        if (type === 'add') console.log('[BatchAdd] tag added from autocomplete:', tag, 'tags:', tags);
     }
-    if (type === 'remove') {
-        // Only suggest tags present in the selection and not already chips
-        const suggestionsSource = getUnionTagsOfSelectedClips();
-        const present = tags.map(t => t.toLowerCase());
-        const filtered = suggestionsSource.filter(tag => tag.toLowerCase().startsWith(inputVal) && !present.includes(tag.toLowerCase()));
-        console.log('[BatchAutocomplete] REMOVE suggestions:', filtered);
-        if (filtered.length === 0) {
+    function showBatchTagSuggestions(input, type) {
+        let dropdown = document.getElementById('batch-tag-suggestions-dropdown');
+        if (!dropdown) {
+            dropdown = document.createElement('div');
+            dropdown.id = 'batch-tag-suggestions-dropdown';
+            dropdown.className = 'tag-suggestions-dropdown';
+            dropdown.setAttribute('role', 'listbox');
+            document.body.appendChild(dropdown);
+        }
+        const rect = input.getBoundingClientRect();
+        dropdown.style.position = 'absolute';
+        dropdown.style.left = `${rect.left + window.scrollX}px`;
+        dropdown.style.top = `${rect.bottom + window.scrollY}px`;
+        dropdown.style.width = `${rect.width}px`;
+        dropdown.innerHTML = '';
+        input.setAttribute('role', 'combobox');
+        input.setAttribute('aria-autocomplete', 'list');
+        input.setAttribute('aria-expanded', dropdown.style.display === 'block' ? 'true' : 'false');
+        input.setAttribute('aria-controls', 'batch-tag-suggestions-dropdown');
+        input.setAttribute('aria-activedescendant', '');
+        const tags = type === 'add' ? batchAddTagsState : batchRemoveTagsState;
+        const inputVal = input.value.trim().toLowerCase();
+        if (!inputVal) {
             dropdown.style.display = 'none';
             input._suggestions = [];
             input._highlighted = -1;
             input.setAttribute('aria-expanded', 'false');
             return;
         }
-        input._suggestions = filtered;
-        input._highlighted = (typeof input._highlighted === 'number' && input._highlighted >= 0) ? input._highlighted : -1;
-        filtered.forEach((tag, idx) => {
-            const item = document.createElement('div');
-            item.className = 'tag-suggestion-item';
-            item.textContent = tag;
-            item.setAttribute('role', 'option');
-            item.setAttribute('id', `batch-tag-suggestion-${type}-${idx}`);
-            item.setAttribute('aria-selected', input._highlighted === idx ? 'true' : 'false');
-            if (input._highlighted === idx) {
-                item.style.background = '#2a3a3a';
-                item.style.color = '#fff';
-                setTimeout(() => { item.scrollIntoView({block: 'nearest'}); }, 0);
-                input.setAttribute('aria-activedescendant', item.id);
-            }
-            item.onmouseenter = () => {
-                input._highlighted = idx;
-                showBatchTagSuggestions(input, type);
-            };
-            item.onmousedown = (e) => {
-                e.preventDefault();
-                addBatchTagFromAutocomplete(input, type, tag);
-                dropdown.style.display = 'none';
-            };
-            dropdown.appendChild(item);
-        });
-        dropdown.style.display = 'block';
-        input.setAttribute('aria-expanded', 'true');
-        return;
-    }
-    // Default: add mode, fetch from backend
-    fetch(`/tags?q=${encodeURIComponent(inputVal)}`)
-        .then(r => r.json())
-        .then(data => {
-            if (!data.tags || data.tags.length === 0) {
-                dropdown.style.display = 'none';
-                input._suggestions = [];
-                input._highlighted = -1;
-                input.setAttribute('aria-expanded', 'false');
-                return;
-            }
-            // Filter out tags already present (case-insensitive)
+        if (type === 'remove') {
+            // Only suggest tags present in the selection and not already chips
+            const suggestionsSource = getUnionTagsOfSelectedClips();
             const present = tags.map(t => t.toLowerCase());
-            const filtered = data.tags.filter(tag => !present.includes(tag.toLowerCase()));
-            console.log('[BatchAutocomplete] ADD suggestions:', filtered);
+            const filtered = suggestionsSource.filter(tag => tag.toLowerCase().startsWith(inputVal) && !present.includes(tag.toLowerCase()));
+            console.log('[BatchAutocomplete] REMOVE suggestions:', filtered);
             if (filtered.length === 0) {
                 dropdown.style.display = 'none';
                 input._suggestions = [];
@@ -414,295 +631,345 @@ function showBatchTagSuggestions(input, type) {
             });
             dropdown.style.display = 'block';
             input.setAttribute('aria-expanded', 'true');
-        });
-}
-
-function getUnionTagsOfSelectedClips() {
-    const tagSet = new Set();
-    selectedClipIds.forEach(clipId => {
-        const tagsText = document.getElementById(`tags-text-${clipId}`);
-        if (tagsText) {
-            tagsText.querySelectorAll('.tag-chip:not(.tag-empty)').forEach(chip => {
-                tagSet.add(chip.textContent.trim());
+            return;
+        }
+        // Default: add mode, fetch from backend
+        fetch(`/tags?q=${encodeURIComponent(inputVal)}`)
+            .then(r => r.json())
+            .then(data => {
+                if (!data.tags || data.tags.length === 0) {
+                    dropdown.style.display = 'none';
+                    input._suggestions = [];
+                    input._highlighted = -1;
+                    input.setAttribute('aria-expanded', 'false');
+                    return;
+                }
+                // Filter out tags already present (case-insensitive)
+                const present = tags.map(t => t.toLowerCase());
+                const filtered = data.tags.filter(tag => !present.includes(tag.toLowerCase()));
+                console.log('[BatchAutocomplete] ADD suggestions:', filtered);
+                if (filtered.length === 0) {
+                    dropdown.style.display = 'none';
+                    input._suggestions = [];
+                    input._highlighted = -1;
+                    input.setAttribute('aria-expanded', 'false');
+                    return;
+                }
+                input._suggestions = filtered;
+                input._highlighted = (typeof input._highlighted === 'number' && input._highlighted >= 0) ? input._highlighted : -1;
+                filtered.forEach((tag, idx) => {
+                    const item = document.createElement('div');
+                    item.className = 'tag-suggestion-item';
+                    item.textContent = tag;
+                    item.setAttribute('role', 'option');
+                    item.setAttribute('id', `batch-tag-suggestion-${type}-${idx}`);
+                    item.setAttribute('aria-selected', input._highlighted === idx ? 'true' : 'false');
+                    if (input._highlighted === idx) {
+                        item.style.background = '#2a3a3a';
+                        item.style.color = '#fff';
+                        setTimeout(() => { item.scrollIntoView({block: 'nearest'}); }, 0);
+                        input.setAttribute('aria-activedescendant', item.id);
+                    }
+                    item.onmouseenter = () => {
+                        input._highlighted = idx;
+                        showBatchTagSuggestions(input, type);
+                    };
+                    item.onmousedown = (e) => {
+                        e.preventDefault();
+                        addBatchTagFromAutocomplete(input, type, tag);
+                        dropdown.style.display = 'none';
+                    };
+                    dropdown.appendChild(item);
+                });
+                dropdown.style.display = 'block';
+                input.setAttribute('aria-expanded', 'true');
             });
-        }
-    });
-    return Array.from(tagSet).sort((a, b) => a.localeCompare(b));
-}
-
-function syncBatchRemoveTagsWithSelection() {
-    const unionTags = getUnionTagsOfSelectedClips();
-    // Only add tags that are not already in the remove state
-    unionTags.forEach(tag => {
-        if (!batchRemoveTagsState.map(t => t.toLowerCase()).includes(tag.toLowerCase())) {
-            batchRemoveTagsState.push(tag);
-        }
-    });
-    // Remove tags from batchRemoveTagsState that are no longer present in the selection
-    for (let i = batchRemoveTagsState.length - 1; i >= 0; i--) {
-        if (!unionTags.map(t => t.toLowerCase()).includes(batchRemoveTagsState[i].toLowerCase())) {
-            batchRemoveTagsState.splice(i, 1);
-        }
     }
-    renderBatchTagChips('remove');
-}
-
-function renderBatchActionBar() {
-    const bar = document.getElementById('batch-action-bar');
-    console.log('[BatchBar] renderBatchActionBar called. Bar:', bar);
-    if (!bar) {
-        console.error('[BatchBar] #batch-action-bar not found in DOM');
-        return;
+    function getUnionTagsOfSelectedClips() {
+        const tagSet = new Set();
+        selectedClipIds.forEach(clipId => {
+            const tagsText = document.getElementById(`tags-text-${clipId}`);
+            if (tagsText) {
+                tagsText.querySelectorAll('.tag-chip:not(.tag-empty)').forEach(chip => {
+                    tagSet.add(chip.textContent.trim());
+                });
+            }
+        });
+        return Array.from(tagSet).sort((a, b) => a.localeCompare(b));
     }
-    console.log('[BatchBar] selectedClipIds:', Array.from(selectedClipIds));
-    if (selectedClipIds.size === 0) {
-        bar.style.display = 'none';
-        bar.innerHTML = '';
-        console.log('[BatchBar] No selection, hiding bar');
-        return;
+    function syncBatchRemoveTagsWithSelection() {
+        const unionTags = getUnionTagsOfSelectedClips();
+        // Only add tags that are not already in the remove state
+        unionTags.forEach(tag => {
+            if (!batchRemoveTagsState.map(t => t.toLowerCase()).includes(tag.toLowerCase())) {
+                batchRemoveTagsState.push(tag);
+            }
+        });
+        // Remove tags from batchRemoveTagsState that are no longer present in the selection
+        for (let i = batchRemoveTagsState.length - 1; i >= 0; i--) {
+            if (!unionTags.map(t => t.toLowerCase()).includes(batchRemoveTagsState[i].toLowerCase())) {
+                batchRemoveTagsState.splice(i, 1);
+            }
+        }
+        renderBatchTagChips('remove');
     }
-    // --- Batch bar UI ---
-    bar.style.display = '';
-    bar.innerHTML = `
-        <div class="batch-bar-section">
-            <span class="batch-bar-label">${selectedClipIds.size} selected</span>
-        </div>
-        <div class="batch-bar-section">
-            <span class="batch-bar-label">Add tags:</span>
-            <span id="batch-add-tags-chips" class="tags-edit" style="display:inline-block;"></span>
-            <input type="text" class="batch-bar-input" id="batch-add-tags-input" placeholder="Add tag..." autocomplete="off" style="width:160px; margin-top:0.3em; display:inline-block;" />
-            <button class="batch-bar-btn" id="batch-add-btn">Add</button>
-        </div>
-        <div class="batch-bar-section">
-            <span class="batch-bar-label">Remove tags:</span>
-            <span id="batch-remove-tags-chips" class="tags-edit" style="display:inline-block;"></span>
-            <input type="text" class="batch-bar-input" id="batch-remove-tags-input" placeholder="Remove tag..." autocomplete="off" style="width:160px; margin-top:0.3em; display:inline-block;" />
-            <button class="batch-bar-btn" id="batch-remove-btn">Remove</button>
-        </div>
-        <div class="batch-bar-section">
-            <button class="batch-bar-btn" id="batch-clear-btn">Clear all tags</button>
-        </div>
-        <span class="batch-bar-help" title="Shift+Click: range select, Ctrl/Cmd+Click: multi-select. Add/Remove tags for all selected clips.">?</span>
-    `;
-    renderBatchTagChips('add');
-    renderBatchTagChips('remove');
-    handleBatchTagInput('add');
-    handleBatchTagInput('remove');
-    // Wire up events (backend integration next)
-    document.getElementById('batch-add-btn').onclick = (e) => {
-        e.preventDefault(); // Prevent accidental form submission
-        // Debug: log state before check
-        console.log('[BatchAdd] Add button clicked. Current tags:', batchAddTagsState);
-        if (batchAddTagsState.length === 0) {
-            showToast('Enter tag(s) to add.', true);
+    function renderBatchActionBar() {
+        const bar = document.getElementById('batch-action-bar');
+        console.log('[BatchBar] renderBatchActionBar called. Bar:', bar);
+        if (!bar) {
+            console.error('[BatchBar] #batch-action-bar not found in DOM');
             return;
         }
-        const clipIds = Array.from(selectedClipIds).map(Number);
-        console.log('[BatchAdd] Sending to backend:', {clip_ids: clipIds, add_tags: batchAddTagsState});
-        fetch('/batch_tag', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({clip_ids: clipIds, add_tags: batchAddTagsState})
-        })
-        .then(r => r.json())
-        .then(data => {
-            if (data.error) {
-                showToast('Batch add failed: ' + data.error, true);
-                return;
-            }
-            for (const [clipId, tags] of Object.entries(data)) {
-                renderTagChips(clipId, tags);
-            }
-            showToast('Tags added to selected clips.');
-            batchAddTagsState.length = 0;
-            renderBatchTagChips('add');
-            document.getElementById('batch-add-tags-input').value = '';
-            console.log('[BatchAdd] Success, cleared chips/input.');
-        })
-        .catch(err => {
-            showToast('Batch add error: ' + err, true);
-            console.error('[BatchAdd] Error:', err);
-        });
-    };
-    document.getElementById('batch-remove-btn').onclick = () => {
-        if (batchRemoveTagsState.length === 0) {
-            showToast('Enter tag(s) to remove.', true);
+        console.log('[BatchBar] selectedClipIds:', Array.from(selectedClipIds));
+        if (selectedClipIds.size === 0) {
+            bar.style.display = 'none';
+            bar.innerHTML = '';
+            console.log('[BatchBar] No selection, hiding bar');
             return;
         }
-        const clipIds = Array.from(selectedClipIds).map(Number);
-        fetch('/batch_tag', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({clip_ids: clipIds, remove_tags: batchRemoveTagsState})
-        })
-        .then(r => r.json())
-        .then(data => {
-            if (data.error) {
-                showToast('Batch remove failed: ' + data.error, true);
+        // --- Batch bar UI ---
+        bar.style.display = '';
+        bar.innerHTML = `
+            <div class="batch-bar-section">
+                <span class="batch-bar-label">${selectedClipIds.size} selected</span>
+            </div>
+            <div class="batch-bar-section">
+                <span class="batch-bar-label">Add tags:</span>
+                <span id="batch-add-tags-chips" class="tags-edit" style="display:inline-block;"></span>
+                <input type="text" class="batch-bar-input" id="batch-add-tags-input" placeholder="Add tag..." autocomplete="off" style="width:160px; margin-top:0.3em; display:inline-block;" />
+                <button class="batch-bar-btn" id="batch-add-btn">Add</button>
+            </div>
+            <div class="batch-bar-section">
+                <span class="batch-bar-label">Remove tags:</span>
+                <span id="batch-remove-tags-chips" class="tags-edit" style="display:inline-block;"></span>
+                <input type="text" class="batch-bar-input" id="batch-remove-tags-input" placeholder="Remove tag..." autocomplete="off" style="width:160px; margin-top:0.3em; display:inline-block;" />
+                <button class="batch-bar-btn" id="batch-remove-btn" title="Removes only the tags shown as chips from all selected clips">Remove</button>
+                <span class="batch-bar-help" style="font-size:0.95em; color:#aaa; margin-left:0.7em;" title="Select tags to remove, then press Remove to apply to all selected clips. Removing a chip only removes it from this list, not from the clips until you press Remove.">?</span>
+            </div>
+            <div class="batch-bar-section">
+                <button class="batch-bar-btn" id="batch-clear-btn">Clear all tags</button>
+            </div>
+            <span class="batch-bar-help" title="Shift+Click: range select, Ctrl/Cmd+Click: multi-select. Add/Remove tags for all selected clips.">?</span>
+        `;
+        renderBatchTagChips('add');
+        renderBatchTagChips('remove');
+        handleBatchTagInput('add');
+        handleBatchTagInput('remove');
+        // Wire up events (backend integration next)
+        document.getElementById('batch-add-btn').onclick = (e) => {
+            e.preventDefault(); // Prevent accidental form submission
+            if (batchAddTagsState.length === 0) {
+                showToast('Enter tag(s) to add.', true);
                 return;
             }
-            for (const [clipId, tags] of Object.entries(data)) {
-                renderTagChips(clipId, tags);
-            }
-            showToast('Tags removed from selected clips.');
-            batchRemoveTagsState.length = 0;
-            renderBatchTagChips('remove');
-            document.getElementById('batch-remove-tags-input').value = '';
-        })
-        .catch(err => {
-            showToast('Batch remove error: ' + err, true);
-        });
-    };
-    document.getElementById('batch-clear-btn').onclick = () => {
-        if (!confirm('Clear all tags from selected clips?')) return;
-        const clipIds = Array.from(selectedClipIds).map(Number);
-        fetch('/batch_tag', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({clip_ids: clipIds, clear: true})
-        })
-        .then(r => r.json())
-        .then(data => {
-            if (data.error) {
-                showToast('Batch clear failed: ' + data.error, true);
+            const clipIds = Array.from(selectedClipIds).map(Number);
+            fetch('/batch_tag', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({clip_ids: clipIds, add_tags: batchAddTagsState})
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.error) {
+                    showToast('Batch add failed: ' + data.error, true);
+                    return;
+                }
+                for (const [clipId, tags] of Object.entries(data)) {
+                    renderTagChips(clipId, tags);
+                }
+                showToast('Tags added to selected clips.');
+                batchAddTagsState.length = 0;
+                renderBatchTagChips('add');
+                document.getElementById('batch-add-tags-input').value = '';
+            })
+            .catch(err => {
+                showToast('Batch add error: ' + err, true);
+            });
+        };
+        const removeBtn = document.getElementById('batch-remove-btn');
+        removeBtn.disabled = batchRemoveTagsState.length === 0;
+        removeBtn.onclick = () => {
+            if (batchRemoveTagsState.length === 0) {
+                showToast('No tags selected for removal. Add tags to the remove field first.', true);
                 return;
             }
-            for (const [clipId, tags] of Object.entries(data)) {
-                renderTagChips(clipId, tags);
-            }
-            showToast('All tags cleared from selected clips.');
-        })
-        .catch(err => {
-            showToast('Batch clear error: ' + err, true);
-        });
-    };
-}
-
-function updateCardSelectionUI() {
-    document.querySelectorAll('.card[data-clip-id]').forEach(card => {
-        const clipId = card.getAttribute('data-clip-id');
-        const checkbox = card.querySelector('.select-clip-checkbox');
-        if (selectedClipIds.has(clipId)) {
-            card.classList.add('selected');
-            checkbox.checked = true;
-        } else {
-            card.classList.remove('selected');
-            checkbox.checked = false;
-        }
-    });
-    // Show/hide batch action bar and render controls
-    renderBatchActionBar();
-    syncBatchRemoveTagsWithSelection();
-}
-
-// --- Batch selection: checkbox and card click
-const selectedClipIds = new Set();
-let lastSelectedIndex = null;
-
-document.addEventListener('DOMContentLoaded', function() {
-    // Make all grid cards focusable and add keyboard listeners
-    const cards = document.querySelectorAll('.card[data-clip-id]');
-    cards.forEach(card => {
-        card.setAttribute('tabindex', '0');
-        card.addEventListener('keydown', function(e) {
-            // Only trigger if not typing in an input/textarea/contenteditable
-            if (['INPUT', 'TEXTAREA'].includes(e.target.tagName) || e.target.isContentEditable) return;
-            if (e.key === 'e' || e.key === 'Enter') {
-                const editLink = card.querySelector('.edit-tag-btn-link');
-                if (editLink) {
-                    // Navigate to detail view for tag editing
-                    window.location.href = editLink.href;
-                    e.preventDefault();
+            const clipIds = Array.from(selectedClipIds).map(Number);
+            fetch('/batch_tag', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({clip_ids: clipIds, remove_tags: batchRemoveTagsState})
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.error) {
+                    showToast('Batch remove failed: ' + data.error, true);
+                    return;
                 }
-            }
-        });
-    });
-    // Make tag section in detail view focusable and keyboard accessible
-    const tagSections = document.querySelectorAll('.meta .tags');
-    tagSections.forEach(section => {
-        section.setAttribute('tabindex', '0');
-        section.addEventListener('keydown', function(e) {
-            // Only trigger if not typing in an input/textarea/contenteditable
-            if (['INPUT', 'TEXTAREA'].includes(e.target.tagName) || e.target.isContentEditable) return;
-            if (e.key === 'e' || e.key === 'Enter') {
-                const editBtn = section.querySelector('.edit-tag-btn');
-                if (editBtn) {
-                    editBtn.click();
-                    setTimeout(() => {
-                        const clipId = editBtn.getAttribute('data-clip-id');
-                        const input = document.getElementById(`tag-input-new-${clipId}`);
-                        if (input) input.focus();
-                    }, 10);
-                    e.preventDefault();
+                for (const [clipId, tags] of Object.entries(data)) {
+                    renderTagChips(clipId, tags);
                 }
+                showToast('Tags removed from selected clips.');
+                batchRemoveTagsState.length = 0;
+                renderBatchTagChips('remove');
+                document.getElementById('batch-remove-tags-input').value = '';
+            })
+            .catch(err => {
+                showToast('Batch remove error: ' + err, true);
+            });
+        };
+        document.getElementById('batch-clear-btn').onclick = () => {
+            if (!confirm('Clear all tags from selected clips?')) return;
+            const clipIds = Array.from(selectedClipIds).map(Number);
+            fetch('/batch_tag', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({clip_ids: clipIds, clear: true})
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.error) {
+                    showToast('Batch clear failed: ' + data.error, true);
+                    return;
+                }
+                for (const [clipId, tags] of Object.entries(data)) {
+                    renderTagChips(clipId, tags);
+                }
+                showToast('All tags cleared from selected clips.');
+            })
+            .catch(err => {
+                showToast('Batch clear error: ' + err, true);
+            });
+        };
+    }
+    function updateCardSelectionUI() {
+        document.querySelectorAll('.card[data-clip-id]').forEach(card => {
+            const clipId = card.getAttribute('data-clip-id');
+            const checkbox = card.querySelector('.select-clip-checkbox');
+            if (selectedClipIds.has(clipId)) {
+                card.classList.add('selected');
+                checkbox.checked = true;
+            } else {
+                card.classList.remove('selected');
+                checkbox.checked = false;
             }
         });
-    });
-
-    function getCardElements() {
-        return Array.from(document.querySelectorAll('.card[data-clip-id]'));
+        // Show/hide batch action bar and render controls
+        renderBatchActionBar();
+        syncBatchRemoveTagsWithSelection();
     }
 
-    document.querySelectorAll('.card[data-clip-id]').forEach((card, idx, allCards) => {
-        const clipId = card.getAttribute('data-clip-id');
-        const checkbox = card.querySelector('.select-clip-checkbox');
-        // Checkbox click
-        checkbox.addEventListener('click', function(e) {
-            console.log('[DEBUG] Checkbox clicked for clip', clipId, 'checked:', checkbox.checked);
-            e.stopPropagation();
-            // FIX: Always toggle only this card, never clear others
-            if (checkbox.checked) {
-                selectedClipIds.add(clipId);
-            } else {
-                selectedClipIds.delete(clipId);
-            }
-            lastSelectedIndex = idx;
-            updateCardSelectionUI();
+    document.addEventListener('DOMContentLoaded', function() {
+        // Make all grid cards focusable and add keyboard listeners
+        const cards = document.querySelectorAll('.card[data-clip-id]');
+        cards.forEach(card => {
+            card.setAttribute('tabindex', '0');
+            card.addEventListener('keydown', function(e) {
+                // Only trigger if not typing in an input/textarea/contenteditable
+                if (['INPUT', 'TEXTAREA'].includes(e.target.tagName) || e.target.isContentEditable) return;
+                if (e.key === 'e' || e.key === 'Enter') {
+                    const editLink = card.querySelector('.edit-tag-btn-link');
+                    if (editLink) {
+                        // Navigate to detail view for tag editing
+                        window.location.href = editLink.href;
+                        e.preventDefault();
+                    }
+                }
+            });
         });
-        // Card click (not on links/buttons/inputs)
-        card.addEventListener('click', function(e) {
-            if (e.target.closest('a,button,input')) return;
-            console.log('[DEBUG] Card clicked for clip', clipId);
-            const isCtrl = e.ctrlKey || e.metaKey;
-            const isShift = e.shiftKey;
-            if (isShift && lastSelectedIndex !== null) {
-                // Range select
-                const cards = getCardElements();
-                const thisIndex = cards.indexOf(card);
-                const [start, end] = [lastSelectedIndex, thisIndex].sort((a, b) => a - b);
-                for (let i = start; i <= end; i++) {
-                    selectedClipIds.add(cards[i].getAttribute('data-clip-id'));
+        // Make tag section in detail view focusable and keyboard accessible
+        const tagSections = document.querySelectorAll('.meta .tags');
+        tagSections.forEach(section => {
+            section.setAttribute('tabindex', '0');
+            section.addEventListener('keydown', function(e) {
+                // Only trigger if not typing in an input/textarea/contenteditable
+                if (['INPUT', 'TEXTAREA'].includes(e.target.tagName) || e.target.isContentEditable) return;
+                if (e.key === 'e' || e.key === 'Enter') {
+                    const editBtn = section.querySelector('.edit-tag-btn');
+                    if (editBtn) {
+                        editBtn.click();
+                        setTimeout(() => {
+                            const clipId = editBtn.getAttribute('data-clip-id');
+                            const input = document.getElementById(`tag-input-new-${clipId}`);
+                            if (input) input.focus();
+                        }, 10);
+                        e.preventDefault();
+                    }
                 }
-            } else if (isCtrl) {
-                // Toggle only this
-                if (selectedClipIds.has(clipId)) {
-                    selectedClipIds.delete(clipId);
-                } else {
-                    selectedClipIds.add(clipId);
-                }
-                lastSelectedIndex = idx;
-            } else {
-                // Normal click: select only this if not already selected
-                if (!selectedClipIds.has(clipId)) {
-                    selectedClipIds.clear();
+            });
+        });
+
+        function getCardElements() {
+            return Array.from(document.querySelectorAll('.card[data-clip-id]'));
+        }
+
+        document.querySelectorAll('.card[data-clip-id]').forEach((card, idx, allCards) => {
+            const clipId = card.getAttribute('data-clip-id');
+            const checkbox = card.querySelector('.select-clip-checkbox');
+            // Checkbox click
+            checkbox.addEventListener('click', function(e) {
+                console.log('[DEBUG] Checkbox clicked for clip', clipId, 'checked:', checkbox.checked);
+                e.stopPropagation();
+                // FIX: Always toggle only this card, never clear others
+                if (checkbox.checked) {
                     selectedClipIds.add(clipId);
                 } else {
                     selectedClipIds.delete(clipId);
                 }
                 lastSelectedIndex = idx;
-            }
-            updateCardSelectionUI();
+                updateCardSelectionUI();
+            });
+            // Card click (not on links/buttons/inputs)
+            card.addEventListener('click', function(e) {
+                if (e.target.closest('a,button,input')) return;
+                console.log('[DEBUG] Card clicked for clip', clipId);
+                const isCtrl = e.ctrlKey || e.metaKey;
+                const isShift = e.shiftKey;
+                if (isShift && lastSelectedIndex !== null) {
+                    // Range select
+                    const cards = getCardElements();
+                    const thisIndex = cards.indexOf(card);
+                    const [start, end] = [lastSelectedIndex, thisIndex].sort((a, b) => a - b);
+                    for (let i = start; i <= end; i++) {
+                        selectedClipIds.add(cards[i].getAttribute('data-clip-id'));
+                    }
+                } else if (isCtrl) {
+                    // Toggle only this
+                    if (selectedClipIds.has(clipId)) {
+                        selectedClipIds.delete(clipId);
+                    } else {
+                        selectedClipIds.add(clipId);
+                    }
+                    lastSelectedIndex = idx;
+                } else {
+                    // Normal click: select only this if not already selected
+                    if (!selectedClipIds.has(clipId)) {
+                        selectedClipIds.clear();
+                        selectedClipIds.add(clipId);
+                    } else {
+                        selectedClipIds.delete(clipId);
+                    }
+                    lastSelectedIndex = idx;
+                }
+                updateCardSelectionUI();
+            });
         });
+        updateCardSelectionUI();
     });
-    updateCardSelectionUI();
+}
 
-    // Minimal test: force batch bar to show TEST
-    // const bar = document.getElementById('batch-action-bar');
-    // if (bar) {
-    //     bar.innerHTML = 'TEST';
-    //     bar.style.display = 'block';
-    //     console.log('[BatchBar] TEST: Bar found and set to TEST');
-    // } else {
-    //     console.error('[BatchBar] TEST: #batch-action-bar not found in DOM');
-    // }
-}); 
+// --- Utility: Render static tag chips for a clip (used by both grid and detail views) ---
+function renderTagChips(clipId, tags) {
+    const tagsText = document.getElementById(`tags-text-${clipId}`);
+    if (!tagsText) return;
+    tagsText.innerHTML = '';
+    if (!tags || tags.length === 0) {
+        tagsText.innerHTML = '<span class="tag-chip tag-empty">No tags</span>';
+    } else {
+        tags.forEach(tag => {
+            const chip = document.createElement('span');
+            chip.className = 'tag-chip';
+            chip.appendChild(document.createTextNode(tag));
+            tagsText.appendChild(chip);
+        });
+    }
+} 
