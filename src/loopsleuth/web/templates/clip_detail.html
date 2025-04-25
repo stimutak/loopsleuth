@@ -1,6 +1,5 @@
 <!--
-LoopSleuth Web: Clip Detail Page
-- Shows video playback and metadata for a single clip
+LoopSleuth Web: Clip Detail Page (DaVinci-inspired)
 -->
 <!DOCTYPE html>
 <html lang="en">
@@ -9,46 +8,157 @@ LoopSleuth Web: Clip Detail Page
     <title>{{ clip.filename }} - LoopSleuth</title>
     <link rel="stylesheet" href="/static/style.css">
     <style>
-        .video-container { text-align: center; margin: 2em 0; }
-        video { width: 80%; max-width: 720px; border-radius: 8px; background: #111; }
-        .meta { margin-top: 1em; text-align: center; }
-        .back-link { color: #7fd6d6; text-decoration: none; font-size: 1.1em; }
-        .back-link:hover { text-decoration: underline; }
+        .detail-flex {
+            display: flex;
+            flex-direction: row;
+            gap: 2.5em;
+            margin: 2.5em 2em 2em 2em;
+            min-height: 60vh;
+        }
+        .detail-main {
+            flex: 2 1 0%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+        }
+        .detail-sidebar {
+            flex: 1 1 0%;
+            background: #181a1b;
+            border-radius: 12px;
+            box-shadow: 0 2px 12px #000a;
+            padding: 2em 1.5em 1.5em 1.5em;
+            min-width: 260px;
+            max-width: 340px;
+            color: #f0f4fa;
+            display: flex;
+            flex-direction: column;
+            gap: 1.2em;
+        }
+        .video-player-container {
+            width: 100%;
+            max-width: 900px;
+            background: #111;
+            border-radius: 12px;
+            box-shadow: 0 2px 12px #000a;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 1.5em 1em 1.2em 1em;
+        }
+        .video-player-container video {
+            width: 100%;
+            max-width: 880px;
+            aspect-ratio: 16/9;
+            background: #111;
+            border-radius: 8px;
+        }
+        .playback-bar {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            gap: 1em;
+            margin-top: 0.7em;
+            color: #f0f4fa;
+        }
+        .meta-label { color: #aaa; font-size: 0.97em; margin-right: 0.5em; }
+        .meta-value { color: #f0f4fa; font-weight: 500; }
+        .sidebar-section { margin-bottom: 1.2em; }
+        .sidebar-section:last-child { margin-bottom: 0; }
+        .sidebar-actions button { margin-right: 0.7em; }
+        @media (max-width: 900px) {
+            .detail-flex { flex-direction: column; gap: 1.5em; margin: 1.2em 0.5em; }
+            .detail-sidebar { max-width: 100vw; min-width: 0; padding: 1.2em 0.7em; }
+            .video-player-container { max-width: 100vw; padding: 0.7em 0.2em; }
+        }
     </style>
 </head>
 <body>
     <a class="back-link" href="/">← Back to grid</a>
-    <h1>{{ clip.filename }}</h1>
-    <div class="video-container">
-        <video controls>
-            <source src="/media/{{ clip.path | urlencode }}" type="{{ video_mime }}">
-            <div style="color:#ffb347; background:#222; padding:1em; border-radius:6px; margin-top:1em;">
-                <b>⚠️ This video format is not supported in your browser.</b><br>
-                <a href="/media/{{ clip.path | urlencode }}" download style="color:#7fd6d6;">Download original file</a> and play in a desktop video player.<br>
-                <span style="font-size:0.9em; color:#aaa;">(For best browser compatibility, use MP4/H.264/AAC.)</span>
+    <div class="detail-flex">
+        <div class="detail-sidebar">
+            <div class="sidebar-section">
+                <div style="font-size:1.15em; font-weight:600;">{{ clip.filename }}</div>
+                <div class="star" style="cursor:pointer; font-size:2em; margin-top:0.2em;" data-clip-id="{{ clip.id }}" onclick="toggleStar(event)" title="Toggle star">{% if clip.starred %}★{% else %}☆{% endif %}</div>
             </div>
-        </video>
-    </div>
-    <div class="meta">
-        <div class="star" style="cursor:pointer; font-size:2em;" data-clip-id="{{ clip.id }}" onclick="toggleStar(event)" title="Toggle star">{% if clip.starred %}★{% else %}☆{% endif %}</div>
-        <div class="tags" style="margin-top:1em;">
-            <span style="color:#aaa;">Tags:</span>
-            <!-- Tags are always visible as static chips -->
-            <span class="tags-text" id="tags-text-{{ clip.id }}">
-                {% for tag in clip.tags %}
-                    <span class="tag-chip">{{ tag }}</span>
-                {% else %}
-                    <span class="tag-chip tag-empty">No tags</span>
-                {% endfor %}
-            </span>
-            <button type="button" class="edit-tag-btn" data-clip-id="{{ clip.id }}" onclick="editTags(event)" style="margin-left:0.5em; font-size:0.9em;">✎</button>
-            <!-- Standard tag input: chips + input for new tag, only in edit mode -->
-            <span class="tags-edit" id="tags-edit-{{ clip.id }}" style="display:none;"></span>
-            <input type="text" class="tag-input-new" id="tag-input-new-{{ clip.id }}" style="display:none; width:40%; margin-top:0.3em;" data-clip-id="{{ clip.id }}" placeholder="Add tag..." autocomplete="off" />
-            <button type="button" class="save-tag-btn" id="save-tag-btn-{{ clip.id }}" style="display:none; margin-left:0.3em; font-size:0.9em;" data-clip-id="{{ clip.id }}" onclick="saveTags(event)">💾</button>
-            <button type="button" class="cancel-tag-btn" id="cancel-tag-btn-{{ clip.id }}" style="display:none; margin-left:0.3em; font-size:0.9em;" data-clip-id="{{ clip.id }}" onclick="cancelEditTags(event)">✖</button>
+            <div class="sidebar-section">
+                <div><span class="meta-label">Duration:</span> <span class="meta-value">
+                    {# Robust duration formatting using .get() #}
+                    {% set duration = clip.get('duration') %}
+                    {% if duration is not none %}
+                        {{ (duration // 60)|int }}:{{ '%02d' % (duration % 60) }} min
+                    {% else %}
+                        ??:?? min
+                    {% endif %}
+                </span></div>
+                <div><span class="meta-label">Resolution:</span> <span class="meta-value">
+                    {% set width = clip.get('width') %}
+                    {% set height = clip.get('height') %}
+                    {% if width is not none and height is not none %}
+                        {{ width }}×{{ height }}
+                    {% else %}
+                        ?×?
+                    {% endif %}
+                </span></div>
+                <div><span class="meta-label">Size:</span> <span class="meta-value">
+                    {% set size = clip.get('size') %}
+                    {% if size is not none %}
+                        {{ size|filesizeformat }}
+                    {% else %}
+                        ?
+                    {% endif %}
+                </span></div>
+                <div><span class="meta-label">Format:</span> <span class="meta-value">{{ clip.get('codec_name', 'Unknown')|default('Unknown') }}</span></div>
+            </div>
+            <div class="sidebar-section">
+                <div style="margin-bottom:0.4em; color:#aaa;">Tags:</div>
+                <span class="tags-text" id="tags-text-{{ clip.id }}">
+                    {% for tag in clip.tags %}
+                        <span class="tag-chip">{{ tag }}</span>
+                    {% else %}
+                        <span class="tag-chip tag-empty">No tags</span>
+                    {% endfor %}
+                </span>
+                <button type="button" class="edit-tag-btn" data-clip-id="{{ clip.id }}" onclick="editTags(event)" style="margin-left:0.5em; font-size:0.9em;">✎</button>
+                <span class="tags-edit" id="tags-edit-{{ clip.id }}" style="display:none;"></span>
+                <input type="text" class="tag-input-new" id="tag-input-new-{{ clip.id }}" style="display:none; width:90%; margin-top:0.3em;" data-clip-id="{{ clip.id }}" placeholder="Add tag..." autocomplete="off" />
+                <button type="button" class="save-tag-btn" id="save-tag-btn-{{ clip.id }}" style="display:none; margin-left:0.3em; font-size:0.9em;" data-clip-id="{{ clip.id }}" onclick="saveTags(event)">💾</button>
+                <button type="button" class="cancel-tag-btn" id="cancel-tag-btn-{{ clip.id }}" style="display:none; margin-left:0.3em; font-size:0.9em;" data-clip-id="{{ clip.id }}" onclick="cancelEditTags(event)">✖</button>
+            </div>
+            <div class="sidebar-section">
+                <div style="margin-bottom:0.4em; color:#aaa;">Playlists:</div>
+                <!-- Placeholder: List playlists this clip is in, with add/remove UI -->
+                <div id="clip-playlists-list">(Coming soon)</div>
+                <button class="sidebar-btn" style="margin-top:0.7em;">Add to Playlist</button>
+            </div>
+            <div class="sidebar-section sidebar-actions">
+                <button class="sidebar-btn" onclick="window.open('/media/{{ clip.path | urlencode }}', '_blank')">Download</button>
+                <button class="sidebar-btn" onclick="window.open('file:///{{ clip.path }}')">Open in System</button>
+            </div>
+        </div>
+        <div class="detail-main">
+            <div class="video-player-container">
+                <video id="clip-video" controls preload="auto">
+                    <source src="/media/{{ clip.path | urlencode }}" type="{{ video_mime }}">
+                    <div style="color:#ffb347; background:#222; padding:1em; border-radius:6px; margin-top:1em;">
+                        <b>⚠️ This video format is not supported in your browser.</b><br>
+                        <a href="/media/{{ clip.path | urlencode }}" download style="color:#7fd6d6;">Download original file</a> and play in a desktop video player.<br>
+                        <span style="font-size:0.9em; color:#aaa;">(For best browser compatibility, use MP4/H.264/AAC.)</span>
+                    </div>
+                </video>
+                <div class="playback-bar">
+                    <!-- Placeholder: Custom controls can be added here (play/pause, seek, timecode, frame step, volume, speed) -->
+                    <span id="current-time">00:00</span> / <span id="duration">00:00</span>
+                    <input type="range" id="seek-bar" min="0" max="100" value="0" style="flex:1; margin:0 1em;">
+                    <button id="play-pause-btn">⏯</button>
+                    <button id="frame-back-btn">⏪</button>
+                    <button id="frame-fwd-btn">⏩</button>
+                    <input type="range" id="volume-bar" min="0" max="1" step="0.01" value="1" style="width:70px;">
+                </div>
+            </div>
         </div>
     </div>
 </body>
 <script src="/static/clip_actions.js"></script>
+<!-- TODO: Add custom JS for playback bar, playlist membership, keyboard shortcuts -->
 </html> 

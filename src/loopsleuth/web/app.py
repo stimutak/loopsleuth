@@ -23,8 +23,8 @@ import os
 import shutil
 
 # --- App setup ---
-# For development/demo: use the test DB with clips
-DEFAULT_DB_PATH = Path("temp_thumb_test.db")  # <-- Use test DB for now
+# Use the main production database by default
+DEFAULT_DB_PATH = Path("loopsleuth.db")
 app = FastAPI(title="LoopSleuth Web")
 
 # Mount static files (for thumbnails, CSS, JS, etc.)
@@ -35,6 +35,20 @@ app.mount("/static", StaticFiles(directory=static_dir), name="static")
 templates_dir = Path(__file__).parent / "templates"
 templates = Jinja2Templates(directory=str(templates_dir))
 
+# --- Custom Jinja2 filter for file size formatting ---
+def filesizeformat(value):
+    try:
+        value = int(value)
+    except (TypeError, ValueError):
+        return "?"
+    for unit in ["bytes", "KB", "MB", "GB", "TB"]:
+        if value < 1024.0:
+            return f"{value:.1f} {unit}" if unit != "bytes" else f"{value} {unit}"
+        value /= 1024.0
+    return f"{value:.1f} PB"
+
+templates.env.filters["filesizeformat"] = filesizeformat
+
 THUMB_DIR = Path(".loopsleuth_data/thumbnails")
 
 # --- Routes ---
@@ -43,6 +57,8 @@ def grid(request: Request):
     """
     Main grid view: shows all clips with thumbnails and info.
     """
+    # Default scan folder for UI (patched to E:/Downloads)
+    default_scan_folder = "E:/Downloads"
     # Connect to the database and fetch all clips
     conn = None
     clips = []
@@ -77,7 +93,7 @@ def grid(request: Request):
         if conn:
             conn.close()
     return templates.TemplateResponse(
-        "grid.html", {"request": request, "clips": clips}
+        "grid.html", {"request": request, "clips": clips, "default_scan_folder": default_scan_folder}
     )
 
 @app.get("/clip/{clip_id}", response_class=HTMLResponse)
@@ -92,7 +108,7 @@ def clip_detail(request: Request, clip_id: int):
         conn = get_db_connection(DEFAULT_DB_PATH)
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT id, filename, path, thumbnail_path, starred
+            SELECT id, filename, path, thumbnail_path, starred, width, height, size, codec_name
             FROM clips WHERE id = ?
         """, (clip_id,))
         row = cursor.fetchone()
@@ -112,10 +128,16 @@ def clip_detail(request: Request, clip_id: int):
             if mime and mime.startswith('video/'):
                 video_mime = mime
         else:
-            raise HTTPException(status_code=404, detail="Clip not found")
+            # Return a custom 404 page if the clip is not found
+            return templates.TemplateResponse(
+                "404.html", {"request": request, "message": f"Clip with ID {clip_id} not found."}, status_code=404
+            )
     except Exception as e:
         print(f"[Error] Could not load clip {clip_id}: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+        # Return a user-friendly error page
+        return templates.TemplateResponse(
+            "error.html", {"request": request, "message": f"An error occurred while loading the clip: {e}"}, status_code=500
+        )
     finally:
         if conn:
             conn.close()

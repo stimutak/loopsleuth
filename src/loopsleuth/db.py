@@ -23,6 +23,7 @@ def get_db_connection(db_path: Path = DEFAULT_DB_PATH) -> sqlite3.Connection:
     # Use Row factory for dict-like access to columns
     conn.row_factory = sqlite3.Row
     create_table(conn)
+    migrate_clips_table(conn)
     return conn
 
 def create_table(conn: sqlite3.Connection):
@@ -87,6 +88,25 @@ def create_table(conn: sqlite3.Connection):
     """)
 
     conn.commit()
+
+def migrate_clips_table(conn):
+    """Add width, height, size, and codec_name columns to the clips table if missing."""
+    cursor = conn.cursor()
+    # Check and add columns if they do not exist
+    columns = [row[1] for row in cursor.execute("PRAGMA table_info(clips)")]
+    alter_stmts = []
+    if 'width' not in columns:
+        alter_stmts.append("ALTER TABLE clips ADD COLUMN width INTEGER")
+    if 'height' not in columns:
+        alter_stmts.append("ALTER TABLE clips ADD COLUMN height INTEGER")
+    if 'size' not in columns:
+        alter_stmts.append("ALTER TABLE clips ADD COLUMN size INTEGER")
+    if 'codec_name' not in columns:
+        alter_stmts.append("ALTER TABLE clips ADD COLUMN codec_name TEXT")
+    for stmt in alter_stmts:
+        cursor.execute(stmt)
+    if alter_stmts:
+        conn.commit()
 
 # Example usage (optional, can be removed or moved to a main script)
 if __name__ == '__main__':

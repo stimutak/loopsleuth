@@ -76,6 +76,78 @@ def get_video_duration(video_path: Path) -> Optional[float]:
             f"An unexpected error occurred while processing {video_path}: {e}"
         ) from e
 
+def get_video_metadata(video_path: Path) -> dict:
+    """
+    Retrieves video metadata (duration, width, height, codec_name, size) using ffprobe.
+
+    Args:
+        video_path: The path to the video file.
+
+    Returns:
+        A dict with keys: duration (float), width (int), height (int), codec_name (str), size (int)
+        Any missing value will be None.
+
+    Raises:
+        FFprobeError: If ffprobe command fails or returns invalid data.
+        FileNotFoundError: If ffprobe executable is not found.
+    """
+    if not video_path.is_file():
+        raise FileNotFoundError(f"Video file not found: {video_path}")
+
+    command = [
+        FFPROBE_COMMAND,
+        "-v", "quiet",
+        "-print_format", "json",
+        "-show_format",
+        "-show_streams",
+        str(video_path)
+    ]
+    try:
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            check=True,
+            encoding='utf-8'
+        )
+        metadata = json.loads(result.stdout)
+        # Duration and size from format
+        fmt = metadata.get("format", {})
+        duration = float(fmt.get("duration")) if fmt.get("duration") else None
+        size = int(fmt.get("size")) if fmt.get("size") else None
+        # First video stream for width/height/codec_name
+        width = height = codec_name = None
+        for stream in metadata.get("streams", []):
+            if stream.get("codec_type") == "video":
+                width = stream.get("width")
+                height = stream.get("height")
+                codec_name = stream.get("codec_name")
+                break
+        return {
+            "duration": duration,
+            "width": width,
+            "height": height,
+            "codec_name": codec_name,
+            "size": size
+        }
+    except FileNotFoundError:
+        raise FileNotFoundError(
+            f"'{FFPROBE_COMMAND}' command not found. "
+            f"Ensure FFmpeg is installed and '{FFPROBE_COMMAND}' is in your PATH."
+        )
+    except subprocess.CalledProcessError as e:
+        raise FFprobeError(
+            f"ffprobe failed for {video_path}. Error: {e.stderr or e}"
+        ) from e
+    except json.JSONDecodeError as e:
+        raise FFprobeError(
+            f"Failed to parse ffprobe JSON output for {video_path}. Error: {e}"
+        ) from e
+    except Exception as e:
+        raise FFprobeError(
+            f"An unexpected error occurred while processing {video_path}: {e}"
+        ) from e
+
 # Example Usage (requires a real video file and ffprobe installed)
 if __name__ == '__main__':
     # Replace with a path to an actual video file on your system for testing

@@ -983,12 +983,132 @@ function renderTagChips(clipId, tags) {
     }
 }
 
+// --- Playlist selection state ---
+let selectedPlaylistId = null;
+
+// Patch selectPlaylist to update selectedPlaylistId and re-render details and bar
+function selectPlaylist(playlistId) {
+    selectedPlaylistId = playlistId;
+    const detailsDiv = document.getElementById('playlist-details');
+    const listDiv = document.getElementById('playlist-list');
+    if (!detailsDiv) return;
+    // Highlight selected
+    Array.from(listDiv.children).forEach(child => {
+        child.classList.toggle('selected', child.dataset.playlistId == playlistId);
+    });
+    fetch(`/playlists/${playlistId}`)
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) {
+                detailsDiv.innerHTML = `<span style="color:#f55">${data.error}</span>`;
+                return;
+            }
+            // Render playlist details: name, created_at, clip count, and list of clips
+            let html = `<div><b>${data.name}</b> <span style='color:#888;font-size:0.9em;'>(${data.clips.length} clips)</span></div>`;
+            html += `<div style='font-size:0.9em;color:#888;'>Created: ${data.created_at}</div>`;
+            html += `<div style='margin-top:0.7em;'>
+                <button id='playlist-rename-btn' class='sidebar-btn' style='margin-right:0.5em;'>Rename</button>
+                <button id='playlist-delete-btn' class='sidebar-btn' style='background:#c0392b;color:#fff;'>Delete</button>
+            </div>`;
+            if (data.clips.length === 0) {
+                html += '<div style="margin-top:1em;color:#aaa;">No clips in this playlist.</div>';
+            } else {
+                html += '<ol style="margin-top:1em;padding-left:1.2em;">';
+                data.clips.forEach((clip, i) => {
+                    html += `<li>${clip.filename} <span style='color:#3fa7ff;font-size:0.9em;'>[id:${clip.id}]</span></li>`;
+                });
+                html += '</ol>';
+            }
+            detailsDiv.innerHTML = html;
+            // Wire up rename
+            document.getElementById('playlist-rename-btn').onclick = () => {
+                const newName = prompt('Rename playlist:', data.name);
+                if (!newName || newName.trim() === data.name) return;
+                fetch(`/playlists/${playlistId}`, {
+                    method: 'PATCH',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({name: newName.trim()})
+                })
+                .then(r => r.json())
+                .then(resp => {
+                    if (resp.error) {
+                        showToast('Rename failed: ' + resp.error, true);
+                        return;
+                    }
+                    showToast('Playlist renamed.');
+                    renderPlaylistSidebar(() => selectPlaylist(playlistId));
+                });
+            };
+            // Wire up delete
+            document.getElementById('playlist-delete-btn').onclick = () => {
+                if (!confirm('Delete this playlist? This cannot be undone.')) return;
+                fetch(`/playlists/${playlistId}`, {method: 'DELETE'})
+                .then(r => r.json())
+                .then(resp => {
+                    if (resp.error) {
+                        showToast('Delete failed: ' + resp.error, true);
+                        return;
+                    }
+                    showToast('Playlist deleted.');
+                    selectedPlaylistId = null;
+                    renderPlaylistSidebar();
+                    document.getElementById('playlist-details').innerHTML = '<em>Select a playlist to view details.</em>';
+                    renderSelectedClipsBar();
+                });
+            };
+            renderSelectedClipsBar();
+        });
+}
+
+// --- Playlist Sidebar ---
+function renderPlaylistSidebar(cbAfter) {
+    const listDiv = document.getElementById('playlist-list');
+    const createBtn = document.getElementById('playlist-create-btn');
+    const detailsDiv = document.getElementById('playlist-details');
+    if (!listDiv || !createBtn) return;
+    fetch('/playlists')
+        .then(r => r.json())
+        .then(data => {
+            if (!data.playlists) return;
+            listDiv.innerHTML = '';
+            data.playlists.forEach(pl => {
+                const item = document.createElement('div');
+                item.className = 'playlist-item';
+                item.textContent = pl.name;
+                item.dataset.playlistId = pl.id;
+                item.onclick = () => selectPlaylist(pl.id);
+                if (selectedPlaylistId && pl.id == selectedPlaylistId) item.classList.add('selected');
+                listDiv.appendChild(item);
+            });
+            if (cbAfter) cbAfter();
+        });
+    createBtn.onclick = () => {
+        const name = prompt('New playlist name:');
+        if (!name) return;
+        fetch('/playlists', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({name})
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.error) {
+                showToast('Create failed: ' + data.error, true);
+                return;
+            }
+            showToast('Playlist created.');
+            renderPlaylistSidebar(() => selectPlaylist(data.id)); // Auto-select new playlist
+        });
+    };
+    detailsDiv.innerHTML = '<em>Select a playlist to view details.</em>';
+}
+
 // --- Selected Clips Bar: Always Visible, Responsive ---
 function renderSelectedClipsBar() {
     const bar = document.getElementById('selected-clips-bar');
     if (!bar) return;
     const count = selectedClipIds.size;
-    // Always show the bar, but disable actions if nothing is selected
+    const playlistEnabled = count > 0 && selectedPlaylistId !== null;
     bar.style.display = '';
     bar.innerHTML = `
         <span class="selected-bar-label">${count} selected</span>
@@ -998,11 +1118,16 @@ function renderSelectedClipsBar() {
         <button class="selected-bar-btn" id="selected-copy-btn" ${count === 0 ? 'disabled' : ''} title="Copy/move selected files">
             <span class="selected-bar-icon">📁</span> Copy to Folder
         </button>
+        <button class="selected-bar-btn" id="selected-add-to-playlist-btn" ${playlistEnabled ? '' : 'disabled'} title="Add selected clips to playlist">
+            <span class="selected-bar-icon">➕</span> Add to Playlist
+        </button>
+        <button class="selected-bar-btn" id="selected-remove-from-playlist-btn" ${playlistEnabled ? '' : 'disabled'} title="Remove selected clips from playlist">
+            <span class="selected-bar-icon">➖</span> Remove from Playlist
+        </button>
         <button class="selected-bar-btn" id="selected-clear-btn" ${count === 0 ? 'disabled' : ''} title="Clear selection">
             <span class="selected-bar-icon">✖️</span> Clear
         </button>
     `;
-    // Wire up actions (placeholders for now)
     document.getElementById('selected-export-btn').onclick = async (e) => {
         if (count === 0) return;
         const ids = Array.from(selectedClipIds).map(Number);
@@ -1049,18 +1174,59 @@ function renderSelectedClipsBar() {
                 showToast('Copy failed: ' + (data.error || resp.status), true);
                 return;
             }
-            // Summarize results
             const ok = Object.values(data.results).filter(v => v === 'ok').length;
             const err = Object.values(data.results).length - ok;
             let msg = `Copied ${ok} file(s)`;
             if (err > 0) msg += `, ${err} error(s)`;
             showToast(msg + '.');
             if (err > 0) {
-                // Optionally show details in console
                 console.warn('[Copy] Errors:', data.results);
             }
         } catch (err) {
             showToast('Copy error: ' + err, true);
+        }
+    };
+    document.getElementById('selected-add-to-playlist-btn').onclick = async (e) => {
+        if (!selectedPlaylistId || selectedClipIds.length === 0) return;
+        const ids = Array.from(selectedClipIds).map(Number);
+        try {
+            const resp = await fetch(`/playlists/${selectedPlaylistId}/clips`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ clip_ids: ids })
+            });
+            if (resp.ok) {
+                showToast('Added to playlist!', 'success');
+                // Deselect all clips after adding to playlist to prevent accidental repeated actions
+                clearSelection();
+            } else {
+                showToast('Failed to add to playlist', 'error');
+            }
+        } finally {
+            document.getElementById('selected-add-to-playlist-btn').disabled = false;
+        }
+    };
+    document.getElementById('selected-remove-from-playlist-btn').onclick = async (e) => {
+        if (!selectedPlaylistId) {
+            showToast('Select a playlist first.', true);
+            return;
+        }
+        const ids = Array.from(selectedClipIds).map(Number);
+        try {
+            const resp = await fetch(`/playlists/${selectedPlaylistId}/clips/remove`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({clip_ids: ids})
+            });
+            const data = await resp.json();
+            if (!resp.ok || data.error) {
+                showToast('Remove from playlist failed: ' + (data.error || resp.status), true);
+                return;
+            }
+            showToast('Removed from playlist.');
+            selectPlaylist(selectedPlaylistId);
+        } catch (err) {
+            showToast('Remove from playlist error: ' + err, true);
         }
     };
     document.getElementById('selected-clear-btn').onclick = (e) => {
@@ -1070,102 +1236,7 @@ function renderSelectedClipsBar() {
     };
 }
 
-// Patch updateCardSelectionUI to always call renderSelectedClipsBar
-const origUpdateCardSelectionUI = updateCardSelectionUI;
-updateCardSelectionUI = function() {
-    origUpdateCardSelectionUI.apply(this, arguments);
-    renderSelectedClipsBar();
-};
-
 document.addEventListener('DOMContentLoaded', function() {
     renderSelectedClipsBar();
-});
-
-// === Playlist Sidebar Logic ===
-
-document.addEventListener('DOMContentLoaded', () => {
     renderPlaylistSidebar();
-});
-
-/**
- * Fetch and render the playlist sidebar: list, create, select.
- */
-function renderPlaylistSidebar() {
-    const listDiv = document.getElementById('playlist-list');
-    const createBtn = document.getElementById('playlist-create-btn');
-    const detailsDiv = document.getElementById('playlist-details');
-    if (!listDiv || !createBtn) return;
-
-    // Fetch playlists and render
-    fetch('/playlists')
-        .then(r => r.json())
-        .then(data => {
-            if (!data.playlists) return;
-            listDiv.innerHTML = '';
-            data.playlists.forEach(pl => {
-                const item = document.createElement('div');
-                item.className = 'playlist-item';
-                item.textContent = pl.name;
-                item.dataset.playlistId = pl.id;
-                item.onclick = () => selectPlaylist(pl.id);
-                listDiv.appendChild(item);
-            });
-        });
-
-    // Create new playlist
-    createBtn.onclick = () => {
-        const name = prompt('New playlist name:');
-        if (!name) return;
-        fetch('/playlists', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({name})
-        })
-        .then(r => r.json())
-        .then(data => {
-            if (data.error) {
-                showToast('Create failed: ' + data.error, true);
-                return;
-            }
-            renderPlaylistSidebar();
-            showToast('Playlist created.');
-        });
-    };
-
-    // Optionally: clear details area
-    detailsDiv.innerHTML = '<em>Select a playlist to view details.</em>';
-}
-
-/**
- * Fetch and render details for a selected playlist.
- */
-function selectPlaylist(playlistId) {
-    const detailsDiv = document.getElementById('playlist-details');
-    const listDiv = document.getElementById('playlist-list');
-    if (!detailsDiv) return;
-    // Highlight selected
-    Array.from(listDiv.children).forEach(child => {
-        child.classList.toggle('selected', child.dataset.playlistId == playlistId);
-    });
-    fetch(`/playlists/${playlistId}`)
-        .then(r => r.json())
-        .then(data => {
-            if (data.error) {
-                detailsDiv.innerHTML = `<span style="color:#f55">${data.error}</span>`;
-                return;
-            }
-            // Render playlist details: name, created_at, clip count, and list of clips
-            let html = `<div><b>${data.name}</b> <span style='color:#888;font-size:0.9em;'>(${data.clips.length} clips)</span></div>`;
-            html += `<div style='font-size:0.9em;color:#888;'>Created: ${data.created_at}</div>`;
-            if (data.clips.length === 0) {
-                html += '<div style="margin-top:1em;color:#aaa;">No clips in this playlist.</div>';
-            } else {
-                html += '<ol style="margin-top:1em;padding-left:1.2em;">';
-                data.clips.forEach((clip, i) => {
-                    html += `<li>${clip.filename} <span style='color:#3fa7ff;font-size:0.9em;'>[id:${clip.id}]</span></li>`;
-                });
-                html += '</ol>';
-            }
-            detailsDiv.innerHTML = html;
-        });
-} 
+}); 

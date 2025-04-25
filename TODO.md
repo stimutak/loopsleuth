@@ -11,13 +11,20 @@
   - Further UX polish (keyboard shortcuts, accessibility, creative/visual features)
   - Gather user feedback and iterate
 
-## ✅ Completed
+## ✅ Completed (2024-06)
 - Grid scroll position restore
 - Modern dark UI
 - Always-visible batch/action bars
 - Custom checkboxes
 - Export List: User can export selected clip paths as keepers.txt
 - Copy to Folder: User can copy selected files to a user-specified folder
+- Web app uses main production DB (`loopsleuth.db`) by default
+- Clip detail view and all templates robust to missing/null/missing-key fields (no more 500 errors)
+- Custom `filesizeformat` Jinja2 filter for human-readable file sizes
+- Sidebar in detail view is now on the left (matches grid view)
+- Progress bar (tqdm) during scan if tqdm is installed
+- Improved error handling: styled 404 and error pages
+- Robust template coding: all metadata fields use `clip.get('field')` for creative/production safety
 
 ## 🚀 Next Implementation Steps (2024-06)
 
@@ -64,7 +71,6 @@
 - [ ] UI/UX: Playlist management interface, ordering, and feedback
 - [ ] Tests: Automated tests for playlist creation, modification, and export
 
-<!-- CURSOR:KEEP_START -->
 ### 🚀 Web-Based Migration Plan (2024-06)
 
 - [ ] **Migrate LoopSleuth to a web-based frontend for a modern, rich UX.**
@@ -87,9 +93,20 @@
 - [ ] thumbnails: skip if exists & mtime unchanged
 - [ ] Textual grid: lazy‑load thumbs (path → Image.open)
 - [ ] export_td: write absolute paths, newline‑delimited
-<!-- CURSOR:KEEP_END -->
 
 ### Tag Autocomplete & Deletion Implementation Plan
 
 #### Tag Autocomplete
 - [x] Backend: `/tags`
+
+## 🛠️ UI/UX Issues & Polish Needed
+
+- The detail view (single clip) needs significant work:
+    - The video player is currently very small and not usable for review/playback.
+    - Layout and spacing are off; controls and metadata are cramped or misaligned.
+    - Needs a full redesign for usability, aesthetics, and creative workflows (larger video, better tag/playlist controls, responsive layout, etc).
+    - Consider inspiration from modern media managers or creative tools (TouchDesigner, DaVinci, etc).
+
+## Troubleshooting
+- If you see a 500 error on the detail view, check your DB schema and run the migration logic in `db.py`.
+- All templates are now robust to missing/null fields and missing keys.

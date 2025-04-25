@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Not Found - LoopSleuth</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <style>
+        body { background: #181a1b; color: #f0f4fa; font-family: 'Inter', sans-serif; }
+        .centered { max-width: 480px; margin: 8em auto 0 auto; text-align: center; padding: 2em; background: #23272a; border-radius: 12px; box-shadow: 0 2px 12px #000a; }
+        .big { font-size: 2.5em; color: #3fa7ff; margin-bottom: 0.3em; }
+        a { color: #3fa7ff; text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="centered">
+        <div class="big">404</div>
+        <div style="margin-bottom:1.2em;">{{ message|default('Resource not found.') }}</div>
+        <a href="/">← Back to grid</a>
+    </div>
+</body>
+</html> 

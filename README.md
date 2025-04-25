@@ -188,3 +188,17 @@ _Stretch:_ .tox export, multi-user/concurrent edits, creative integrations (Touc
 - All layout is production-ready and tested for all screen sizes.
 - The grid and sidebar are now ready for creative and advanced workflows.
 
+## Recent Updates (2024-06)
+- The web app now uses the main production database (`loopsleuth.db`) by default.
+- The clip detail view and all templates are robust to missing/null/missing-key metadata fields, preventing 500 errors.
+- A custom `filesizeformat` Jinja2 filter is registered for human-readable file sizes.
+- The sidebar in the detail view is now on the left, matching the grid view and standard UX conventions.
+- Progress bar (tqdm) is shown during scans if tqdm is installed.
+- Improved error handling: 404 and error pages are styled and user-friendly.
+- See the Troubleshooting section for 500 error and schema migration tips.
+
+## Troubleshooting
+- If you see a 500 error on the clip detail view, ensure your database schema is up to date. Run the migration logic in `db.py` to add any missing columns.
+- All templates now use robust dictionary access (`clip.get('field')`) to prevent errors from missing keys.
+- If file sizes are not formatted, ensure the custom `filesizeformat` filter is registered in `app.py`.
+

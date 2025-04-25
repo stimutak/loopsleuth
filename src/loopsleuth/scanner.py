@@ -6,6 +6,12 @@ import sys
 from pathlib import Path
 from typing import Iterable, List, Set, Optional
 
+# Add tqdm for progress bar if available
+try:
+    from tqdm import tqdm
+except ImportError:
+    tqdm = None
+
 # Adjust import path assuming this script might be run directly
 # or as part of the package
 SCRIPTS_DIR = Path(__file__).parent.resolve()
@@ -14,7 +20,7 @@ if str(SRC_DIR) not in sys.path:
     sys.path.append(str(SRC_DIR))
 
 from loopsleuth.db import get_db_connection, DEFAULT_DB_PATH
-from loopsleuth.metadata import get_video_duration, FFprobeError
+from loopsleuth.metadata import get_video_duration, FFprobeError, get_video_metadata
 from loopsleuth.thumbnailer import generate_thumbnail, ThumbnailError
 
 # Common video file extensions
@@ -69,7 +75,11 @@ def ingest_directory(
         skipped_count = 0
         error_count = 0
 
-        for video_path in _scan_directory_internal(start_path, extensions):
+        # Collect all video files first for progress bar
+        video_files = list(_scan_directory_internal(start_path, extensions))
+        iterator = tqdm(video_files, desc="Scanning", unit="file") if tqdm else video_files
+
+        for video_path in iterator:
             try:
                 path_str = str(video_path)
                 filename = video_path.name
@@ -78,40 +88,42 @@ def ingest_directory(
                 cursor.execute("SELECT id FROM clips WHERE path = ?", (path_str,))
                 existing = cursor.fetchone()
                 if existing and not force_rescan:
-                    # TODO: Add option to re-scan/update existing entries
-                    # print(f"Skipping already existing: {filename}")
                     skipped_count += 1
                     continue
 
                 print(f"Processing: {filename}")
-                duration: Optional[float] = None
+                # --- Extract metadata ---
                 try:
-                    duration = get_video_duration(video_path)
+                    meta = get_video_metadata(video_path)
                 except FFprobeError as e:
-                    print(f"  Warning: Could not get duration for {filename}. Error: {e}", file=sys.stderr)
+                    print(f"  Warning: Could not get metadata for {filename}. Error: {e}", file=sys.stderr)
                     error_count += 1
+                    continue
                 except FileNotFoundError as e:
-                    # Handle ffprobe not found globally here
                     print(f"  Error: {e}", file=sys.stderr)
                     print("  Aborting scan due to missing ffprobe.", file=sys.stderr)
                     error_count += 1
-                    break # Stop processing further files if ffprobe isn't there
+                    break
+                duration = meta.get("duration")
+                width = meta.get("width")
+                height = meta.get("height")
+                size = meta.get("size")
+                codec_name = meta.get("codec_name")
+                print(f"  Metadata: duration={duration}, width={width}, height={height}, size={size}, codec={codec_name}")
 
                 if existing and force_rescan:
-                    # Update duration for existing entry
                     clip_id = existing[0]
                     cursor.execute(
-                        "UPDATE clips SET duration = ? WHERE id = ?",
-                        (duration, clip_id)
+                        "UPDATE clips SET duration = ?, width = ?, height = ?, size = ?, codec_name = ? WHERE id = ?",
+                        (duration, width, height, size, codec_name, clip_id)
                     )
                 else:
-                    # Insert into DB
                     cursor.execute(
                         """
-                        INSERT INTO clips (path, filename, duration, modified_at)
-                        VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                        INSERT INTO clips (path, filename, duration, width, height, size, codec_name, modified_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                         """,
-                        (path_str, filename, duration)
+                        (path_str, filename, duration, width, height, size, codec_name)
                     )
                     clip_id = cursor.lastrowid
                     processed_count += 1
@@ -132,7 +144,6 @@ def ingest_directory(
                                 abs_project_root = Path.cwd().resolve()
                                 relative_thumb_path = str(abs_thumb_path.relative_to(abs_project_root))
                             except ValueError:
-                                # If not in subpath, just use the filename
                                 relative_thumb_path = str(thumb_path.name)
                             cursor.execute(
                                 "UPDATE clips SET thumbnail_path = ? WHERE id = ?",
