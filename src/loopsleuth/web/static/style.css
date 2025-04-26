@@ -14,7 +14,7 @@ LoopSleuth Web: Minimal CSS
 body {
     font-family: 'Inter', system-ui, sans-serif;
     background: #16171a;
-    color: #f0f4fa;
+    color: #bfc7d5;
     margin: 0;
     padding: 0.5em 0;
     font-size: 0.93em;
@@ -27,7 +27,7 @@ body {
 }
 
 h1 {
-    color: #f0f4fa;
+    color: #bfc7d5;
     font-size: 1.2em;
     margin-bottom: 0.5em;
     letter-spacing: 0.01em;
@@ -67,8 +67,8 @@ h1 {
 }
 
 .thumb {
-    width: 120px;
-    height: 68px;
+    width: var(--thumb-size, 120px);
+    height: calc(var(--thumb-size, 120px) * 0.566); /* 16:9 aspect ratio */
     object-fit: cover;
     background: #181a1b;
     border-radius: 4px;
@@ -89,7 +89,7 @@ h1 {
 .filename {
     font-weight: 600;
     margin-bottom: 0.05em;
-    color: #f0f4fa;
+    color: #bbb;
     font-size: 0.98em;
     letter-spacing: 0.01em;
 }
@@ -112,7 +112,7 @@ h1 {
 .tag-chip {
     display: inline-block;
     background: #23232a;
-    color: #f0f4fa;
+    color: #bbb;
     border-radius: 9px;
     padding: 0.08em 0.5em;
     margin: 0 0.08em 0.08em 0;
@@ -162,7 +162,7 @@ h1 {
     gap: 0.5em;
     z-index: 2100;
     font-size: 0.89em;
-    color: #f0f4fa;
+    color: #bbb;
     min-height: 1.7em;
     transition: background 0.18s, border 0.18s;
     flex-wrap: wrap;
@@ -395,7 +395,7 @@ h1 {
   font-size: 1.15em;
   padding: 1.1em 1.2em 0.7em 1.2em;
   letter-spacing: 0.04em;
-  color: #3fa7ff;
+  color: #bbb;
   border-bottom: 1px solid #222;
 }
 #playlist-list {
@@ -413,7 +413,7 @@ h1 {
 }
 #playlist-list .playlist-item.selected {
   background: #232b36;
-  color: #3fa7ff;
+  color: #bbb;
 }
 #playlist-list .playlist-item:hover {
   background: #222c3a;
@@ -422,7 +422,7 @@ h1 {
   margin: 0.5em 1.2em 0.5em 1.2em;
   padding: 0.5em 1em;
   background: #232b36;
-  color: #3fa7ff;
+  color: #bbb;
   border: none;
   border-radius: 4px;
   font-weight: 600;
@@ -621,4 +621,15 @@ button:hover, button:focus, input[type="submit"]:hover, input[type="submit"]:foc
     color: #fff;
 }
 /* Remove previous scan-form-label, scan-form-input, scan-form-btn rules if present */
-.scan-form-label, .scan-form-input, .scan-form-btn { all: unset; } 
+.scan-form-label, .scan-form-input, .scan-form-btn { all: unset; }
+
+.sidebar-header,
+#playlist-list .playlist-item.selected,
+#playlist-list .playlist-item:hover,
+.sidebar-btn,
+.playlist-badge,
+.playlist-badge.selected {
+    color: #bbb !important;
+    background: inherit !important;
+    border-color: #23232a !important;
+} 

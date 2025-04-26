@@ -25,6 +25,11 @@ LoopSleuth Web: Grid View Template
     </div>
     <div class="container">
         <h1>LoopSleuth - Clip Grid (Web UI)</h1>
+        <div class="thumb-size-slider" style="margin-bottom:1.2em; display:flex; align-items:center; gap:0.7em;">
+            <label for="thumb-size-range" class="notch-label" style="margin:0;">Thumbnail Size:</label>
+            <input type="range" id="thumb-size-range" min="60" max="220" value="120" step="2" style="width:180px;">
+            <span id="thumb-size-value" style="font-size:0.93em; color:#888; min-width:2.5em;">120px</span>
+        </div>
         <form method="post" action="/scan_folder" style="margin-bottom:2em;">
             <label for="folder_path" class="notch-label">Scan folder for videos:</label>
             <input type="text" id="folder_path" name="folder_path" placeholder="E:/downloads" size="40" required />
@@ -92,5 +97,24 @@ window.addEventListener('pageshow', function(event) {
         window.location.reload();
     }
 });
+// --- Thumbnail size slider logic ---
+(function() {
+    const root = document.documentElement;
+    const slider = document.getElementById('thumb-size-range');
+    const valueLabel = document.getElementById('thumb-size-value');
+    // Load from localStorage or default
+    const saved = localStorage.getItem('thumbSizePx');
+    const defaultSize = 120;
+    const size = saved ? parseInt(saved, 10) : defaultSize;
+    slider.value = size;
+    valueLabel.textContent = size + 'px';
+    root.style.setProperty('--thumb-size', size + 'px');
+    slider.addEventListener('input', function() {
+        const v = parseInt(this.value, 10);
+        valueLabel.textContent = v + 'px';
+        root.style.setProperty('--thumb-size', v + 'px');
+        localStorage.setItem('thumbSizePx', v);
+    });
+})();
 </script>
 </html> 
