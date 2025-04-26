@@ -5,7 +5,7 @@ LoopSleuth Web Frontend (FastAPI)
 - Will support video playback, tagging, starring, and export
 - Uses Jinja2 templates and static files
 """
-from fastapi import FastAPI, Request, HTTPException, Form, Body
+from fastapi import FastAPI, Request, HTTPException, Form, Body, status
 from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -21,6 +21,8 @@ from typing import List, Dict, Optional
 import tempfile
 import os
 import shutil
+import platform
+import subprocess
 
 def get_default_db_path():
     return Path(os.environ.get("LOOPSLEUTH_DB_PATH", "loopsleuth.db"))
@@ -618,6 +620,41 @@ def export_playlist(playlist_id: int, format: str = "txt"):
     """Export playlist in the requested format (txt, zip, tox). Stub for now."""
     # TODO: Implement export logic for txt, zip, tox
     return JSONResponse({"message": f"Export for playlist {playlist_id} as {format} not yet implemented."}, status_code=501)
+
+@app.post("/open_in_system/{clip_id}")
+def open_in_system(clip_id: int):
+    """
+    Open the folder containing the video file in the system's file explorer.
+    """
+    conn = None
+    try:
+        conn = get_db_connection(get_default_db_path())
+        cursor = conn.cursor()
+        cursor.execute("SELECT path FROM clips WHERE id = ?", (clip_id,))
+        row = cursor.fetchone()
+        if not row:
+            return JSONResponse({"detail": "Clip not found"}, status_code=status.HTTP_404_NOT_FOUND)
+        file_path = Path(row[0])
+        if not file_path.exists():
+            return JSONResponse({"detail": "File not found"}, status_code=status.HTTP_404_NOT_FOUND)
+        folder = file_path.parent
+        # Open in system file explorer
+        system = platform.system()
+        try:
+            if system == "Windows":
+                os.startfile(str(folder))
+            elif system == "Darwin":
+                subprocess.Popen(["open", str(folder)])
+            else:
+                subprocess.Popen(["xdg-open", str(folder)])
+        except Exception as e:
+            return JSONResponse({"detail": f"Failed to open folder: {e}"}, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return JSONResponse({"detail": "Opened in system file explorer"})
+    except Exception as e:
+        return JSONResponse({"detail": f"Error: {e}"}, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    finally:
+        if conn:
+            conn.close()
 
 # TODO: Add API endpoints for clips, tagging, starring, etc.
 # TODO: Add video playback route 
