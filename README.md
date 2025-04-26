@@ -51,6 +51,11 @@ A web-first (formerly terminal-first) librarian for video loops.
 - Accessibility and keyboard navigation are maintained.
 - Responsive design: grid and controls scale for smaller screens.
 
+## 🆕 Scan UX Improvements (2024-06)
+- The grid now clears instantly when a new scan is started, providing immediate visual feedback.
+- A toast/snackbar notification appears when a scan completes, fails, or finds no clips, so users always know the scan result.
+- These changes improve clarity and responsiveness for creative workflows and large libraries.
+
 ## MVP (v0.1)
 1. **Scan**: walk folder → SQLite row per clip (`ffprobe`)
 2. **Thumb**: grab frame @ 25 % duration → 256 px JPEG

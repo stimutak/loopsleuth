@@ -101,14 +101,23 @@ def grid(request: Request):
     try:
         conn = get_db_connection(get_default_db_path())
         cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM clips")
-        total_clips = cursor.fetchone()[0]
-        cursor.execute(f"""
-            SELECT id, filename, path, duration, thumbnail_path, starred, size, modified_at
-            FROM clips
-            ORDER BY {order_by}
-            LIMIT ? OFFSET ?
-        """, (per_page, offset))
+        # Get the latest scan_id
+        cursor.execute("SELECT id FROM scans ORDER BY scanned_at DESC LIMIT 1")
+        row = cursor.fetchone()
+        latest_scan_id = row[0] if row else None
+        if latest_scan_id is not None:
+            cursor.execute("SELECT COUNT(*) FROM clips WHERE scan_id = ?", (latest_scan_id,))
+            total_clips = cursor.fetchone()[0]
+            cursor.execute(f"""
+                SELECT id, filename, path, duration, thumbnail_path, starred, size, modified_at
+                FROM clips
+                WHERE scan_id = ?
+                ORDER BY {order_by}
+                LIMIT ? OFFSET ?
+            """, (latest_scan_id, per_page, offset))
+        else:
+            total_clips = 0
+            cursor.execute("SELECT id, filename, path, duration, thumbnail_path, starred, size, modified_at FROM clips WHERE 0")
         for row in cursor.fetchall():
             clip = dict(row)
             # Fetch tags for this clip
