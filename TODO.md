@@ -110,3 +110,8 @@
 ## Troubleshooting
 - If you see a 500 error on the detail view, check your DB schema and run the migration logic in `db.py`.
 - All templates are now robust to missing/null fields and missing keys.
+
+## [2024-06-15] Batch Action Bar Working Baseline
+- The batch action bar (edit bar) is confirmed working as of commit 999d0372cb193b2ff9543ec5783646b4b136b2e2.
+- Any regressions after this commit should be compared against this baseline.
+- Preserve this commit as a working reference for future UI/UX changes.

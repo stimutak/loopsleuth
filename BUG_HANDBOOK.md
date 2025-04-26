@@ -1,5 +1,7 @@
 # LoopSleuth Persistent UI Bugs: Handoff & Debug Handbook
 
+**[2024-06-15] NOTE:** The batch action bar (edit bar) is confirmed working as of commit 999d0372cb193b2ff9543ec5783646b4b136b2e2. Use this commit as a baseline for future debugging and UI/UX work. Any regressions after this commit should be compared against it.
+
 ## 1. Sidebar Still Pinned (Grid View)
 
 ### Symptoms
@@ -49,6 +51,9 @@
 - Add more granular debug logs to trace the exact event order (input, mousedown, blur).
 - Consider using a library for autocomplete or a more robust event delegation pattern.
 - Test with a minimal HTML/JS page to isolate the issue outside of the main app.
+
+### Status
+- [2024-06-15] Batch action bar and autocomplete are working as of commit 999d0372cb193b2ff9543ec5783646b4b136b2e2. If issues recur, compare against this baseline.
 
 ---
 
