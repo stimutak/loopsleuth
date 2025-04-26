@@ -573,4 +573,38 @@ body {
 
 .detail-sidebar .playlists {
     margin-top: 0.5em;
+}
+
+/* Scan folder form input and button styling */
+.scan-form-input {
+    background: #23232a;
+    color: #f0f4fa;
+    border: 1.5px solid #222;
+    border-radius: 6px;
+    padding: 0.18em 0.7em;
+    font-size: 1em;
+    min-width: 220px;
+    max-width: 350px;
+    transition: border 0.18s, background 0.18s;
+    outline: none;
+}
+.scan-form-input:focus {
+    border: 1.5px solid #3a8fff;
+    background: #23243a;
+}
+.scan-form-btn {
+    background: #23232a;
+    color: #f0f4fa;
+    border: 1.5px solid #222;
+    border-radius: 999px;
+    padding: 0.18em 1.2em;
+    font-size: 1em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: border 0.18s, background 0.18s, color 0.18s;
+}
+.scan-form-btn:hover, .scan-form-btn:focus {
+    background: #23243a;
+    border: 1.5px solid #3a8fff;
+    color: #fff;
 } 
