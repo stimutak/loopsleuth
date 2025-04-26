@@ -319,12 +319,13 @@ h1 {
     left: 0;
     right: 0;
     bottom: 2em;
-    z-index: 2090;
+    z-index: 2200;
     max-height: 30vh;
     overflow-y: auto;
     background: #181a1bee;
     border-top: none;
     border-bottom: 1.5px solid #222;
+    box-shadow: 0 -4px 24px #000c, 0 0 0 2px #3fa7ff33;
 }
 
 @media (max-width: 700px) {
