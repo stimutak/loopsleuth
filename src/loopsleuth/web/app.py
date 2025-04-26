@@ -624,7 +624,7 @@ def export_playlist(playlist_id: int, format: str = "txt"):
 @app.post("/open_in_system/{clip_id}")
 def open_in_system(clip_id: int):
     """
-    Open the folder containing the video file in the system's file explorer.
+    Open the folder containing the video file in the system's file explorer, selecting the file if possible.
     """
     conn = None
     try:
@@ -638,14 +638,16 @@ def open_in_system(clip_id: int):
         if not file_path.exists():
             return JSONResponse({"detail": "File not found"}, status_code=status.HTTP_404_NOT_FOUND)
         folder = file_path.parent
-        # Open in system file explorer
         system = platform.system()
         try:
             if system == "Windows":
-                os.startfile(str(folder))
+                # Select the file in Explorer
+                subprocess.Popen(["explorer", "/select,", str(file_path)])
             elif system == "Darwin":
-                subprocess.Popen(["open", str(folder)])
+                # Reveal the file in Finder
+                subprocess.Popen(["open", "-R", str(file_path)])
             else:
+                # Linux: just open the folder
                 subprocess.Popen(["xdg-open", str(folder)])
         except Exception as e:
             return JSONResponse({"detail": f"Failed to open folder: {e}"}, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
