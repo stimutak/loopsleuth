@@ -269,3 +269,26 @@ _Stretch:_ .tox export, multi-user/concurrent edits, creative integrations (Touc
 
 _Last update: 2025-04-26_
 
+## 🚦 Grid Sorting & Preview Features (2025-04-26)
+
+- The grid view now supports sorting by:
+  - Name (filename)
+  - Date modified
+  - Size
+  - Duration (length)
+  - Starred (favorites)
+- You can also enable a 'Show starred first' checkbox to always prioritize starred clips in the sort order.
+- Sorting controls are available in a persistent sort bar above the grid, with dropdowns for field and order (ascending/descending).
+- The grid and selection bar are now more interactive:
+  - Each card has a PiP (Picture-in-Picture) button for floating video preview.
+  - The selection bar includes a Preview Grid button to open a floating overlay with a grid of video previews for selected clips.
+- All sorting and preview features are robust, accessible, and tested for creative workflows.
+
+## 🚦 Preview Grid Overlay Improvements (2024-06)
+- The Preview Grid overlay now uses a fully adaptive, responsive CSS Grid layout.
+- Video player cells automatically adjust their size and aspect ratio based on the number of selected clips and the viewport size.
+- Videos are maximized within their grid cells, maintaining aspect ratio and filling available vertical space.
+- The grid uses `repeat(auto-fit, minmax(320px, 1fr))` for columns, and each cell/video fills the available height and width.
+- The overlay is robust for 1 to many selected clips, and the code is modular and ready for further creative/UX enhancements.
+- See `src/loopsleuth/web/static/clip_actions.js` for the JS logic and `grid.html` for the template.
+
