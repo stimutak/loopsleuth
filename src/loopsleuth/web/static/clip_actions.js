@@ -1105,6 +1105,7 @@ function renderPlaylistSidebar(cbAfter) {
 
 // --- Selected Clips Bar: Always Visible, Responsive ---
 function renderSelectedClipsBar() {
+    console.log('renderSelectedClipsBar called');
     const bar = document.getElementById('selected-clips-bar');
     if (!bar) return;
     const count = selectedClipIds.size;
@@ -1118,6 +1119,9 @@ function renderSelectedClipsBar() {
         <button class="selected-bar-btn" id="selected-copy-btn" ${count === 0 ? 'disabled' : ''} title="Copy/move selected files">
             <span class="selected-bar-icon">📁</span> Copy to Folder
         </button>
+        <button class="selected-bar-btn" id="selected-preview-grid-btn" ${count === 0 ? 'disabled' : ''} title="Preview selected clips in a floating grid">
+            <span class="selected-bar-icon">🎬</span> Preview Grid
+        </button>
         <button class="selected-bar-btn" id="selected-add-to-playlist-btn" ${playlistEnabled ? '' : 'disabled'} title="Add selected clips to playlist">
             <span class="selected-bar-icon">➕</span> Add to Playlist
         </button>
@@ -1128,6 +1132,17 @@ function renderSelectedClipsBar() {
             <span class="selected-bar-icon">✖️</span> Clear
         </button>
     `;
+    console.log('Bar rendered, attaching handlers');
+    const previewBtn = document.getElementById('selected-preview-grid-btn');
+    console.log('Attaching handler to', previewBtn);
+    previewBtn.onclick = function(e) {
+        e.preventDefault();
+        console.log('Button native click');
+        if (selectedClipIds.size === 0) return;
+        const selected = Array.from(selectedClipIds);
+        console.log('About to call openPreviewGrid with', selected);
+        openPreviewGrid(selected);
+    };
     document.getElementById('selected-export-btn').onclick = async (e) => {
         if (count === 0) return;
         const ids = Array.from(selectedClipIds).map(Number);
@@ -1239,4 +1254,110 @@ function renderSelectedClipsBar() {
 document.addEventListener('DOMContentLoaded', function() {
     renderSelectedClipsBar();
     renderPlaylistSidebar();
-}); 
+});
+
+// --- Preview Grid logic ---
+function openPreviewGrid(selectedClipIds) {
+    console.log('openPreviewGrid called with:', selectedClipIds);
+    if (!selectedClipIds || selectedClipIds.length === 0) {
+        console.log('No selectedClipIds, aborting');
+        return;
+    }
+    let overlay = document.getElementById('preview-grid-overlay');
+    if (overlay) overlay.remove();
+    overlay = document.createElement('div');
+    overlay.id = 'preview-grid-overlay';
+    overlay.style.position = 'fixed';
+    overlay.style.top = '0';
+    overlay.style.left = '0';
+    overlay.style.width = '100vw';
+    overlay.style.height = '100vh';
+    overlay.style.background = 'rgba(18,20,24,0.97)';
+    overlay.style.zIndex = '3000';
+    overlay.style.display = 'flex';
+    overlay.style.flexDirection = 'column';
+    overlay.style.padding = '2em';
+    overlay.innerHTML = `<button id="close-preview-grid" style="position:absolute; top:1em; right:1.5em; font-size:1.5em; background:none; border:none; color:#aaa; cursor:pointer;">✖</button>`;
+    const grid = document.createElement('div');
+    const n = selectedClipIds.length;
+
+    // Ensure overlay fills viewport
+    overlay.style.width = '100vw';
+    overlay.style.height = '100vh';
+    // Use grid: one column per video, always fill overlay
+    grid.style.display = 'grid';
+    grid.style.gridTemplateColumns = 'repeat(auto-fit, minmax(320px, 1fr))';
+    grid.style.justifyContent = 'center';
+    grid.style.alignItems = 'start';
+    grid.style.gap = '1.5em';
+    grid.style.width = '100vw';
+    grid.style.height = 'auto';
+
+    let foundCount = 0;
+    selectedClipIds.forEach(clipId => {
+        const card = document.querySelector(`.card[data-clip-id='${clipId}']`);
+        if (!card) {
+            console.log('No card found for clipId', clipId);
+            return;
+        }
+        foundCount++;
+        const filename = card.querySelector('.filename').textContent;
+        const videoUrl = '/media/' + card.getAttribute('data-path');
+        const cell = document.createElement('div');
+        cell.style.background = '#181a1b';
+        cell.style.borderRadius = '10px';
+        cell.style.display = 'flex';
+        cell.style.flexDirection = 'column';
+        cell.style.alignItems = 'center';
+        cell.style.justifyContent = 'center';
+        cell.style.padding = '0.7em';
+        cell.style.margin = 'auto';
+        cell.style.maxWidth = '800px';
+        cell.style.width = '100%';
+        cell.style.height = 'auto';
+        cell.style.aspectRatio = '16 / 9';
+        cell.style.display = 'flex';
+        cell.style.alignItems = 'center';
+        cell.style.justifyContent = 'center';
+        cell.style.margin = 'auto';
+        cell.innerHTML = `<div style='font-size:0.93em;color:#bbb;margin-bottom:0.3em;'>${filename}</div>`;
+        const video = document.createElement('video');
+        video.src = videoUrl;
+        video.controls = true;
+        video.muted = true;
+        video.style.maxWidth = '100%';
+        video.style.maxHeight = '100%';
+        video.style.width = '100%';
+        video.style.height = '100%';
+        video.style.objectFit = 'contain';
+        video.style.borderRadius = '6px';
+        video.style.background = '#111';
+        cell.appendChild(video);
+        const controls = document.createElement('div');
+        controls.style.display = 'flex';
+        controls.style.gap = '0.7em';
+        controls.style.marginTop = '0.3em';
+        const playBtn = document.createElement('button');
+        playBtn.textContent = '▶';
+        playBtn.title = 'Play/Pause';
+        playBtn.onclick = () => { video.paused ? video.play() : video.pause(); };
+        const muteBtn = document.createElement('button');
+        muteBtn.textContent = '🔇';
+        muteBtn.title = 'Mute/Unmute';
+        muteBtn.onclick = () => { video.muted = !video.muted; muteBtn.textContent = video.muted ? '🔇' : '🔊'; };
+        const closeBtn = document.createElement('button');
+        closeBtn.textContent = '✖';
+        closeBtn.title = 'Close';
+        closeBtn.onclick = () => { cell.remove(); };
+        controls.appendChild(playBtn);
+        controls.appendChild(muteBtn);
+        controls.appendChild(closeBtn);
+        cell.appendChild(controls);
+        grid.appendChild(cell);
+    });
+    console.log('Preview grid: found', foundCount, 'cards out of', n);
+    overlay.appendChild(grid);
+    document.body.appendChild(overlay);
+    console.log('Preview grid overlay appended to DOM');
+    document.getElementById('close-preview-grid').onclick = () => overlay.remove();
+} 
