@@ -575,36 +575,50 @@ body {
     margin-top: 0.5em;
 }
 
-/* Scan folder form input and button styling */
-.scan-form-input {
-    background: #23232a;
-    color: #f0f4fa;
-    border: 1.5px solid #222;
-    border-radius: 6px;
+/* Notch-style elegant, thin typography for all form elements site-wide */
+label, .notch-label {
+    font-size: 0.93em;
+    font-weight: 400;
+    color: #bfc7d5;
+    letter-spacing: 0.01em;
+    margin-right: 0.7em;
+    font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+    opacity: 0.85;
+}
+input[type="text"], input[type="password"], input[type="email"], input[type="number"], select, textarea {
+    font-size: 0.95em;
+    font-weight: 300;
+    letter-spacing: 0.01em;
     padding: 0.18em 0.7em;
-    font-size: 1em;
-    min-width: 220px;
-    max-width: 350px;
+    background: #23232a;
+    color: #e0e6ef;
+    border: 1.2px solid #23232a;
+    border-radius: 6px;
     transition: border 0.18s, background 0.18s;
     outline: none;
+    box-shadow: none;
 }
-.scan-form-input:focus {
-    border: 1.5px solid #3a8fff;
+input[type="text"]:focus, input[type="password"]:focus, input[type="email"]:focus, input[type="number"]:focus, select:focus, textarea:focus {
+    border: 1.2px solid #3fa7ff;
     background: #23243a;
 }
-.scan-form-btn {
+button, input[type="submit"], input[type="button"] {
+    font-size: 0.93em;
+    font-weight: 400;
+    letter-spacing: 0.02em;
+    padding: 0.18em 1.1em;
     background: #23232a;
-    color: #f0f4fa;
-    border: 1.5px solid #222;
+    color: #bfc7d5;
+    border: 1.2px solid #23232a;
     border-radius: 999px;
-    padding: 0.18em 1.2em;
-    font-size: 1em;
-    font-weight: 600;
-    cursor: pointer;
     transition: border 0.18s, background 0.18s, color 0.18s;
+    box-shadow: none;
+    cursor: pointer;
 }
-.scan-form-btn:hover, .scan-form-btn:focus {
+button:hover, button:focus, input[type="submit"]:hover, input[type="submit"]:focus, input[type="button"]:hover, input[type="button"]:focus {
     background: #23243a;
-    border: 1.5px solid #3a8fff;
+    border: 1.2px solid #3fa7ff;
     color: #fff;
-} 
+}
+/* Remove previous scan-form-label, scan-form-input, scan-form-btn rules if present */
+.scan-form-label, .scan-form-input, .scan-form-btn { all: unset; } 

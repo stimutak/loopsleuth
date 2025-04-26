@@ -26,9 +26,9 @@ LoopSleuth Web: Grid View Template
     <div class="container">
         <h1>LoopSleuth - Clip Grid (Web UI)</h1>
         <form method="post" action="/scan_folder" style="margin-bottom:2em;">
-            <label for="folder_path">Scan folder for videos:</label>
-            <input type="text" id="folder_path" name="folder_path" placeholder="E:/downloads" size="40" required class="scan-form-input" />
-            <button type="submit" class="scan-form-btn">Scan</button>
+            <label for="folder_path" class="notch-label">Scan folder for videos:</label>
+            <input type="text" id="folder_path" name="folder_path" placeholder="E:/downloads" size="40" required />
+            <button type="submit">Scan</button>
         </form>
         {% if clips %}
             <div class="grid">
