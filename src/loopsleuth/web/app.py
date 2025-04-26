@@ -6,7 +6,7 @@ LoopSleuth Web Frontend (FastAPI)
 - Uses Jinja2 templates and static files
 """
 from fastapi import FastAPI, Request, HTTPException, Form, Body
-from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse, JSONResponse
+from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
@@ -615,8 +615,34 @@ def reorder_playlist_clips(playlist_id: int, req: PlaylistReorderRequest):
 
 @app.get("/playlists/{playlist_id}/export")
 def export_playlist(playlist_id: int, format: str = "txt"):
-    """Export playlist in the requested format (txt, zip, tox). Stub for now."""
-    # TODO: Implement export logic for txt, zip, tox
+    """Export playlist in the requested format (txt, zip, tox)."""
+    if format == "txt":
+        conn = None
+        try:
+            conn = get_db_connection(get_default_db_path())
+            cursor = conn.cursor()
+            # Get all clip paths in playlist order
+            cursor.execute("""
+                SELECT c.path
+                FROM playlist_clips pc
+                JOIN clips c ON pc.clip_id = c.id
+                WHERE pc.playlist_id = ?
+                ORDER BY pc.position ASC
+            """, (playlist_id,))
+            paths = [row[0] for row in cursor.fetchall() if row[0]]
+            if not paths:
+                return JSONResponse({"error": "No clips found in playlist or playlist does not exist."}, status_code=404)
+            content = "\n".join(paths) + "\n"
+            headers = {
+                "Content-Disposition": f"attachment; filename=playlist_{playlist_id}.txt"
+            }
+            return PlainTextResponse(content, headers=headers)
+        except Exception as e:
+            return JSONResponse({"error": str(e)}, status_code=500)
+        finally:
+            if conn:
+                conn.close()
+    # For other formats, keep stub
     return JSONResponse({"message": f"Export for playlist {playlist_id} as {format} not yet implemented."}, status_code=501)
 
 # TODO: Add API endpoints for clips, tagging, starring, etc.

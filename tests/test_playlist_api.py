@@ -114,4 +114,55 @@ def test_playlist_errors(client):
     resp = client.post("/playlists/99999/clips/remove", json={"clip_ids": [1]})
     assert resp.status_code == 200
     resp = client.patch("/playlists/99999/reorder", json={"clip_ids": [1]})
-    assert resp.status_code == 200 
+    assert resp.status_code == 200
+
+# --- Additional Playlist Tests ---
+def test_playlist_export_stub(client):
+    # Create a playlist
+    resp = client.post("/playlists", json={"name": "ExportTest"})
+    assert resp.status_code == 200
+    pid = resp.json()["id"]
+    # Export as txt (should be 501 Not Implemented)
+    resp = client.get(f"/playlists/{pid}/export?format=txt")
+    assert resp.status_code == 501
+    assert "not yet implemented" in resp.json()["message"].lower()
+    # Export as zip (should be 501)
+    resp = client.get(f"/playlists/{pid}/export?format=zip")
+    assert resp.status_code == 501
+    # Export as tox (should be 501)
+    resp = client.get(f"/playlists/{pid}/export?format=tox")
+    assert resp.status_code == 501
+
+def test_playlist_duplicate_and_edge_cases(client):
+    # Create playlist and add a clip
+    resp = client.post("/playlists", json={"name": "EdgeCase"})
+    assert resp.status_code == 200
+    pid = resp.json()["id"]
+    # Add a clip to DB
+    conn = get_db_connection(get_default_db_path())
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO clips (path, filename) VALUES (?, ?)", ("/tmp/edge.mp4", "edge.mp4"))
+    cid = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    # Add the same clip twice
+    resp = client.post(f"/playlists/{pid}/clips", json={"clip_ids": [cid]})
+    assert resp.status_code == 200
+    resp = client.post(f"/playlists/{pid}/clips", json={"clip_ids": [cid]})
+    assert resp.status_code == 200
+    # Should only appear once in playlist
+    resp = client.get(f"/playlists/{pid}")
+    assert resp.status_code == 200
+    clips = resp.json()["clips"]
+    assert [c["id"] for c in clips].count(cid) == 1
+    # Remove a non-existent clip (should not error)
+    resp = client.post(f"/playlists/{pid}/clips/remove", json={"clip_ids": [99999]})
+    assert resp.status_code == 200
+    # Reorder with missing/extra IDs (should only reorder existing)
+    resp = client.patch(f"/playlists/{pid}/reorder", json={"clip_ids": [cid, 99999]})
+    assert resp.status_code == 200
+    # Playlist should still have only the real clip
+    resp = client.get(f"/playlists/{pid}")
+    assert resp.status_code == 200
+    clips = resp.json()["clips"]
+    assert [c["id"] for c in clips] == [cid] 
