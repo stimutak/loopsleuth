@@ -97,6 +97,20 @@ LoopSleuth Web: Grid View Template
                     </div>
                 {% endfor %}
             </div>
+            <!-- Pagination controls -->
+            {% set total_clips = total_clips | default(0) %}
+            {% set per_page = per_page | default(100) %}
+            {% set page = page | default(1) %}
+            <div class="pagination-bar" style="margin:2em 0; display:flex; justify-content:center; align-items:center; gap:1em;">
+                {% set total_pages = (total_clips // per_page) + (1 if total_clips % per_page else 0) %}
+                {% if page > 1 %}
+                    <a href="?page={{ page-1 }}&per_page={{ per_page }}&sort={{ sort }}&order={{ order }}{% if starred_first %}&starred_first=1{% endif %}" class="pagination-btn">&laquo; Prev</a>
+                {% endif %}
+                <span>Page {{ page }} of {{ total_pages }}</span>
+                {% if page < total_pages %}
+                    <a href="?page={{ page+1 }}&per_page={{ per_page }}&sort={{ sort }}&order={{ order }}{% if starred_first %}&starred_first=1{% endif %}" class="pagination-btn">Next &raquo;</a>
+                {% endif %}
+            </div>
             <!-- Floating batch action bar -->
             <div id="batch-action-bar" style="display:none;"></div>
         {% else %}

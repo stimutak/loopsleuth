@@ -61,7 +61,7 @@ THUMB_DIR = Path(".loopsleuth_data/thumbnails")
 @app.get("/", response_class=HTMLResponse)
 def grid(request: Request):
     """
-    Main grid view: shows all clips with thumbnails and info.
+    Main grid view: shows all clips with thumbnails and info. Now paginated.
     """
     # Default scan folder for UI (patched to E:/Downloads)
     default_scan_folder = "E:/Downloads"
@@ -75,22 +75,40 @@ def grid(request: Request):
     if order not in valid_orders:
         order = "asc"
     starred_first = request.query_params.get("starred_first", "0") == "1"
+    # Pagination
+    try:
+        page = int(request.query_params.get("page", 1))
+        if page < 1:
+            page = 1
+    except Exception:
+        page = 1
+    try:
+        per_page = int(request.query_params.get("per_page", 100))
+        if per_page < 1:
+            per_page = 100
+    except Exception:
+        per_page = 100
+    offset = (page - 1) * per_page
     # SQL injection safe: use validated field names only
     if starred_first:
         order_by = f"starred DESC, {sort} {order.upper()}"
     else:
         order_by = f"{sort} {order.upper()}"
-    # Connect to the database and fetch all clips
+    # Connect to the database and fetch paginated clips
     conn = None
     clips = []
+    total_clips = 0
     try:
         conn = get_db_connection(get_default_db_path())
         cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM clips")
+        total_clips = cursor.fetchone()[0]
         cursor.execute(f"""
             SELECT id, filename, path, duration, thumbnail_path, starred, size, modified_at
             FROM clips
             ORDER BY {order_by}
-        """)
+            LIMIT ? OFFSET ?
+        """, (per_page, offset))
         for row in cursor.fetchall():
             clip = dict(row)
             # Fetch tags for this clip
@@ -114,7 +132,17 @@ def grid(request: Request):
         if conn:
             conn.close()
     return templates.TemplateResponse(
-        "grid.html", {"request": request, "clips": clips, "default_scan_folder": default_scan_folder, "sort": sort, "order": order, "starred_first": starred_first}
+        "grid.html", {
+            "request": request,
+            "clips": clips,
+            "default_scan_folder": default_scan_folder,
+            "sort": sort,
+            "order": order,
+            "starred_first": starred_first,
+            "page": page,
+            "per_page": per_page,
+            "total_clips": total_clips
+        }
     )
 
 @app.get("/clip/{clip_id}", response_class=HTMLResponse)
