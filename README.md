@@ -1,7 +1,13 @@
 # LoopSleuth
 
-> **Note (2024-06-13): LoopSleuth is now web-first!**
-> The web UI (FastAPI + Jinja2) is the primary interface for browsing, tagging, and managing video loops. See `STARTUP_MESSAGE.md` for the latest project state, usage, and next steps.
+> **Note (2025-04-22 to 2025-04-26): Major UI/UX improvements and handoff readiness**
+> - Favicons are now present on all pages (grid, detail, error, 404) for consistent branding.
+> - A persistent, real-time thumbnail size slider is available above the grid view (per-browser persistence).
+> - The detail view features fully custom video controls (play/pause, seek, frame step, volume) in addition to native controls.
+> - All forms and buttons use a modern, thin, Notch-inspired typographic style for a clean, creative look.
+> - The "Open in System" feature selects files in Explorer/Finder or opens the folder on Linux.
+> - All major UI/UX changes are documented in `BUG_HANDBOOK.md` for handoff/debug.
+> - See `CHANGELOG.md` for a detailed, date-accurate version history and recent changes.
 
 ## 🚦 Handoff & Next Steps (2024-06)
 - **Production-ready:**
@@ -261,5 +267,5 @@ _Stretch:_ .tox export, multi-user/concurrent edits, creative integrations (Touc
 - [x] All major user flows are documented in this README and `STARTUP_MESSAGE.md`
 - [x] See `src/loopsleuth/web/templates/clip_detail.html` for the latest playlist UX logic
 
-_Last update: 2024-06-14_
+_Last update: 2025-04-26_
 
