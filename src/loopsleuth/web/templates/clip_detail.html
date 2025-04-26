@@ -204,6 +204,79 @@ LoopSleuth Web: Clip Detail Page (DaVinci-inspired)
             alert('Playlist: ' + playlistName);
         }
     };
+
+    // --- Custom video controls wiring ---
+    (function() {
+        const video = document.getElementById('clip-video');
+        const playPauseBtn = document.getElementById('play-pause-btn');
+        const seekBar = document.getElementById('seek-bar');
+        const currentTimeLabel = document.getElementById('current-time');
+        const durationLabel = document.getElementById('duration');
+        const frameBackBtn = document.getElementById('frame-back-btn');
+        const frameFwdBtn = document.getElementById('frame-fwd-btn');
+        const volumeBar = document.getElementById('volume-bar');
+        let seeking = false;
+
+        function formatTime(sec) {
+            if (isNaN(sec)) return '00:00';
+            const m = Math.floor(sec / 60);
+            const s = Math.floor(sec % 60);
+            return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        }
+
+        // Update duration when metadata is loaded
+        video.addEventListener('loadedmetadata', function() {
+            seekBar.max = video.duration || 0;
+            durationLabel.textContent = formatTime(video.duration);
+        });
+
+        // Sync seek bar and time display
+        video.addEventListener('timeupdate', function() {
+            if (!seeking) seekBar.value = video.currentTime;
+            currentTimeLabel.textContent = formatTime(video.currentTime);
+        });
+
+        // Play/pause button
+        playPauseBtn.addEventListener('click', function() {
+            if (video.paused) {
+                video.play();
+                playPauseBtn.textContent = '⏸';
+            } else {
+                video.pause();
+                playPauseBtn.textContent = '⏯';
+            }
+        });
+        video.addEventListener('play', () => { playPauseBtn.textContent = '⏸'; });
+        video.addEventListener('pause', () => { playPauseBtn.textContent = '⏯'; });
+
+        // Seek bar interaction
+        seekBar.addEventListener('input', function() {
+            seeking = true;
+            currentTimeLabel.textContent = formatTime(seekBar.value);
+        });
+        seekBar.addEventListener('change', function() {
+            video.currentTime = seekBar.value;
+            seeking = false;
+        });
+        seekBar.addEventListener('mousedown', () => seeking = true);
+        seekBar.addEventListener('mouseup', () => seeking = false);
+
+        // Frame step (assume 30fps)
+        frameBackBtn.addEventListener('click', function() {
+            video.currentTime = Math.max(0, video.currentTime - 1/30);
+        });
+        frameFwdBtn.addEventListener('click', function() {
+            video.currentTime = Math.min(video.duration, video.currentTime + 1/30);
+        });
+
+        // Volume
+        volumeBar.addEventListener('input', function() {
+            video.volume = volumeBar.value;
+        });
+        video.addEventListener('volumechange', function() {
+            volumeBar.value = video.volume;
+        });
+    })();
     </script>
 </body>
 </html> 
