@@ -5,7 +5,7 @@ LoopSleuth Web Frontend (FastAPI)
 - Will support video playback, tagging, starring, and export
 - Uses Jinja2 templates and static files
 """
-from fastapi import FastAPI, Request, HTTPException, Form, Body, status
+from fastapi import FastAPI, Request, HTTPException, Form, Body, status, BackgroundTasks
 from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -23,6 +23,8 @@ import os
 import shutil
 import platform
 import subprocess
+import json
+from datetime import datetime, timedelta
 
 def get_default_db_path():
     return Path(os.environ.get("LOOPSLEUTH_DB_PATH", "loopsleuth.db"))
@@ -63,16 +65,31 @@ def grid(request: Request):
     """
     # Default scan folder for UI (patched to E:/Downloads)
     default_scan_folder = "E:/Downloads"
+    # --- Sorting logic ---
+    sort = request.query_params.get("sort", "filename")
+    order = request.query_params.get("order", "asc")
+    valid_sorts = {"filename", "modified_at", "size", "duration", "starred"}
+    valid_orders = {"asc", "desc"}
+    if sort not in valid_sorts:
+        sort = "filename"
+    if order not in valid_orders:
+        order = "asc"
+    starred_first = request.query_params.get("starred_first", "0") == "1"
+    # SQL injection safe: use validated field names only
+    if starred_first:
+        order_by = f"starred DESC, {sort} {order.upper()}"
+    else:
+        order_by = f"{sort} {order.upper()}"
     # Connect to the database and fetch all clips
     conn = None
     clips = []
     try:
         conn = get_db_connection(get_default_db_path())
         cursor = conn.cursor()
-        cursor.execute("""
-            SELECT id, filename, duration, thumbnail_path, starred
+        cursor.execute(f"""
+            SELECT id, filename, path, duration, thumbnail_path, starred, size, modified_at
             FROM clips
-            ORDER BY filename ASC
+            ORDER BY {order_by}
         """)
         for row in cursor.fetchall():
             clip = dict(row)
@@ -97,7 +114,7 @@ def grid(request: Request):
         if conn:
             conn.close()
     return templates.TemplateResponse(
-        "grid.html", {"request": request, "clips": clips, "default_scan_folder": default_scan_folder}
+        "grid.html", {"request": request, "clips": clips, "default_scan_folder": default_scan_folder, "sort": sort, "order": order, "starred_first": starred_first}
     )
 
 @app.get("/clip/{clip_id}", response_class=HTMLResponse)
@@ -175,15 +192,36 @@ def serve_video(filename: str):
     return FileResponse(file_path)
 
 @app.post("/scan_folder")
-def scan_folder(folder_path: str = Form(...), force_rescan: bool = Form(False)):
+def scan_folder(folder_path: str = Form(...), force_rescan: bool = Form(False), background_tasks: BackgroundTasks = None):
     """
     Scan the given folder for videos and ingest them into the DB.
-    Redirects back to the grid after completion.
+    Now runs as a FastAPI BackgroundTask to keep the UI responsive for large batches.
+    Prevents overlapping scans using a lock file.
     """
-    try:
-        ingest_directory(Path(folder_path), db_path=get_default_db_path(), force_rescan=force_rescan)
-    except Exception as e:
-        print(f"[Error] Scanning folder {folder_path}: {e}")
+    lock_path = Path(".loopsleuth_data/scan.lock")
+    # Check for existing lock
+    if lock_path.exists():
+        mtime = datetime.fromtimestamp(lock_path.stat().st_mtime)
+        if datetime.now() - mtime < timedelta(hours=1):
+            return JSONResponse({"error": "A scan is already in progress."}, status_code=409)
+        else:
+            # Stale lock, remove it
+            lock_path.unlink()
+    # Create lock
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    lock_path.write_text(str(datetime.now()))
+
+    def wrapped_ingest(*args, **kwargs):
+        try:
+            ingest_directory(*args, **kwargs)
+        finally:
+            if lock_path.exists():
+                lock_path.unlink()
+
+    if background_tasks is not None:
+        background_tasks.add_task(wrapped_ingest, Path(folder_path), get_default_db_path(), False, force_rescan)
+    else:
+        wrapped_ingest(Path(folder_path), db_path=get_default_db_path(), force_rescan=force_rescan)
     return RedirectResponse(url="/", status_code=303)
 
 @app.post("/star/{clip_id}")
@@ -657,6 +695,22 @@ def open_in_system(clip_id: int):
     finally:
         if conn:
             conn.close()
+
+@app.get("/scan_progress")
+def scan_progress():
+    """
+    Returns the current scan/ingest progress for the frontend progress bar.
+    Reads .loopsleuth_data/scan_progress.json. If missing, returns status: idle.
+    """
+    progress_path = Path(".loopsleuth_data/scan_progress.json")
+    if not progress_path.exists():
+        return JSONResponse({"status": "idle"})
+    try:
+        with progress_path.open("r") as f:
+            data = json.load(f)
+        return JSONResponse(data)
+    except Exception as e:
+        return JSONResponse({"status": "error", "error": str(e)})
 
 # TODO: Add API endpoints for clips, tagging, starring, etc.
 # TODO: Add video playback route 

@@ -5,6 +5,7 @@ import sqlite3
 import sys
 from pathlib import Path
 from typing import Iterable, List, Set, Optional
+import json
 
 # Add tqdm for progress bar if available
 try:
@@ -53,6 +54,7 @@ def ingest_directory(
     """
     Scans a directory for video files, extracts metadata (duration),
     and saves the information to the database.
+    Now writes progress to .loopsleuth_data/scan_progress.json for UI polling.
 
     Args:
         start_path: The directory path to start scanning from.
@@ -63,6 +65,12 @@ def ingest_directory(
     if not start_path.is_dir():
         print(f"Error: Invalid start path '{start_path}' is not a directory.", file=sys.stderr)
         return
+
+    progress_path = Path(".loopsleuth_data/scan_progress.json")
+    try:
+        progress_path.parent.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        pass
 
     print(f"Scanning {start_path} for video files ({', '.join(extensions)})...")
 
@@ -77,9 +85,14 @@ def ingest_directory(
 
         # Collect all video files first for progress bar
         video_files = list(_scan_directory_internal(start_path, extensions))
+        total_files = len(video_files)
+        # Write initial progress
+        with progress_path.open("w") as f:
+            json.dump({"total": total_files, "done": 0, "status": "scanning"}, f)
+
         iterator = tqdm(video_files, desc="Scanning", unit="file") if tqdm else video_files
 
-        for video_path in iterator:
+        for idx, video_path in enumerate(iterator):
             try:
                 path_str = str(video_path)
                 filename = video_path.name
@@ -89,6 +102,9 @@ def ingest_directory(
                 existing = cursor.fetchone()
                 if existing and not force_rescan:
                     skipped_count += 1
+                    # Update progress for skipped
+                    with progress_path.open("w") as f:
+                        json.dump({"total": total_files, "done": idx + 1, "status": "scanning"}, f)
                     continue
 
                 print(f"Processing: {filename}")
@@ -98,11 +114,17 @@ def ingest_directory(
                 except FFprobeError as e:
                     print(f"  Warning: Could not get metadata for {filename}. Error: {e}", file=sys.stderr)
                     error_count += 1
+                    # Update progress for error
+                    with progress_path.open("w") as f:
+                        json.dump({"total": total_files, "done": idx + 1, "status": "scanning"}, f)
                     continue
                 except FileNotFoundError as e:
                     print(f"  Error: {e}", file=sys.stderr)
                     print("  Aborting scan due to missing ffprobe.", file=sys.stderr)
                     error_count += 1
+                    # Set error status and exit
+                    with progress_path.open("w") as f:
+                        json.dump({"total": total_files, "done": idx, "status": "error", "error": str(e)}, f)
                     break
                 duration = meta.get("duration")
                 width = meta.get("width")
@@ -152,10 +174,17 @@ def ingest_directory(
                     except (ThumbnailError, Exception) as e:
                         print(f"  Error generating thumbnail for {filename}: {e}", file=sys.stderr)
 
+                # Update progress after each file
+                with progress_path.open("w") as f:
+                    json.dump({"total": total_files, "done": idx + 1, "status": "scanning"}, f)
+
             except Exception as e:
                 # Catch unexpected errors during processing of a single file
                 print(f"  Error processing file {video_path}: {e}", file=sys.stderr)
                 error_count += 1
+                # Update progress for error
+                with progress_path.open("w") as f:
+                    json.dump({"total": total_files, "done": idx + 1, "status": "scanning"}, f)
                 continue # Skip to the next file
 
         conn.commit()
@@ -164,10 +193,20 @@ def ingest_directory(
         print(f"  Skipped (already exist): {skipped_count}")
         print(f"  Errors: {error_count}")
 
+        # Set status to done
+        with progress_path.open("w") as f:
+            json.dump({"total": total_files, "done": total_files, "status": "done"}, f)
+
     except sqlite3.Error as e:
         print(f"Database error during scan: {e}", file=sys.stderr)
+        # Set error status
+        with progress_path.open("w") as f:
+            json.dump({"total": 0, "done": 0, "status": "error", "error": str(e)}, f)
     except Exception as e:
         print(f"An unexpected error occurred during scan: {e}", file=sys.stderr)
+        # Set error status
+        with progress_path.open("w") as f:
+            json.dump({"total": 0, "done": 0, "status": "error", "error": str(e)}, f)
     finally:
         if conn:
             conn.close()
