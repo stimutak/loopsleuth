@@ -16,7 +16,7 @@ if str(SRC_DIR) not in sys.path:
     sys.path.append(str(SRC_DIR))
 
 from PIL import Image, UnidentifiedImageError
-from loopsleuth.db import get_db_connection, DEFAULT_DB_PATH # Import top-level
+from loopsleuth.db import get_db_connection, get_default_db_path
 from loopsleuth.metadata import get_video_duration, FFprobeError # Import top-level for example
 
 # Constants
@@ -48,8 +48,9 @@ def _get_thumbnail_filename(video_path_str: str, clip_id: Optional[int] = None) 
 
 def generate_thumbnail(
     video_path: Path,
-    duration: Optional[float],
-    clip_id: Optional[int] = None, # Pass DB ID for better filename
+    duration: Optional[float] = None,
+    clip_id: Optional[int] = None,
+    db_path: Path = get_default_db_path(),
     output_dir: Optional[Path] = None,
     target_size: Tuple[int, int] = THUMBNAIL_SIZE,
     quality: int = THUMBNAIL_QUALITY,
@@ -62,6 +63,7 @@ def generate_thumbnail(
         video_path: Path to the input video file.
         duration: Duration of the video in seconds (required to calculate time).
         clip_id: The primary key ID of the clip in the database (optional, for filename).
+        db_path: Path to the SQLite database.
         output_dir: The directory to save thumbnails (defaults to THUMBNAIL_DIR_NAME).
         target_size: Desired thumbnail size (width, height), maintains aspect ratio.
         quality: JPEG quality (1-95).
@@ -180,7 +182,7 @@ def generate_thumbnail(
                  pass
 
 def process_thumbnails(
-    db_path: Path = DEFAULT_DB_PATH,
+    db_path: Path = get_default_db_path(),
     limit: Optional[int] = None,
     force_regenerate: bool = False,
 ) -> Tuple[int, int]:
@@ -239,6 +241,7 @@ def process_thumbnails(
                     video_path=video_path,
                     duration=duration,
                     clip_id=clip_id,
+                    db_path=db_path,
                     output_dir=base_output_dir
                 )
 

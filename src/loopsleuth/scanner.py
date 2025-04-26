@@ -19,7 +19,7 @@ SRC_DIR = SCRIPTS_DIR.parent
 if str(SRC_DIR) not in sys.path:
     sys.path.append(str(SRC_DIR))
 
-from loopsleuth.db import get_db_connection, DEFAULT_DB_PATH
+from loopsleuth.db import get_db_connection, get_default_db_path
 from loopsleuth.metadata import get_video_duration, FFprobeError, get_video_metadata
 from loopsleuth.thumbnailer import generate_thumbnail, ThumbnailError
 
@@ -46,7 +46,7 @@ def _scan_directory_internal(
 
 def ingest_directory(
     start_path: Path,
-    db_path: Path = DEFAULT_DB_PATH,
+    db_path: Path = get_default_db_path(),
     extensions: Set[str] = DEFAULT_VIDEO_EXTENSIONS,
     force_rescan: bool = False,
 ) -> None:

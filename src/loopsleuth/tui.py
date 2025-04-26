@@ -23,7 +23,7 @@ from textual import events # Import events
 from textual.geometry import Region # Import Region
 
 # Import database functions and default path
-from loopsleuth.db import get_db_connection, DEFAULT_DB_PATH
+from loopsleuth.db import get_db_connection, get_default_db_path
 # Import the exporter function
 from loopsleuth.exporter import export_starred_clips
 
@@ -131,7 +131,7 @@ class ClipGrid(VerticalScroll):
     grid_cols: int = 3
     card_height: int = 14 # Approx. height (ClipCard height 12 + margin 1*2)
 
-    def __init__(self, db_path: Path = DEFAULT_DB_PATH, **kwargs):
+    def __init__(self, db_path: Path = get_default_db_path(), **kwargs):
         super().__init__(**kwargs)
         self.db_path = db_path
 
@@ -362,7 +362,7 @@ class LoopSleuthApp(App[None]):
     # Store DB path for the app instance
     db_path: Path
 
-    def __init__(self, db_path: Path = DEFAULT_DB_PATH, **kwargs):
+    def __init__(self, db_path: Path = get_default_db_path(), **kwargs):
         """Initialize the app, ensuring base class init and setting DB path."""
         super().__init__(**kwargs)
         self.db_path = db_path

@@ -5,10 +5,11 @@ import shutil
 import sqlite3
 import uuid
 import sys
-from src.loopsleuth.web.app import app
+from loopsleuth.web.app import app
+from loopsleuth.db import get_db_connection, get_default_db_path
 
 @pytest.fixture
-def test_db_path(tmp_path):
+def test_db_path(tmp_path, monkeypatch):
     db_path = tmp_path / f"test_{uuid.uuid4().hex}.db"
     # Create minimal schema matching production (including NOT NULL path)
     conn = sqlite3.connect(db_path)
@@ -28,12 +29,11 @@ def test_db_path(tmp_path):
     c.execute("CREATE TABLE clip_tags (clip_id INTEGER, tag_id INTEGER, PRIMARY KEY (clip_id, tag_id))")
     conn.commit()
     conn.close()
+    monkeypatch.setenv("LOOPSLEUTH_DB_PATH", str(db_path))
     return db_path
 
 @pytest.fixture
-def client(test_db_path, monkeypatch):
-    # Patch DEFAULT_DB_PATH to use our temp DB
-    monkeypatch.setattr("src.loopsleuth.web.app.DEFAULT_DB_PATH", test_db_path)
+def client(test_db_path):
     return TestClient(app)
 
 def seed_clips_and_tags(db_path):

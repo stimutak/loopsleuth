@@ -14,7 +14,7 @@ if str(SRC_DIR) not in sys.path:
 from PIL import Image, UnidentifiedImageError
 import imagehash
 
-from loopsleuth.db import get_db_connection, DEFAULT_DB_PATH
+from loopsleuth.db import get_db_connection, get_default_db_path
 
 class HasherError(Exception):
     """Custom exception for errors during hashing."""
@@ -51,7 +51,7 @@ def calculate_phash(image_path: Path) -> Optional[str]:
         raise HasherError(f"Failed to calculate pHash for {image_path}. Error: {e}") from e
 
 def process_hashes(
-    db_path: Path = DEFAULT_DB_PATH,
+    db_path: Path = get_default_db_path(),
     limit: Optional[int] = None,
     force_regenerate: bool = False,
 ) -> Tuple[int, int]:

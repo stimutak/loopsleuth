@@ -136,7 +136,38 @@ See code comments for further details and next steps.
     pip install -r requirements.txt
     ```
 
-- [2024-06-14] Batch bar tag add/remove/autocomplete now robust to DOM state. Toast feedback restored. Selection logic fixed. Batch bar is now resilient to rapid selection/deselection and DOM changes.
+## 🧪 Test Coverage & Improving Quality
+
+LoopSleuth uses `pytest` and `pytest-cov` for automated testing and coverage reporting.
+
+- **Current coverage:** ~30% (as of June 2024)
+- **How to check coverage:**
+  ```bash
+  pytest --cov=src/loopsleuth --cov-report=term-missing
+  ```
+- **How to improve coverage:**
+  1. Add or expand tests in `tests/` for the modules and lines reported as missing.
+  2. Focus on files with 0% or low coverage first (see below).
+  3. Use `pytest --cov=src/loopsleuth --cov-report=html` for a browsable HTML report.
+
+### Coverage Priorities (as of last run)
+- **No/Low coverage:**
+  - `src/loopsleuth/db_migrate_tags.py` (0%)
+  - `src/loopsleuth/hasher.py` (0%)
+  - `src/loopsleuth/tui.py` (0%)
+  - `src/loopsleuth/exporter.py` (34%)
+  - `src/loopsleuth/metadata.py` (29%)
+  - `src/loopsleuth/scanner.py` (48%)
+  - `src/loopsleuth/thumbnailer.py` (34%)
+  - `src/loopsleuth/web/app.py` (53%)
+  - `src/loopsleuth/ingest.py` (67%)
+- **What's covered well:**
+  - Batch/tag/playlist API logic and core backend tested in `tests/`.
+
+#### To reach higher coverage:
+- Add tests for CLI, TUI, hashing, thumbnailing, exporter, and error-handling paths.
+- Add tests for the web UI's endpoints and error cases.
+- See the coverage report for exact lines/files to target.
 
 ## ✅ Batch Tag Editing: Production-Ready (2024-06)
 - Batch tag add, remove, and clear actions are fully implemented and robust in both backend and frontend.

@@ -12,7 +12,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 # Import the FastAPI app
-from src.loopsleuth.web.app import app, get_db_connection, DEFAULT_DB_PATH
+from loopsleuth.web.app import app, get_db_connection, get_default_db_path
 
 @pytest.fixture(scope="function")
 def temp_db(tmp_path):
@@ -55,7 +55,7 @@ def test_playlist_crud_and_clips(client):
     assert any(p["id"] == pid for p in playlists)
 
     # 4. Add some clips to DB
-    conn = get_db_connection(DEFAULT_DB_PATH)
+    conn = get_db_connection(get_default_db_path())
     cursor = conn.cursor()
     cursor.execute("INSERT INTO clips (path, filename) VALUES (?, ?)", ("/tmp/a.mp4", "a.mp4"))
     cid1 = cursor.lastrowid

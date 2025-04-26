@@ -12,7 +12,7 @@ from fastapi.templating import Jinja2Templates
 from pathlib import Path
 import sys
 sys.path.append(str((Path(__file__).parent.parent.parent).resolve()))  # Ensure src/ is importable
-from loopsleuth.db import get_db_connection, DEFAULT_DB_PATH
+from loopsleuth.db import get_db_connection
 from urllib.parse import unquote
 from loopsleuth.scanner import ingest_directory
 import mimetypes  # <-- Add this import
@@ -22,9 +22,11 @@ import tempfile
 import os
 import shutil
 
+def get_default_db_path():
+    return Path(os.environ.get("LOOPSLEUTH_DB_PATH", "loopsleuth.db"))
+
 # --- App setup ---
 # Use the main production database by default
-DEFAULT_DB_PATH = Path("loopsleuth.db")
 app = FastAPI(title="LoopSleuth Web")
 
 # Mount static files (for thumbnails, CSS, JS, etc.)
@@ -63,7 +65,7 @@ def grid(request: Request):
     conn = None
     clips = []
     try:
-        conn = get_db_connection(DEFAULT_DB_PATH)
+        conn = get_db_connection(get_default_db_path())
         cursor = conn.cursor()
         cursor.execute("""
             SELECT id, filename, duration, thumbnail_path, starred
@@ -105,7 +107,7 @@ def clip_detail(request: Request, clip_id: int):
     clip = None
     video_mime = "video/mp4"  # Default
     try:
-        conn = get_db_connection(DEFAULT_DB_PATH)
+        conn = get_db_connection(get_default_db_path())
         cursor = conn.cursor()
         cursor.execute("""
             SELECT id, filename, path, thumbnail_path, starred, width, height, size, codec_name
@@ -177,7 +179,7 @@ def scan_folder(folder_path: str = Form(...), force_rescan: bool = Form(False)):
     Redirects back to the grid after completion.
     """
     try:
-        ingest_directory(Path(folder_path), db_path=DEFAULT_DB_PATH, force_rescan=force_rescan)
+        ingest_directory(Path(folder_path), db_path=get_default_db_path(), force_rescan=force_rescan)
     except Exception as e:
         print(f"[Error] Scanning folder {folder_path}: {e}")
     return RedirectResponse(url="/", status_code=303)
@@ -187,7 +189,7 @@ def toggle_star(clip_id: int):
     """Toggle the 'starred' flag for a clip and return the new state as JSON."""
     conn = None
     try:
-        conn = get_db_connection(DEFAULT_DB_PATH)
+        conn = get_db_connection(get_default_db_path())
         cursor = conn.cursor()
         cursor.execute("SELECT starred FROM clips WHERE id = ?", (clip_id,))
         row = cursor.fetchone()
@@ -216,7 +218,7 @@ def update_tags(clip_id: int, tag_update: TagUpdate = Body(...)):
     tags = [t.strip() for t in tag_update.tags if t.strip()]
     conn = None
     try:
-        conn = get_db_connection(DEFAULT_DB_PATH)
+        conn = get_db_connection(get_default_db_path())
         cursor = conn.cursor()
         # Insert new tags into tags table if not present
         tag_ids = []
@@ -255,7 +257,7 @@ def get_all_tags(q: str = None):
     """Return a list of all tag names for autocomplete/suggestions. If 'q' is provided, return only tags starting with the prefix (case-insensitive)."""
     conn = None
     try:
-        conn = get_db_connection(DEFAULT_DB_PATH)
+        conn = get_db_connection(get_default_db_path())
         cursor = conn.cursor()
         if q:
             # Use parameterized LIKE for case-insensitive prefix search
@@ -294,7 +296,7 @@ def batch_tag_update(batch_update: BatchTagUpdate = Body(...)):
     """
     conn = None
     try:
-        conn = get_db_connection(DEFAULT_DB_PATH)
+        conn = get_db_connection(get_default_db_path())
         cursor = conn.cursor()
         add_tags = [t.strip() for t in (batch_update.add_tags or []) if t.strip()]
         remove_tags = [t.strip() for t in (batch_update.remove_tags or []) if t.strip()]
@@ -373,7 +375,7 @@ def export_selected(export_req: ExportSelectedRequest = Body(...)):
     """
     conn = None
     try:
-        conn = get_db_connection(DEFAULT_DB_PATH)
+        conn = get_db_connection(get_default_db_path())
         cursor = conn.cursor()
         paths = []
         for clip_id in export_req.clip_ids:
@@ -414,7 +416,7 @@ def copy_selected(copy_req: CopySelectedRequest = Body(...)):
         dest = Path(copy_req.dest_folder)
         if not dest.exists() or not dest.is_dir():
             return JSONResponse({"error": f"Destination folder does not exist: {dest}"}, status_code=400)
-        conn = get_db_connection(DEFAULT_DB_PATH)
+        conn = get_db_connection(get_default_db_path())
         cursor = conn.cursor()
         for clip_id in copy_req.clip_ids:
             cursor.execute("SELECT filename, path FROM clips WHERE id = ?", (clip_id,))
@@ -460,7 +462,7 @@ def create_playlist(req: PlaylistCreateRequest):
     """Create a new playlist with the given name."""
     conn = None
     try:
-        conn = get_db_connection(DEFAULT_DB_PATH)
+        conn = get_db_connection(get_default_db_path())
         cursor = conn.cursor()
         cursor.execute("INSERT INTO playlists (name) VALUES (?)", (req.name,))
         playlist_id = cursor.lastrowid
@@ -477,7 +479,7 @@ def rename_playlist(playlist_id: int, req: PlaylistRenameRequest):
     """Rename a playlist."""
     conn = None
     try:
-        conn = get_db_connection(DEFAULT_DB_PATH)
+        conn = get_db_connection(get_default_db_path())
         cursor = conn.cursor()
         cursor.execute("UPDATE playlists SET name = ? WHERE id = ?", (req.name, playlist_id))
         if cursor.rowcount == 0:
@@ -495,7 +497,7 @@ def delete_playlist(playlist_id: int):
     """Delete a playlist and its associations."""
     conn = None
     try:
-        conn = get_db_connection(DEFAULT_DB_PATH)
+        conn = get_db_connection(get_default_db_path())
         cursor = conn.cursor()
         cursor.execute("DELETE FROM playlists WHERE id = ?", (playlist_id,))
         if cursor.rowcount == 0:
@@ -513,7 +515,7 @@ def list_playlists():
     """List all playlists (id, name, created_at)."""
     conn = None
     try:
-        conn = get_db_connection(DEFAULT_DB_PATH)
+        conn = get_db_connection(get_default_db_path())
         cursor = conn.cursor()
         cursor.execute("SELECT id, name, created_at FROM playlists ORDER BY created_at DESC")
         playlists = [dict(row) for row in cursor.fetchall()]
@@ -529,7 +531,7 @@ def get_playlist(playlist_id: int):
     """Get playlist details: id, name, created_at, and ordered clips."""
     conn = None
     try:
-        conn = get_db_connection(DEFAULT_DB_PATH)
+        conn = get_db_connection(get_default_db_path())
         cursor = conn.cursor()
         cursor.execute("SELECT id, name, created_at FROM playlists WHERE id = ?", (playlist_id,))
         playlist = cursor.fetchone()
@@ -555,7 +557,7 @@ def add_clips_to_playlist(playlist_id: int, req: PlaylistClipUpdateRequest):
     """Add one or more clips to a playlist (appends to end)."""
     conn = None
     try:
-        conn = get_db_connection(DEFAULT_DB_PATH)
+        conn = get_db_connection(get_default_db_path())
         cursor = conn.cursor()
         # Get current max position
         cursor.execute("SELECT MAX(position) FROM playlist_clips WHERE playlist_id = ?", (playlist_id,))
@@ -579,7 +581,7 @@ def remove_clips_from_playlist(playlist_id: int, req: PlaylistClipUpdateRequest)
     """Remove one or more clips from a playlist (POST for batch remove)."""
     conn = None
     try:
-        conn = get_db_connection(DEFAULT_DB_PATH)
+        conn = get_db_connection(get_default_db_path())
         cursor = conn.cursor()
         for clip_id in req.clip_ids:
             cursor.execute("DELETE FROM playlist_clips WHERE playlist_id = ? AND clip_id = ?", (playlist_id, clip_id))
@@ -596,7 +598,7 @@ def reorder_playlist_clips(playlist_id: int, req: PlaylistReorderRequest):
     """Reorder clips in a playlist. Accepts new clip_id order."""
     conn = None
     try:
-        conn = get_db_connection(DEFAULT_DB_PATH)
+        conn = get_db_connection(get_default_db_path())
         cursor = conn.cursor()
         for pos, clip_id in enumerate(req.clip_ids):
             cursor.execute("""

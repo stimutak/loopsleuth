@@ -3,12 +3,12 @@
 import sqlite3
 from pathlib import Path
 from typing import Optional
+import os
 
-# Define the default database path (e.g., in the user's data directory or project root)
-# For simplicity during development, let's put it in the project root.
-DEFAULT_DB_PATH = Path("loopsleuth.db")
+def get_default_db_path():
+    return Path(os.environ.get("LOOPSLEUTH_DB_PATH", "loopsleuth.db"))
 
-def get_db_connection(db_path: Path = DEFAULT_DB_PATH) -> sqlite3.Connection:
+def get_db_connection(db_path: Path = None) -> sqlite3.Connection:
     """
     Establishes a connection to the SQLite database and ensures the necessary
     table exists.
@@ -19,6 +19,8 @@ def get_db_connection(db_path: Path = DEFAULT_DB_PATH) -> sqlite3.Connection:
     Returns:
         An active SQLite database connection.
     """
+    if db_path is None:
+        db_path = get_default_db_path()
     conn = sqlite3.connect(db_path)
     # Use Row factory for dict-like access to columns
     conn.row_factory = sqlite3.Row
@@ -111,6 +113,6 @@ def migrate_clips_table(conn):
 # Example usage (optional, can be removed or moved to a main script)
 if __name__ == '__main__':
     connection = get_db_connection()
-    print(f"Database connection established to {DEFAULT_DB_PATH}")
+    print(f"Database connection established to {get_default_db_path()}")
     print("'clips' table ensured.")
     connection.close() 
