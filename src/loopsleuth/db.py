@@ -89,6 +89,20 @@ def create_table(conn: sqlite3.Connection):
         )
     """)
 
+    # --- Scan tracking table ---
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS scans (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            folder_path TEXT NOT NULL,
+            scanned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    # Add scan_id to clips if not present
+    try:
+        cursor.execute("ALTER TABLE clips ADD COLUMN scan_id INTEGER")
+    except Exception:
+        pass  # Already exists
+
     conn.commit()
 
 def migrate_clips_table(conn):

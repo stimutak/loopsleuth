@@ -79,6 +79,10 @@ def ingest_directory(
         conn = get_db_connection(db_path)
         cursor = conn.cursor()
 
+        # --- Insert new scan row ---
+        cursor.execute("INSERT INTO scans (folder_path) VALUES (?)", (str(start_path),))
+        scan_id = cursor.lastrowid
+
         processed_count = 0
         skipped_count = 0
         error_count = 0
@@ -136,16 +140,16 @@ def ingest_directory(
                 if existing and force_rescan:
                     clip_id = existing[0]
                     cursor.execute(
-                        "UPDATE clips SET duration = ?, width = ?, height = ?, size = ?, codec_name = ? WHERE id = ?",
-                        (duration, width, height, size, codec_name, clip_id)
+                        "UPDATE clips SET duration = ?, width = ?, height = ?, size = ?, codec_name = ?, scan_id = ? WHERE id = ?",
+                        (duration, width, height, size, codec_name, scan_id, clip_id)
                     )
                 else:
                     cursor.execute(
                         """
-                        INSERT INTO clips (path, filename, duration, width, height, size, codec_name, modified_at)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                        INSERT INTO clips (path, filename, duration, width, height, size, codec_name, modified_at, scan_id)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)
                         """,
-                        (path_str, filename, duration, width, height, size, codec_name)
+                        (path_str, filename, duration, width, height, size, codec_name, scan_id)
                     )
                     clip_id = cursor.lastrowid
                     processed_count += 1
@@ -186,6 +190,9 @@ def ingest_directory(
                 with progress_path.open("w") as f:
                     json.dump({"total": total_files, "done": idx + 1, "status": "scanning"}, f)
                 continue # Skip to the next file
+
+        # --- Delete all clips not from this scan (true replace behavior) ---
+        cursor.execute("DELETE FROM clips WHERE scan_id != ? OR scan_id IS NULL", (scan_id,))
 
         conn.commit()
         print("\nScan complete.")
