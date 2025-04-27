@@ -307,3 +307,10 @@ _Last update: 2025-04-26_
 - All code is modular, maintainable, and ready for creative/production workflows.
 - See `src/loopsleuth/web/templates/grid.html`, `src/loopsleuth/web/static/style.css`, and `src/loopsleuth/web/static/clip_actions.js` for the main logic.
 
+## Selection Behavior (macOS & Cross-Platform)
+
+- **Single click**: Selects only the clicked card.
+- **Shift+Click**: Selects a range of cards.
+- **Checkboxes**: Use checkboxes to select multiple, non-contiguous cards. This is the most reliable method for multi-select on all platforms.
+- **Cmd/Ctrl/Option+Click**: Not supported for multi-select on macOS browsers due to OS/browser limitations. Use checkboxes and shift+click instead.
+

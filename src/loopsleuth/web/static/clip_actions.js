@@ -837,6 +837,7 @@ if (document.getElementById('batch-action-bar')) {
         };
     }
     function updateCardSelectionUI() {
+        console.log('[updateCardSelectionUI] called');
         document.querySelectorAll('.card[data-clip-id]').forEach(card => {
             const clipId = card.getAttribute('data-clip-id');
             const checkbox = card.querySelector('.select-clip-checkbox');
@@ -854,71 +855,16 @@ if (document.getElementById('batch-action-bar')) {
     }
 
     document.addEventListener('DOMContentLoaded', function() {
-        // Make all grid cards focusable and add keyboard listeners
-        const cards = document.querySelectorAll('.card[data-clip-id]');
-        cards.forEach(card => {
-            card.setAttribute('tabindex', '0');
-            // Visual hover/focus effect
-            card.addEventListener('mouseover', () => card.classList.add('card-hover'));
-            card.addEventListener('mouseout', () => card.classList.remove('card-hover'));
-            card.addEventListener('focus', () => card.classList.add('card-hover'));
-            card.addEventListener('blur', () => card.classList.remove('card-hover'));
-            // Keyboard navigation to detail view
-            card.addEventListener('keydown', function(e) {
-                if (["INPUT", "TEXTAREA"].includes(e.target.tagName) || e.target.isContentEditable) return;
-                if (e.key === 'e' || e.key === 'Enter') {
-                    const editLink = card.querySelector('.edit-tag-btn-link');
-                    if (editLink) {
-                        window.location.href = editLink.href;
-                        e.preventDefault();
-                    }
-                }
-            });
-            // Card-wide click for selection (except on links/buttons/inputs)
-            card.addEventListener('click', function(e) {
-                if (e.target.closest('a,button,input')) return;
-                sessionStorage.setItem('gridScrollY', window.scrollY);
-                const clipId = card.getAttribute('data-clip-id');
-                const allCards = Array.from(document.querySelectorAll('.card[data-clip-id]'));
-                const idx = allCards.indexOf(card);
-                const isCtrl = e.ctrlKey || e.metaKey;
-                const isShift = e.shiftKey;
-                if (isShift && lastSelectedIndex !== null) {
-                    // Range select: select all between lastSelectedIndex and idx
-                    const [start, end] = [lastSelectedIndex, idx].sort((a, b) => a - b);
-                    for (let i = start; i <= end; i++) {
-                        selectedClipIds.add(allCards[i].getAttribute('data-clip-id'));
-                    }
-                    // Update anchor to end of range for further shift+clicks
-                    lastSelectedIndex = idx;
-                } else if (isCtrl) {
-                    // Multi-toggle: do NOT update lastSelectedIndex (keeps anchor for shift+click)
-                    if (selectedClipIds.has(clipId)) {
-                        selectedClipIds.delete(clipId);
-                    } else {
-                        selectedClipIds.add(clipId);
-                    }
-                    // lastSelectedIndex remains unchanged
-                } else {
-                    // Normal click: select only this, update anchor
-                    if (!selectedClipIds.has(clipId) || selectedClipIds.size > 1) {
-                        selectedClipIds.clear();
-                        selectedClipIds.add(clipId);
-                    } else {
-                        selectedClipIds.delete(clipId);
-                    }
-                    lastSelectedIndex = idx;
-                }
-                updateCardSelectionUI();
-            });
-            // Save scroll position on thumbnail or filename link click
-            card.querySelectorAll('.card-link').forEach(link => {
-                link.addEventListener('click', function(e) {
-                    sessionStorage.setItem('gridScrollY', window.scrollY);
-                });
-            });
-        });
-        updateCardSelectionUI();
+        // --- Removed redundant card event handler block ---
+        // All card event handlers (selection, checkbox, PiP, etc.) are now attached exclusively
+        // via afterGridUpdate() and attachCardEventHandlers() for robustness and maintainability.
+        // See the end of this file for afterGridUpdate definition and usage.
+        //
+        // This prevents duplicate handlers and ensures consistent selection logic after grid updates.
+        //
+        // If you need to add new per-card logic, do so in attachCardEventHandlers().
+        //
+        // (No card selection logic here.)
     });
 }
 
@@ -1370,6 +1316,10 @@ document.addEventListener('DOMContentLoaded', patchSelectedClipsBarForPreviewGri
 // --- Attach all card event handlers (selection, hover, checkbox, PiP) ---
 function attachCardEventHandlers() {
     const cards = document.querySelectorAll('.card[data-clip-id]');
+    console.log('[attachCardEventHandlers] Found', cards.length, 'cards');
+    if (cards.length === 0) {
+        console.warn('[attachCardEventHandlers] No .card elements found!');
+    }
     cards.forEach(card => {
         card.setAttribute('tabindex', '0');
         // Remove previous handlers to avoid duplicates
@@ -1380,43 +1330,41 @@ function attachCardEventHandlers() {
         card.addEventListener('mouseout', () => card.classList.remove('card-hover'));
         card.addEventListener('focus', () => card.classList.add('card-hover'));
         card.addEventListener('blur', () => card.classList.remove('card-hover'));
-        // Card-wide click for selection (except on links/buttons/inputs)
+        // Card-wide click for selection (except on links/buttons/inputs/checkboxes/PiP)
         card.addEventListener('click', function(e) {
-            if (e.target.closest('a,button,input')) return;
-            sessionStorage.setItem('gridScrollY', window.scrollY);
+            e.preventDefault(); // Prevent default browser behavior
             const clipId = card.getAttribute('data-clip-id');
+            // Only skip if the target is a link, button, input, or certain controls
+            if (e.target.closest('a,button,input,.pip-btn,.custom-checkbox,.select-clip-checkbox')) return;
+            // --- Selection logic with Cmd/Ctrl+Click enabled for testing ---
             const allCards = Array.from(document.querySelectorAll('.card[data-clip-id]'));
             const idx = allCards.indexOf(card);
-            const isCtrl = e.ctrlKey || e.metaKey;
             const isShift = e.shiftKey;
+            const isCtrl = e.ctrlKey || e.metaKey; // Enable Cmd/Ctrl+Click for multi-select
             if (isShift && lastSelectedIndex !== null) {
+                // Shift+Click: range select
                 const [start, end] = [lastSelectedIndex, idx].sort((a, b) => a - b);
                 for (let i = start; i <= end; i++) {
                     selectedClipIds.add(allCards[i].getAttribute('data-clip-id'));
                 }
-                // Update anchor to end of range for further shift+clicks
                 lastSelectedIndex = idx;
             } else if (isCtrl) {
-                // Multi-toggle: do NOT update lastSelectedIndex (keeps anchor for shift+click)
+                // Cmd/Ctrl+Click: toggle selection, never clear all
                 if (selectedClipIds.has(clipId)) {
                     selectedClipIds.delete(clipId);
                 } else {
                     selectedClipIds.add(clipId);
                 }
-                // lastSelectedIndex remains unchanged
+                // Do not update lastSelectedIndex (keeps anchor for shift+click)
             } else {
-                // Normal click: select only this, update anchor
-                if (!selectedClipIds.has(clipId) || selectedClipIds.size > 1) {
-                    selectedClipIds.clear();
-                    selectedClipIds.add(clipId);
-                } else {
-                    selectedClipIds.delete(clipId);
-                }
+                // Single click: always select only this card
+                selectedClipIds.clear();
+                selectedClipIds.add(clipId);
                 lastSelectedIndex = idx;
             }
             updateCardSelectionUI();
         });
-        // Checkbox click
+        // Checkbox click: always toggle selection, never clear all
         const checkbox = card.querySelector('.select-clip-checkbox');
         if (checkbox) {
             checkbox.onclick = function(e) {
@@ -1493,6 +1441,7 @@ function attachCardEventHandlers() {
 }
 // Call attachCardEventHandlers after every grid update and on DOMContentLoaded
 function afterGridUpdate() {
+    console.log('[afterGridUpdate] called');
     attachCardEventHandlers();
     updateCardSelectionUI();
 }
