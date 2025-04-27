@@ -100,6 +100,12 @@
     - [ ] (Optional) Add duplicate detection, advanced metadata, and creative integrations.
     - [ ] Document migration and update README.
     - [x] Unify tag/star JS logic in a shared static file and include in both grid and detail templates.
+    - [x] Unify database selection and custom DB name into a single combo box (recent + custom entry, styled, with recents persisted)
+    - [x] Unify scan folder selection into a combo box (recent + custom entry, styled, with recents persisted)
+    - [x] All endpoints (grid, playlists, duplicates, etc.) now respect the selected DB for true multi-library support
+    - [x] Improved onboarding and workflow documentation
+    - [x] Users do not need to re-ingest to see previous scans—just select the same DB and clips will appear if the DB file is present
+    - [x] Improved error feedback: all scan and DB errors are shown as toast notifications in the UI
 - [ ] **TUI is now feature-frozen except for critical bugfixes.**
 
 ### MVP checklist (hand‑curated)
@@ -149,3 +155,47 @@
 - Investigate and optimize selection performance (laggy selection when clicking cards or checkboxes).
 - Fix ctrl/cmd (multi-toggle) selection so non-contiguous selection works as expected (should not update anchor, should always toggle selection instantly).
 - Profile and refactor selection logic for efficiency, especially with large grids or many DOM updates.
+
+## 🚦 Duplicate Detection, Auto-Merge, and Database Reloadability (2024-06)
+
+### 🟡 Duplicate Detection & Management
+- **Perceptual Hashing:**
+    - Ensure every clip has a perceptual hash (pHash) computed and stored in the database on ingest.
+    - On ingest, check for existing pHashes (or near-duplicates using Hamming distance) before inserting a new clip.
+    - If a duplicate is found, log, skip, or prompt the user (configurable behavior).
+- **Batch Duplicate Review Tool:**
+    - Implement a UI tool/button to scan the database for near-duplicate pHashes and present results for manual review.
+    - Group and display potential duplicates side-by-side with thumbnails/videos for quick comparison.
+    - Allow user to merge, delete, or ignore flagged duplicates.
+- **Auto-Merge Option:**
+    - For exact pHash matches, provide an option to auto-merge metadata/tags and keep only one file (with user confirmation).
+    - Optionally, auto-merge can be enabled for ingest or batch review.
+- **Cross-Database Duplicate Scan (Experimental):**
+    - Allow scanning for duplicates across multiple databases (for distributed or multi-library workflows).
+    - Present cross-DB duplicate groups for review and merging.
+- **Filename Uniqueness:**
+    - Move away from appending numbers to filenames for uniqueness; rely on pHash for true duplicate detection.
+
+### 🟡 Database Reloadability & Multi-Library Workflow
+- **Database Reloadability:**
+    - Add a UI/CLI option to "Open Database…" and select a different `.db` file.
+    - On open, reload all state (clips, tags, playlists, stars, etc.) from the selected DB.
+    - Ensure all user state is always written to the DB, not just held in memory.
+    - On DB switch, clear any in-memory caches and reload from the new DB.
+- **Multi-Library Support:**
+    - Document and support workflows for working on multiple libraries (e.g., VJ sets, project-specific DBs).
+    - Add a dropdown or menu for fast switching between recent/opened databases.
+    - Ensure all playlist, tag, and selection state is preserved per DB.
+
+### 🚀 Next Steps
+- [ ] Implement pHash duplicate check on ingest (with configurable behavior: skip, log, prompt, auto-merge).
+- [ ] Add batch duplicate review tool in the UI (side-by-side visual review, merge/delete actions).
+- [ ] Add auto-merge option for exact pHash matches (with user confirmation).
+- [ ] Implement cross-database duplicate scan (experimental/optional).
+- [ ] Add "Open Database" option in UI/CLI for reloadability and multi-library workflows.
+- [ ] Document all new workflows and features in the README and onboarding materials.
+
+### 💡 Rationale
+- Robust duplicate detection ensures a clean, master list of unique files for creative workflows and export.
+- Visual review and auto-merge streamline library management and reduce manual cleanup.
+- Database reloadability and multi-library support enable flexible, non-destructive workflows for artists and VJs working across multiple projects or sets.

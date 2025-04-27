@@ -12,7 +12,7 @@ from fastapi.templating import Jinja2Templates
 from pathlib import Path
 import sys
 sys.path.append(str((Path(__file__).parent.parent.parent).resolve()))  # Ensure src/ is importable
-from loopsleuth.db import get_db_connection
+from loopsleuth.db import get_db_connection, get_default_db_path
 from urllib.parse import unquote
 from loopsleuth.scanner import ingest_directory
 import mimetypes  # <-- Add this import
@@ -25,8 +25,16 @@ import platform
 import subprocess
 import json
 from datetime import datetime, timedelta
+import re
 
-def get_default_db_path():
+def get_db_path_from_request(request: Request) -> Path:
+    """
+    Returns the database path for this request, using the 'db' query parameter if present,
+    otherwise falling back to LOOPSLEUTH_DB_PATH or the default.
+    """
+    db_param = request.query_params.get('db') if hasattr(request, 'query_params') else None
+    if db_param:
+        return Path(db_param)
     return Path(os.environ.get("LOOPSLEUTH_DB_PATH", "loopsleuth.db"))
 
 # --- App setup ---
@@ -63,6 +71,7 @@ def grid(request: Request):
     """
     Main grid view: shows all clips with thumbnails and info. Now paginated.
     """
+    db_path = get_db_path_from_request(request)
     # Default scan folder for UI (patched to E:/Downloads)
     default_scan_folder = "E:/Downloads"
     # --- Sorting logic ---
@@ -98,9 +107,14 @@ def grid(request: Request):
     conn = None
     clips = []
     total_clips = 0
+    has_duplicates = False
     try:
-        conn = get_db_connection(get_default_db_path())
+        conn = get_db_connection(db_path)
         cursor = conn.cursor()
+        # Check for flagged duplicates
+        cursor.execute("SELECT 1 FROM clips WHERE needs_review = 1 LIMIT 1")
+        if cursor.fetchone():
+            has_duplicates = True
         # Get the latest scan_id
         cursor.execute("SELECT id FROM scans ORDER BY scanned_at DESC LIMIT 1")
         row = cursor.fetchone()
@@ -150,7 +164,8 @@ def grid(request: Request):
             "starred_first": starred_first,
             "page": page,
             "per_page": per_page,
-            "total_clips": total_clips
+            "total_clips": total_clips,
+            "has_duplicates": has_duplicates
         }
     )
 
@@ -159,11 +174,12 @@ def clip_detail(request: Request, clip_id: int):
     """
     Detail page for a single clip: video playback and metadata.
     """
+    db_path = get_db_path_from_request(request)
     conn = None
     clip = None
     video_mime = "video/mp4"  # Default
     try:
-        conn = get_db_connection(get_default_db_path())
+        conn = get_db_connection(db_path)
         cursor = conn.cursor()
         cursor.execute("""
             SELECT id, filename, path, thumbnail_path, starred, width, height, size, codec_name
@@ -229,14 +245,55 @@ def serve_video(filename: str):
     return FileResponse(file_path)
 
 @app.post("/scan_folder")
-def scan_folder(folder_path: str = Form(...), force_rescan: bool = Form(False), background_tasks: BackgroundTasks = None):
+def scan_folder(request: Request, folder_path: str = Form(...), force_rescan: bool = Form(False), db_path: Optional[str] = Form(None), db_path_manual: Optional[str] = Form(None), background_tasks: BackgroundTasks = None):
     """
     Scan the given folder for videos and ingest them into the DB.
-    Now runs as a FastAPI BackgroundTask to keep the UI responsive for large batches.
-    Prevents overlapping scans using a lock file.
+    Accepts an optional db_path (from dropdown or manual entry). If not provided, auto-generates a DB name based on the folder.
+    Validates all inputs and returns clear error messages for any failure.
     """
     lock_path = Path(".loopsleuth_data/scan.lock")
-    # Check for existing lock
+    # --- Validation: scan folder must exist and be a directory ---
+    scan_folder_path = Path(folder_path).expanduser().resolve()
+    if not scan_folder_path.exists() or not scan_folder_path.is_dir():
+        return JSONResponse({"error": f"Scan folder does not exist or is not a directory: {scan_folder_path}"}, status_code=400)
+    if not os.access(scan_folder_path, os.R_OK):
+        return JSONResponse({"error": f"Scan folder is not readable: {scan_folder_path}"}, status_code=400)
+
+    # --- Database path resolution and validation ---
+    db_path_final = None
+    forbidden_chars = r'[<>:"/\\|?*]'  # Windows forbidden chars, also avoid slashes
+    reserved_names = {"CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"}
+    if db_path_manual and db_path_manual.strip():
+        db_path_final = Path(db_path_manual.strip())
+    elif db_path and db_path.strip():
+        db_path_final = Path(db_path.strip())
+    else:
+        # Auto-generate DB name from folder name
+        safe_name = scan_folder_path.name or "scanned"
+        db_path_final = Path(f"{safe_name}.db")
+    # Validate DB path: must not be a directory, must not contain forbidden chars, must not be reserved, must end with .db
+    db_name = db_path_final.name
+    if db_path_final.is_dir():
+        return JSONResponse({"error": f"Database path cannot be a directory: {db_path_final}"}, status_code=400)
+    if re.search(forbidden_chars, db_name):
+        return JSONResponse({"error": f"Database name contains forbidden characters: {db_name}"}, status_code=400)
+    if db_name.split(".")[0].upper() in reserved_names:
+        return JSONResponse({"error": f"Database name is a reserved system name: {db_name}"}, status_code=400)
+    if not db_name.lower().endswith(".db"):
+        return JSONResponse({"error": f"Database name must end with .db: {db_name}"}, status_code=400)
+    if not db_name or db_name.strip() == "":
+        return JSONResponse({"error": "Database name cannot be empty."}, status_code=400)
+    # Optionally: check for write permission in the target directory
+    db_dir = db_path_final.parent.resolve()
+    if not db_dir.exists():
+        try:
+            db_dir.mkdir(parents=True, exist_ok=True)
+        except Exception as e:
+            return JSONResponse({"error": f"Could not create database directory: {db_dir}. Error: {e}"}, status_code=400)
+    if not os.access(db_dir, os.W_OK):
+        return JSONResponse({"error": f"Database directory is not writable: {db_dir}"}, status_code=400)
+
+    # --- Scan lock: prevent overlapping scans ---
     if lock_path.exists():
         mtime = datetime.fromtimestamp(lock_path.stat().st_mtime)
         if datetime.now() - mtime < timedelta(hours=1):
@@ -251,31 +308,42 @@ def scan_folder(folder_path: str = Form(...), force_rescan: bool = Form(False), 
     def wrapped_ingest(*args, **kwargs):
         try:
             ingest_directory(*args, **kwargs)
+        except Exception as e:
+            # Log error and remove lock
+            print(f"[Scan Error] {e}")
+            if lock_path.exists():
+                lock_path.unlink()
         finally:
             if lock_path.exists():
                 lock_path.unlink()
 
-    if background_tasks is not None:
-        background_tasks.add_task(
-            wrapped_ingest,
-            Path(folder_path),
-            db_path=get_default_db_path(),
-            force_rescan=force_rescan
-        )
-    else:
-        wrapped_ingest(
-            Path(folder_path),
-            db_path=get_default_db_path(),
-            force_rescan=force_rescan
-        )
-    return RedirectResponse(url="/", status_code=303)
+    try:
+        if background_tasks is not None:
+            background_tasks.add_task(
+                wrapped_ingest,
+                scan_folder_path,
+                db_path=db_path_final,
+                force_rescan=force_rescan
+            )
+        else:
+            wrapped_ingest(
+                scan_folder_path,
+                db_path=db_path_final,
+                force_rescan=force_rescan
+            )
+        return RedirectResponse(url="/", status_code=303)
+    except Exception as e:
+        if lock_path.exists():
+            lock_path.unlink()
+        return JSONResponse({"error": f"Scan failed: {e}"}, status_code=500)
 
 @app.post("/star/{clip_id}")
 def toggle_star(clip_id: int):
     """Toggle the 'starred' flag for a clip and return the new state as JSON."""
+    db_path = get_db_path_from_request(request)
     conn = None
     try:
-        conn = get_db_connection(get_default_db_path())
+        conn = get_db_connection(db_path)
         cursor = conn.cursor()
         cursor.execute("SELECT starred FROM clips WHERE id = ?", (clip_id,))
         row = cursor.fetchone()
@@ -302,9 +370,10 @@ def update_tags(clip_id: int, tag_update: TagUpdate = Body(...)):
     """
     print(f"[DEBUG] Received tag update for clip {clip_id}: {tag_update}")
     tags = [t.strip() for t in tag_update.tags if t.strip()]
+    db_path = get_db_path_from_request(request)
     conn = None
     try:
-        conn = get_db_connection(get_default_db_path())
+        conn = get_db_connection(db_path)
         cursor = conn.cursor()
         # Insert new tags into tags table if not present
         tag_ids = []
@@ -341,9 +410,10 @@ def update_tags(clip_id: int, tag_update: TagUpdate = Body(...)):
 @app.get("/tags")
 def get_all_tags(q: str = None):
     """Return a list of all tag names for autocomplete/suggestions. If 'q' is provided, return only tags starting with the prefix (case-insensitive)."""
+    db_path = get_db_path_from_request(request)
     conn = None
     try:
-        conn = get_db_connection(get_default_db_path())
+        conn = get_db_connection(db_path)
         cursor = conn.cursor()
         if q:
             # Use parameterized LIKE for case-insensitive prefix search
@@ -380,9 +450,10 @@ def batch_tag_update(batch_update: BatchTagUpdate = Body(...)):
       - clear: if true, remove all tags from selected clips
     Returns: {clip_id: [updated tags, ...], ...}
     """
+    db_path = get_db_path_from_request(request)
     conn = None
     try:
-        conn = get_db_connection(get_default_db_path())
+        conn = get_db_connection(db_path)
         cursor = conn.cursor()
         add_tags = [t.strip() for t in (batch_update.add_tags or []) if t.strip()]
         remove_tags = [t.strip() for t in (batch_update.remove_tags or []) if t.strip()]
@@ -459,9 +530,10 @@ def export_selected(export_req: ExportSelectedRequest = Body(...)):
     Accepts JSON: {"clip_ids": [1,2,3,...]}
     Returns: keepers.txt (text/plain, one absolute path per line)
     """
+    db_path = get_db_path_from_request(request)
     conn = None
     try:
-        conn = get_db_connection(get_default_db_path())
+        conn = get_db_connection(db_path)
         cursor = conn.cursor()
         paths = []
         for clip_id in export_req.clip_ids:
@@ -496,13 +568,14 @@ def copy_selected(copy_req: CopySelectedRequest = Body(...)):
     Accepts JSON: {"clip_ids": [1,2,3,...], "dest_folder": "/path/to/folder"}
     Returns: {"results": {filename: "ok"|"error: ...", ...}}
     """
+    db_path = get_db_path_from_request(request)
     conn = None
     results = {}
     try:
         dest = Path(copy_req.dest_folder)
         if not dest.exists() or not dest.is_dir():
             return JSONResponse({"error": f"Destination folder does not exist: {dest}"}, status_code=400)
-        conn = get_db_connection(get_default_db_path())
+        conn = get_db_connection(db_path)
         cursor = conn.cursor()
         for clip_id in copy_req.clip_ids:
             cursor.execute("SELECT filename, path FROM clips WHERE id = ?", (clip_id,))
@@ -597,46 +670,34 @@ def delete_playlist(playlist_id: int):
             conn.close()
 
 @app.get("/playlists")
-def list_playlists():
-    """List all playlists (id, name, created_at)."""
-    conn = None
-    try:
-        conn = get_db_connection(get_default_db_path())
-        cursor = conn.cursor()
-        cursor.execute("SELECT id, name, created_at FROM playlists ORDER BY created_at DESC")
-        playlists = [dict(row) for row in cursor.fetchall()]
-        return {"playlists": playlists}
-    except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=500)
-    finally:
-        if conn:
-            conn.close()
+def list_playlists(request: Request):
+    """List all playlists (id, name, created_at) for the selected DB."""
+    db_path = get_db_path_from_request(request)
+    conn = get_db_connection(db_path)
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, name, created_at FROM playlists ORDER BY created_at DESC")
+    playlists = [dict(row) for row in cursor.fetchall()]
+    return {"playlists": playlists}
 
 @app.get("/playlists/{playlist_id}")
-def get_playlist(playlist_id: int):
-    """Get playlist details: id, name, created_at, and ordered clips."""
-    conn = None
-    try:
-        conn = get_db_connection(get_default_db_path())
-        cursor = conn.cursor()
-        cursor.execute("SELECT id, name, created_at FROM playlists WHERE id = ?", (playlist_id,))
-        playlist = cursor.fetchone()
-        if not playlist:
-            return JSONResponse({"error": "Playlist not found"}, status_code=404)
-        cursor.execute("""
-            SELECT c.id, c.filename, c.thumbnail_path, c.duration, pc.position
-            FROM playlist_clips pc
-            JOIN clips c ON pc.clip_id = c.id
-            WHERE pc.playlist_id = ?
-            ORDER BY pc.position ASC
-        """, (playlist_id,))
-        clips = [dict(row) for row in cursor.fetchall()]
-        return {"id": playlist[0], "name": playlist[1], "created_at": playlist[2], "clips": clips}
-    except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=500)
-    finally:
-        if conn:
-            conn.close()
+def get_playlist(request: Request, playlist_id: int):
+    """Get playlist details: id, name, created_at, and ordered clips for the selected DB."""
+    db_path = get_db_path_from_request(request)
+    conn = get_db_connection(db_path)
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, name, created_at FROM playlists WHERE id = ?", (playlist_id,))
+    playlist = cursor.fetchone()
+    if not playlist:
+        return JSONResponse({"error": "Playlist not found"}, status_code=404)
+    cursor.execute("""
+        SELECT c.id, c.filename, c.thumbnail_path, c.duration, pc.position
+        FROM playlist_clips pc
+        JOIN clips c ON pc.clip_id = c.id
+        WHERE pc.playlist_id = ?
+        ORDER BY pc.position ASC
+    """, (playlist_id,))
+    clips = [dict(row) for row in cursor.fetchall()]
+    return {"id": playlist[0], "name": playlist[1], "created_at": playlist[2], "clips": clips}
 
 @app.post("/playlists/{playlist_id}/clips")
 def add_clips_to_playlist(playlist_id: int, req: PlaylistClipUpdateRequest):
@@ -759,14 +820,13 @@ def scan_progress():
         return JSONResponse({"status": "error", "error": str(e)})
 
 @app.get("/api/clips")
-def api_clips(
-    offset: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=500)
-):
+def api_clips(request: Request, offset: int = Query(0, ge=0), limit: int = Query(100, ge=1, le=500)):
     """
     Returns a window of clips for virtualized/infinite scrolling.
+    Uses the selected DB from the request for multi-library support.
     """
-    conn = get_db_connection(get_default_db_path())
+    db_path = get_db_path_from_request(request)
+    conn = get_db_connection(db_path)
     cursor = conn.cursor()
     cursor.execute("SELECT COUNT(*) FROM clips")
     total = cursor.fetchone()[0]
@@ -789,6 +849,145 @@ def api_clips(
             "modified_at": row[7],
         })
     return {"clips": clips, "total": total}
+
+@app.get("/api/duplicates")
+def api_duplicates(request: Request):
+    """
+    Returns all clips flagged for duplicate review (needs_review=1), grouped by canonical (duplicate_of).
+    Uses the selected DB from the request for multi-library support.
+    """
+    db_path = get_db_path_from_request(request)
+    conn = get_db_connection(db_path)
+    cursor = conn.cursor()
+    # Find all clips needing review
+    cursor.execute("SELECT * FROM clips WHERE needs_review = 1")
+    dup_rows = cursor.fetchall()
+    # Group by duplicate_of (canonical id)
+    groups = {}
+    for row in dup_rows:
+        canonical_id = row['duplicate_of']
+        if canonical_id is None:
+            continue  # Defensive: should always be set if needs_review=1
+        if canonical_id not in groups:
+            # Fetch canonical clip
+            cursor.execute("SELECT * FROM clips WHERE id = ?", (canonical_id,))
+            canonical = cursor.fetchone()
+            if not canonical:
+                continue  # Defensive: skip if canonical missing
+            groups[canonical_id] = {
+                'canonical': {
+                    'id': canonical['id'],
+                    'filename': canonical['filename'],
+                    'path': canonical['path'],
+                    'phash': canonical['phash'],
+                    'thumbnail_path': canonical['thumbnail_path'],
+                    'duration': canonical['duration'],
+                    'size': canonical.get('size'),
+                },
+                'duplicates': []
+            }
+        groups[canonical_id]['duplicates'].append({
+            'id': row['id'],
+            'filename': row['filename'],
+            'path': row['path'],
+            'phash': row['phash'],
+            'thumbnail_path': row['thumbnail_path'],
+            'duration': row['duration'],
+            'size': row.get('size'),
+        })
+    # Return as list of groups
+    result = list(groups.values())
+    conn.close()
+    return {"duplicate_groups": result}
+
+@app.get("/duplicates", response_class=HTMLResponse)
+def duplicates_review(request: Request):
+    """
+    Render the batch duplicate review UI. Fetches duplicate groups via JS from /api/duplicates.
+    """
+    return templates.TemplateResponse("duplicates.html", {"request": request})
+
+@app.post("/api/duplicate_action")
+def duplicate_action(request: Request):
+    """
+    Handle actions for duplicate review: keep, delete, ignore.
+    Expects JSON: {"dup_id": int, "action": "keep"|"delete"|"ignore", "canonical_id": int}
+    """
+    data = request.json() if hasattr(request, 'json') else None
+    if not data:
+        try:
+            data = request._json
+        except Exception:
+            data = None
+    if not data:
+        try:
+            data = request.body()
+            if data:
+                import json as _json
+                data = _json.loads(data)
+        except Exception:
+            data = None
+    if not data:
+        return JSONResponse({"error": "Missing or invalid JSON."}, status_code=400)
+    dup_id = data.get("dup_id")
+    action = data.get("action")
+    canonical_id = data.get("canonical_id")
+    if not dup_id or not action:
+        return JSONResponse({"error": "Missing dup_id or action."}, status_code=400)
+    conn = get_db_connection(get_default_db_path())
+    cursor = conn.cursor()
+    try:
+        if action == "keep":
+            # Clear needs_review and duplicate_of
+            cursor.execute("UPDATE clips SET needs_review = 0, duplicate_of = NULL WHERE id = ?", (dup_id,))
+            conn.commit()
+            return {"status": "kept", "dup_id": dup_id}
+        elif action == "delete":
+            # Delete tags, clip_tags, and the clip itself
+            cursor.execute("DELETE FROM clip_tags WHERE clip_id = ?", (dup_id,))
+            cursor.execute("DELETE FROM playlist_clips WHERE clip_id = ?", (dup_id,))
+            cursor.execute("DELETE FROM clips WHERE id = ?", (dup_id,))
+            conn.commit()
+            return {"status": "deleted", "dup_id": dup_id}
+        elif action == "ignore":
+            # Clear needs_review but leave duplicate_of
+            cursor.execute("UPDATE clips SET needs_review = 0 WHERE id = ?", (dup_id,))
+            conn.commit()
+            return {"status": "ignored", "dup_id": dup_id}
+        elif action == "merge":
+            # --- Merge tags ---
+            # Get all tag_ids for canonical and duplicate
+            cursor.execute("SELECT tag_id FROM clip_tags WHERE clip_id = ?", (canonical_id,))
+            canonical_tags = set(row[0] for row in cursor.fetchall())
+            cursor.execute("SELECT tag_id FROM clip_tags WHERE clip_id = ?", (dup_id,))
+            dup_tags = set(row[0] for row in cursor.fetchall())
+            tags_to_add = dup_tags - canonical_tags
+            for tag_id in tags_to_add:
+                cursor.execute("INSERT OR IGNORE INTO clip_tags (clip_id, tag_id) VALUES (?, ?)", (canonical_id, tag_id))
+            # --- Merge playlist memberships ---
+            cursor.execute("SELECT playlist_id FROM playlist_clips WHERE clip_id = ?", (canonical_id,))
+            canonical_playlists = set(row[0] for row in cursor.fetchall())
+            cursor.execute("SELECT playlist_id FROM playlist_clips WHERE clip_id = ?", (dup_id,))
+            dup_playlists = set(row[0] for row in cursor.fetchall())
+            playlists_to_add = dup_playlists - canonical_playlists
+            for playlist_id in playlists_to_add:
+                # Add to end of playlist (max position + 1)
+                cursor.execute("SELECT MAX(position) FROM playlist_clips WHERE playlist_id = ?", (playlist_id,))
+                row = cursor.fetchone()
+                pos = (row[0] + 1) if row and row[0] is not None else 0
+                cursor.execute("INSERT OR IGNORE INTO playlist_clips (playlist_id, clip_id, position) VALUES (?, ?, ?)", (playlist_id, canonical_id, pos))
+            # --- Delete duplicate ---
+            cursor.execute("DELETE FROM clip_tags WHERE clip_id = ?", (dup_id,))
+            cursor.execute("DELETE FROM playlist_clips WHERE clip_id = ?", (dup_id,))
+            cursor.execute("DELETE FROM clips WHERE id = ?", (dup_id,))
+            conn.commit()
+            return {"status": "merged", "dup_id": dup_id, "canonical_id": canonical_id, "tags_merged": list(tags_to_add), "playlists_merged": list(playlists_to_add)}
+        else:
+            return JSONResponse({"error": f"Unknown action: {action}"}, status_code=400)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+    finally:
+        conn.close()
 
 # TODO: Add API endpoints for clips, tagging, starring, etc.
 # TODO: Add video playback route 

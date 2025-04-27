@@ -46,11 +46,206 @@ LoopSleuth Web: Grid View Template
             <input type="range" id="thumb-size-range" min="60" max="220" value="120" step="2" style="width:180px;">
             <span id="thumb-size-value" style="font-size:0.93em; color:#888; min-width:2.5em;">120px</span>
         </div>
-        <form method="post" action="/scan_folder" id="scan-form" style="margin-bottom:2em;">
-            <label for="folder_path">Scan folder for videos:</label>
-            <input type="text" id="folder_path" name="folder_path" placeholder="E:/downloads" size="40" required style="margin:0 1em;" />
+        <form method="post" action="/scan_folder" id="scan-form" style="margin-bottom:2em; display:flex; align-items:center; gap:1em;">
+            <!-- Database combo: custom select for recents + manual entry -->
+            <label for="db-combo-select" style="margin-right:0.5em;">Database:</label>
+            <select id="db-combo-select" style="min-width:180px; background:#181a1b; color:#f0f4fa; border:1px solid #333; border-radius:6px; padding:0.4em 1.2em 0.4em 0.7em; font-size:1em;">
+                <option value="__custom__">Custom...</option>
+            </select>
+            <input type="text" id="db-combo-input" name="db_path" placeholder="Enter DB name (e.g. MyVideos.db)" style="display:none; min-width:180px; background:#181a1b; color:#f0f4fa; border:1px solid #333; border-radius:6px; padding:0.4em 1.2em 0.4em 0.7em; font-size:1em; margin-right:1em;" autocomplete="off" />
+            <!-- Scan folder combo: custom select for recents + manual entry -->
+            <label for="recent-folders-select" style="margin-right:0.5em;">Scan folder for videos:</label>
+            <select id="recent-folders-select" style="min-width:220px; background:#181a1b; color:#f0f4fa; border:1px solid #333; border-radius:6px; padding:0.4em 1.2em 0.4em 0.7em; font-size:1em;">
+                <option value="__custom__">Custom...</option>
+            </select>
+            <input type="text" id="custom-folder-input" name="folder_path" placeholder="Enter folder path (e.g. E:/downloads)" style="display:none; min-width:220px; background:#181a1b; color:#f0f4fa; border:1px solid #333; border-radius:6px; padding:0.4em 1.2em 0.4em 0.7em; font-size:1em; margin-right:1em;" autocomplete="off" />
             <button type="submit">Scan</button>
         </form>
+        <script>
+        // --- Database combo: custom select for recents + manual entry ---
+        (function() {
+            const dbKey = 'loopsleuthDatabases';
+            const select = document.getElementById('db-combo-select');
+            const input = document.getElementById('db-combo-input');
+            let dbs = JSON.parse(localStorage.getItem(dbKey) || '["loopsleuth.db"]');
+            function updateSelect() {
+                select.innerHTML = '<option value="__custom__">Custom...</option>';
+                dbs.forEach(path => {
+                    const opt = document.createElement('option');
+                    opt.value = path;
+                    opt.textContent = path;
+                    select.appendChild(opt);
+                });
+            }
+            updateSelect();
+            // On select change: if custom, show input; else, hide input
+            select.addEventListener('change', function() {
+                if (select.value === '__custom__') {
+                    input.style.display = '';
+                    input.value = '';
+                    input.focus();
+                } else {
+                    input.style.display = 'none';
+                    input.value = select.value;
+                }
+            });
+            // On page load, default to most recent or custom
+            if (dbs.length > 0) {
+                select.value = dbs[0];
+                input.style.display = 'none';
+                input.value = dbs[0];
+            } else {
+                select.value = '__custom__';
+                input.style.display = '';
+                input.value = '';
+            }
+            // On scan, add to recents if not present
+            const scanForm = document.getElementById('scan-form');
+            scanForm.addEventListener('submit', function(e) {
+                let db = select.value === '__custom__' ? input.value.trim() : select.value;
+                if (db && !dbs.includes(db)) {
+                    dbs.unshift(db);
+                    if (dbs.length > 8) dbs = dbs.slice(0, 8);
+                    localStorage.setItem(dbKey, JSON.stringify(dbs));
+                    updateSelect();
+                }
+                // Always set the input's name for form submission
+                input.name = 'db_path';
+                if (select.value !== '__custom__') {
+                    input.value = select.value;
+                }
+            });
+        })();
+        // --- Scan folder combo: custom select for recents + manual entry ---
+        (function() {
+            const recentsKey = 'recentScanFolders';
+            const select = document.getElementById('recent-folders-select');
+            const customInput = document.getElementById('custom-folder-input');
+            let recents = JSON.parse(localStorage.getItem(recentsKey) || '[]');
+            function updateSelect() {
+                // Remove all except Custom...
+                select.innerHTML = '<option value="__custom__">Custom...</option>';
+                recents.forEach(path => {
+                    const opt = document.createElement('option');
+                    opt.value = path;
+                    opt.textContent = path;
+                    select.appendChild(opt);
+                });
+            }
+            updateSelect();
+            // On select change: if custom, show input; else, hide input
+            select.addEventListener('change', function() {
+                if (select.value === '__custom__') {
+                    customInput.style.display = '';
+                    customInput.value = '';
+                    customInput.focus();
+                } else {
+                    customInput.style.display = 'none';
+                    customInput.value = select.value;
+                }
+            });
+            // On page load, default to most recent or custom
+            if (recents.length > 0) {
+                select.value = recents[0];
+                customInput.style.display = 'none';
+                customInput.value = recents[0];
+            } else {
+                select.value = '__custom__';
+                customInput.style.display = '';
+                customInput.value = '';
+            }
+            // On scan, add to recents if not present
+            const scanForm = document.getElementById('scan-form');
+            scanForm.addEventListener('submit', function(e) {
+                let folder = select.value === '__custom__' ? customInput.value.trim() : select.value;
+                if (folder && !recents.includes(folder)) {
+                    recents.unshift(folder);
+                    if (recents.length > 8) recents = recents.slice(0, 8);
+                    localStorage.setItem(recentsKey, JSON.stringify(recents));
+                    updateSelect();
+                }
+                // Always set the input's name for form submission
+                customInput.name = 'folder_path';
+                if (select.value !== '__custom__') {
+                    customInput.value = select.value;
+                }
+            });
+        })();
+        // --- Client-side validation for DB and folder ---
+        (function() {
+            const scanForm = document.getElementById('scan-form');
+            const dbInput = document.getElementById('db-combo-input');
+            const select = document.getElementById('recent-folders-select');
+            const customInput = document.getElementById('custom-folder-input');
+            function showToast(msg, duration=3500) {
+                const toast = document.getElementById('toast');
+                if (!toast) return;
+                toast.textContent = msg;
+                toast.style.display = 'block';
+                toast.style.opacity = '0.97';
+                setTimeout(() => {
+                    toast.style.opacity = '0';
+                    setTimeout(() => { toast.style.display = 'none'; }, 400);
+                }, duration);
+            }
+            scanForm.addEventListener('submit', function(e) {
+                let folder = select.value === '__custom__' ? customInput.value.trim() : select.value;
+                if (!folder) {
+                    showToast('Please enter a scan folder path.');
+                    e.preventDefault();
+                    return false;
+                }
+                let dbName = dbInput.value.trim();
+                if (!dbName) dbName = select.value;
+                if (!dbName) {
+                    showToast('Please select or enter a database name.');
+                    e.preventDefault();
+                    return false;
+                }
+                const forbidden = /[<>:"/\\|?*]/;
+                if (forbidden.test(dbName)) {
+                    showToast('Database name contains forbidden characters.');
+                    e.preventDefault();
+                    return false;
+                }
+                if (!dbName.toLowerCase().endsWith('.db')) {
+                    showToast('Database name must end with .db');
+                    e.preventDefault();
+                    return false;
+                }
+                const reserved = ["CON","PRN","AUX","NUL","COM1","COM2","COM3","COM4","COM5","COM6","COM7","COM8","COM9","LPT1","LPT2","LPT3","LPT4","LPT5","LPT6","LPT7","LPT8","LPT9"];
+                if (reserved.includes(dbName.split('.')[0].toUpperCase())) {
+                    showToast('Database name is a reserved system name.');
+                    e.preventDefault();
+                    return false;
+                }
+            });
+        })();
+        // --- Show backend errors as toast ---
+        (function() {
+            const scanForm = document.getElementById('scan-form');
+            scanForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const formData = new FormData(scanForm);
+                fetch(scanForm.action, {
+                    method: 'POST',
+                    body: formData
+                }).then(async resp => {
+                    if (resp.redirected) {
+                        window.location.href = resp.url;
+                        return;
+                    }
+                    let data;
+                    try { data = await resp.json(); } catch { data = {}; }
+                    if (data && data.error) {
+                        showToast(data.error, 5000);
+                    }
+                }).catch(err => {
+                    showToast('Scan failed: ' + err, 5000);
+                });
+            });
+        })();
+        </script>
         <!-- Replace the classic grid and pagination with a virtualized scroll area -->
         <div id="clip-scroll-area" style="height:80vh;overflow:auto;">
             <div id="clip-content-area"></div>
@@ -58,6 +253,11 @@ LoopSleuth Web: Grid View Template
         <div id="batch-action-bar">
             <span class="batch-bar-help" title="Use the checkboxes to select multiple clips. Shift+Click selects a range. Modifier keys (Cmd, Option, Ctrl) are not supported for multi-select on macOS browsers.">?</span>
         </div>
+        {% if has_duplicates %}
+          <div class="duplicate-banner" style="background:#23242a;color:#fff;padding:1em 2em;margin-bottom:1.5em;border-left:6px solid #3fa7ff;font-size:1.1em;display:flex;align-items:center;justify-content:space-between;">
+            <span>⚠️ <b>Duplicates flagged for review.</b> <a href="/duplicates" style="color:#3fa7ff;text-decoration:underline;font-weight:bold;">Review now</a></span>
+          </div>
+        {% endif %}
     </div>
     <div id="selected-clips-bar"><!-- Persistent selection bar (populated by JS) --></div>
     <!-- Scan Progress Modal -->
@@ -547,5 +747,41 @@ scrollArea.addEventListener('scroll', function() {
         loadMoreClips();
     }
 });
+// --- Recent scan folders logic ---
+(function() {
+    const folderInput = document.getElementById('folder_path');
+    const recentSelect = document.getElementById('recent-folders');
+    if (!folderInput || !recentSelect) return;
+    // Load from localStorage
+    let recents = JSON.parse(localStorage.getItem('recentScanFolders') || '[]');
+    function updateDropdown() {
+        recentSelect.innerHTML = '';
+        if (recents.length === 0) {
+            recentSelect.innerHTML = '<option value="">(none)</option>';
+        } else {
+            recents.forEach(path => {
+                const opt = document.createElement('option');
+                opt.value = path;
+                opt.textContent = path;
+                recentSelect.appendChild(opt);
+            });
+        }
+    }
+    updateDropdown();
+    // On select, update input
+    recentSelect.addEventListener('change', function() {
+        if (recentSelect.value) folderInput.value = recentSelect.value;
+    });
+    // On scan, add to recents
+    const scanForm = document.getElementById('scan-form');
+    scanForm.addEventListener('submit', function() {
+        const val = folderInput.value.trim();
+        if (val && !recents.includes(val)) {
+            recents.unshift(val);
+            if (recents.length > 8) recents = recents.slice(0, 8);
+            localStorage.setItem('recentScanFolders', JSON.stringify(recents));
+        }
+    });
+})();
 </script>
 </html> 

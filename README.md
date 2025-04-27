@@ -52,9 +52,13 @@ A web-first (formerly terminal-first) librarian for video loops.
 - Responsive design: grid and controls scale for smaller screens.
 
 ## 🆕 Scan UX Improvements (2024-06)
-- The grid now clears instantly when a new scan is started, providing immediate visual feedback.
-- A toast/snackbar notification appears when a scan completes, fails, or finds no clips, so users always know the scan result.
-- These changes improve clarity and responsiveness for creative workflows and large libraries.
+- The scan folder and database fields are now unified, modern combo boxes: select from recent entries or enter a new value. Both are styled to match the dark UI and support keyboard/mouse interaction.
+- The last-used database and scan folder are always available at the top of their respective dropdowns, unless localStorage is cleared.
+- All endpoints (grid, playlists, duplicates, etc.) now respect the selected database, enabling seamless multi-library workflows.
+- You do not need to re-ingest to see your last scan—just select the same DB and your clips will appear.
+- All errors (validation, permission, scan conflicts, etc.) are shown as toast notifications in the UI—no more silent failures.
+- The scan form prevents submission if validation fails, and backend errors are always surfaced to the user.
+- These changes make multi-library workflows safer and more user-friendly, with instant feedback and robust error handling.
 
 ## MVP (v0.1)
 1. **Scan**: walk folder → SQLite row per clip (`ffprobe`)
@@ -313,4 +317,18 @@ _Last update: 2025-04-26_
 - **Shift+Click**: Selects a range of cards.
 - **Checkboxes**: Use checkboxes to select multiple, non-contiguous cards. This is the most reliable method for multi-select on all platforms.
 - **Cmd/Ctrl/Option+Click**: Not supported for multi-select on macOS browsers due to OS/browser limitations. Use checkboxes and shift+click instead.
+
+## 🚦 New Features (2024-06)
+
+- **Recent Scan Folders:** The scan form now includes a dropdown of your last 8 scanned folders (per user, stored in localStorage). Select a recent location or type a new one to scan.
+- **Database Selection:** A database dropdown in the header/sidebar lets you quickly switch between libraries. Add new DBs, persist your selection, and reload the app with the chosen DB (via ?db=... query param). All state and actions are scoped to the selected DB.
+- **Seamless Multi-Library Workflow:** The backend now supports per-request DB switching. You can scan, tag, review duplicates, and manage playlists in any selected DB without restarting the server.
+- **Duplicate Review Banner:** If any duplicates are flagged, a prominent banner appears in the grid view linking to the batch review UI. Resolve, merge, or ignore duplicates directly from the web UI.
+
+## 🚦 Onboarding & Workflow (2024-06)
+
+- **Switching Libraries:** Use the database dropdown to select or add a DB. The app reloads with the selected DB, and all actions (scan, tag, review) apply to that library. All DB names are validated for safety.
+- **Scanning Folders:** Use the scan form's combo dropdown to quickly select from recent folders or enter a new location. Recent folders are remembered per user. All scan folders are validated for existence and readability before scanning.
+- **Error Feedback:** Any error (invalid DB name, permission denied, scan in progress, etc.) is shown as a toast notification. No silent failures.
+- **Duplicate Review:** If flagged, review and resolve duplicates from the grid banner or the /duplicates page. Merge tags/playlists, keep, delete, or ignore as needed.
 

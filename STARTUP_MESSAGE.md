@@ -116,7 +116,24 @@ _Last update: 2024-06-XX_
 
 The Preview Grid overlay is robust, adaptive, and ready for further creative/UX enhancements. Code is modular and ready for onboarding. 
 
+## 🚦 New Features & Onboarding (2024-06)
+
+- **Recent Scan Folders:** The scan form now includes a dropdown of your last 8 scanned folders (per user, localStorage). Select or type a folder to scan instantly.
+- **Database Selection:** Use the database dropdown in the header/sidebar to switch between libraries. Add new DBs, persist your selection, and reload the app with the chosen DB (via ?db=... param). All actions are scoped to the selected DB.
+- **Seamless Multi-Library Workflow:** The backend supports per-request DB switching. Scan, tag, review duplicates, and manage playlists in any selected DB without restarting the server.
+- **Duplicate Review Banner:** If any duplicates are flagged, a prominent banner appears in the grid view linking to the batch review UI. Resolve, merge, or ignore duplicates directly from the web UI.
+- **Database and scan folder selection are now unified, modern combo boxes (recent + custom entry, styled, with recents persisted per user).**
+- **The last-used database and scan folder are always available at the top of their respective dropdowns, unless localStorage is cleared.**
+- **All endpoints (grid, playlists, duplicates, etc.) now respect the selected database, enabling seamless multi-library workflows.**
+- **Users do not need to re-ingest to see previous scans—just select the same DB and your clips will appear if the DB file is present.**
+- **All scan and DB errors are shown as toast notifications in the UI for immediate feedback.**
+- **Onboarding and workflow documentation is up to date and reflects these improvements.**
+
 ## 🚦 Onboarding Checklist (2024-06)
+
+- **Switch Libraries:** Use the database dropdown to select or add a DB. The app reloads with the selected DB, and all actions (scan, tag, review) apply to that library.
+- **Scan Folders:** Use the scan form and recent folders dropdown to quickly rescan or add new locations. Recent folders are remembered per user.
+- **Review Duplicates:** If flagged, review and resolve duplicates from the grid banner or the /duplicates page. Merge tags/playlists, keep, delete, or ignore as needed.
 
 ### 1. Setup
 - Clone the repo and set up a Python 3.10+ virtual environment.

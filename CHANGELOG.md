@@ -97,6 +97,45 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - All code is modular, maintainable, and ready for creative/production workflows.
 - See README for handoff summary and onboarding notes.
 
+## [2024-06-XX] Duplicate Detection, Review, and Merge Features
+
+- Added perceptual hash (pHash) duplicate detection on ingestion, with configurable handling (skip, mark-for-review, log, auto-merge).
+- Schema: Added `needs_review` and `duplicate_of` columns to `clips` table for robust duplicate tracking and review.
+- New batch duplicate review UI at `/duplicates`:
+  - Groups flagged duplicates by canonical clip.
+  - Shows canonical and duplicate(s) side-by-side with thumbnails, filenames, and metadata.
+  - Actions: **Keep**, **Delete**, **Ignore**, **Merge** (merge tags/playlists and delete duplicate).
+  - Merge action transfers all tags and playlist memberships from duplicate to canonical, then deletes the duplicate.
+  - Toast/snackbar feedback for all actions.
+- Grid view now shows a prominent banner linking to `/duplicates` if any duplicates are flagged for review.
+- All duplicate review actions are available after re-ingestion with the new logic, or by manually flagging test rows in the DB.
+- Backend: `/api/duplicates` (fetch groups), `/api/duplicate_action` (resolve actions).
+- All changes are fully documented and modular for further extension.
+
+## [2024-06-XX] Recent Scan Folders & Database Selection
+
+- Added a dropdown for recent scan locations above the scan folder input. Remembers up to 8 recent folders per user (localStorage).
+- Added a database selection dropdown in the grid view header/sidebar. User can add, select, and persist DBs (localStorage).
+- Selecting a DB reloads the app with a ?db=... query parameter; backend now uses this for all DB operations.
+- Enables seamless multi-library workflows and rapid switching between libraries/databases.
+- All UI/UX and backend changes are fully documented and modular for further extension.
+
+## [Unreleased] - 2024-06
+### Added
+- Unified database selection: a single combo box for recent DBs and custom entry, styled to match the UI. No more separate dropdown and manual entry fields.
+- Scan folder field is also a modern combo box (recent + custom), with the last-used entry always available unless localStorage is cleared.
+- All endpoints (grid, playlists, duplicates, etc.) now respect the selected database, enabling seamless multi-library workflows.
+- Users do not need to re-ingest to see previous scans—just select the same DB and clips will appear if the DB file is present.
+
+### Changed
+- Improved onboarding and workflow clarity in docs and UI.
+- All scan and DB errors are shown as toast notifications in the UI—no more silent failures.
+- Code is modular and documented for maintainability.
+
+### Fixed
+- Prevented accidental creation of invalid or unsafe database files.
+- Prevented scans from running on non-existent or unreadable folders.
+
 ---
 
 Older changes and project history can be found in the README and ROADMAP. 
