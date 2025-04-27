@@ -42,7 +42,9 @@ def create_table(conn: sqlite3.Connection):
             starred BOOLEAN DEFAULT FALSE,
             tags TEXT,              -- Comma-separated string or JSON? Start with simple string.
             scanned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            modified_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP -- Track file modification
+            modified_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, -- Track file modification
+            duplicate_of INTEGER,   -- If duplicate, points to canonical clip.id
+            needs_review BOOLEAN DEFAULT 0 -- Flag for batch duplicate review
             -- Consider adding width, height, codec later if needed
         )
     """)
@@ -106,7 +108,7 @@ def create_table(conn: sqlite3.Connection):
     conn.commit()
 
 def migrate_clips_table(conn):
-    """Add width, height, size, and codec_name columns to the clips table if missing."""
+    """Add width, height, size, codec_name, duplicate_of, and needs_review columns to the clips table if missing."""
     cursor = conn.cursor()
     # Check and add columns if they do not exist
     columns = [row[1] for row in cursor.execute("PRAGMA table_info(clips)")]
@@ -119,6 +121,10 @@ def migrate_clips_table(conn):
         alter_stmts.append("ALTER TABLE clips ADD COLUMN size INTEGER")
     if 'codec_name' not in columns:
         alter_stmts.append("ALTER TABLE clips ADD COLUMN codec_name TEXT")
+    if 'duplicate_of' not in columns:
+        alter_stmts.append("ALTER TABLE clips ADD COLUMN duplicate_of INTEGER")
+    if 'needs_review' not in columns:
+        alter_stmts.append("ALTER TABLE clips ADD COLUMN needs_review BOOLEAN DEFAULT 0")
     for stmt in alter_stmts:
         cursor.execute(stmt)
     if alter_stmts:

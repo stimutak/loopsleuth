@@ -23,6 +23,7 @@ if str(SRC_DIR) not in sys.path:
 from loopsleuth.db import get_db_connection, get_default_db_path
 from loopsleuth.metadata import get_video_duration, FFprobeError, get_video_metadata
 from loopsleuth.thumbnailer import generate_thumbnail, ThumbnailError
+from loopsleuth.hasher import calculate_phash, HasherError
 
 # Common video file extensions
 # TODO: Make this configurable
@@ -34,6 +35,14 @@ DEFAULT_VIDEO_EXTENSIONS: Set[str] = {
     # Add more as needed, e.g., .mpeg, .mpg, .wmv
     # DXV is often in a .mov container, so it should be covered.
 }
+
+# --- Duplicate Handling Config ---
+# Options: 'skip', 'mark-for-review', 'log', 'auto-merge' (future)
+DUPLICATE_HANDLING_MODE = os.environ.get('LOOPSLEUTH_DUPLICATE_MODE', 'mark-for-review')
+# 'skip': skip and do not insert
+# 'mark-for-review': insert, set needs_review=1, duplicate_of=canonical id
+# 'log': just log, insert as normal
+# 'auto-merge': (future) merge tags/metadata automatically
 
 def _scan_directory_internal(
     start_path: Path,
@@ -160,6 +169,7 @@ def ingest_directory(
                     processed_count += 1
 
                 # --- Generate thumbnail immediately if possible ---
+                phash_str = None
                 if duration and duration > 0:
                     try:
                         from loopsleuth.thumbnailer import _get_thumbnail_dir
@@ -180,6 +190,58 @@ def ingest_directory(
                                 "UPDATE clips SET thumbnail_path = ? WHERE id = ?",
                                 (relative_thumb_path, clip_id)
                             )
+                            # --- Calculate pHash and check for duplicates ---
+                            try:
+                                phash_str = calculate_phash(thumb_path)
+                                if phash_str:
+                                    # Check for duplicates (exact or near)
+                                    cursor.execute("SELECT id, path, filename, phash FROM clips WHERE phash IS NOT NULL AND id != ?", (clip_id,))
+                                    dup_found = False
+                                    threshold = 5  # Hamming distance threshold for near-duplicate
+                                    for row in cursor.fetchall():
+                                        existing_phash = row['phash']
+                                        if existing_phash:
+                                            dist = hamming_distance(phash_str, existing_phash)
+                                            if dist == 0:
+                                                print(f"[DUPLICATE] Exact pHash match: {filename} == {row['filename']} (id {row['id']})")
+                                                dup_found = True
+                                                canonical_id = row['id']
+                                                break
+                                            elif dist <= threshold:
+                                                print(f"[NEAR-DUPLICATE] {filename} ~ {row['filename']} (id {row['id']}), Hamming distance: {dist}")
+                                                dup_found = True
+                                                canonical_id = row['id']
+                                                break
+                                    if dup_found:
+                                        if DUPLICATE_HANDLING_MODE == 'skip':
+                                            print(f"[SKIP] Duplicate detected for {filename}, not inserting.")
+                                            cursor.execute("DELETE FROM clips WHERE id = ?", (clip_id,))
+                                            conn.commit()
+                                            skipped_count += 1
+                                            with progress_path.open("w") as f:
+                                                json.dump({"total": total_files, "done": idx + 1, "status": "scanning"}, f)
+                                            continue
+                                        elif DUPLICATE_HANDLING_MODE == 'mark-for-review':
+                                            print(f"[REVIEW] Duplicate detected for {filename}, marking for review.")
+                                            cursor.execute("UPDATE clips SET needs_review = 1, duplicate_of = ? WHERE id = ?", (canonical_id, clip_id))
+                                            conn.commit()
+                                        elif DUPLICATE_HANDLING_MODE == 'log':
+                                            print(f"[LOG] Duplicate detected for {filename}, but inserting as normal.")
+                                            # No action, just log
+                                        elif DUPLICATE_HANDLING_MODE == 'auto-merge':
+                                            print(f"[AUTO-MERGE] Duplicate detected for {filename}, auto-merge not yet implemented.")
+                                            # Placeholder for future auto-merge logic
+                                        else:
+                                            print(f"[WARN] Unknown duplicate handling mode: {DUPLICATE_HANDLING_MODE}. Defaulting to 'mark-for-review'.")
+                                            cursor.execute("UPDATE clips SET needs_review = 1, duplicate_of = ? WHERE id = ?", (canonical_id, clip_id))
+                                            conn.commit()
+                                    else:
+                                        # Store pHash for this clip
+                                        cursor.execute("UPDATE clips SET phash = ? WHERE id = ?", (phash_str, clip_id))
+                            except (HasherError, FileNotFoundError) as e:
+                                print(f"[ERROR] pHash calculation failed for {filename}: {e}")
+                            except Exception as e:
+                                print(f"[ERROR] Unexpected error in pHash duplicate check: {e}")
                     except (ThumbnailError, Exception) as e:
                         print(f"  Error generating thumbnail for {filename}: {e}", file=sys.stderr)
 
@@ -302,4 +364,12 @@ if __name__ == '__main__':
                 conn_check.close()
 
     # Clean up after test
-    _cleanup_test_environment(test_dir, test_db) 
+    _cleanup_test_environment(test_dir, test_db)
+
+# --- Utility: Hamming distance for hex hashes ---
+def hamming_distance(hash1: str, hash2: str) -> int:
+    """Compute Hamming distance between two hex string hashes."""
+    # Convert hex to binary string, pad to same length
+    b1 = bin(int(hash1, 16))[2:].zfill(len(hash1)*4)
+    b2 = bin(int(hash2, 16))[2:].zfill(len(hash2)*4)
+    return sum(c1 != c2 for c1, c2 in zip(b1, b2)) 

@@ -1445,4 +1445,112 @@ function afterGridUpdate() {
     attachCardEventHandlers();
     updateCardSelectionUI();
 }
-document.addEventListener('DOMContentLoaded', afterGridUpdate); 
+document.addEventListener('DOMContentLoaded', afterGridUpdate);
+
+/**
+ * Render the batch duplicate review UI on /duplicates page.
+ * Fetches /api/duplicates and renders each group with canonical and duplicates.
+ * For each duplicate, show action buttons: Keep, Delete, Ignore.
+ * Uses showToast for feedback. Updates UI after actions.
+ */
+window.renderDuplicateReviewUI = function() {
+    const container = document.getElementById('duplicate-review-container');
+    if (!container) return;
+    container.innerHTML = '<div class="loading">Loading duplicate groups...</div>';
+    fetch('/api/duplicates')
+        .then(r => r.json())
+        .then(data => {
+            if (!data.duplicate_groups || data.duplicate_groups.length === 0) {
+                container.innerHTML = '<div class="empty">No duplicates flagged for review.</div>';
+                return;
+            }
+            container.innerHTML = '';
+            data.duplicate_groups.forEach(group => {
+                const canonical = group.canonical;
+                const dups = group.duplicates;
+                // Canonical card
+                const canonicalCard = `
+                  <div class="canonical-clip">
+                    <h3>Canonical</h3>
+                    <img src="/thumbs/${canonical.thumbnail_path ? canonical.thumbnail_path.split('/').pop() : 'missing.jpg'}" alt="Canonical thumbnail">
+                    <div><b>${canonical.filename}</b></div>
+                    <div class="meta">ID: ${canonical.id} | Duration: ${canonical.duration || '?'} | Size: ${canonical.size || '?'}<br>pHash: <span style="font-family:monospace;">${canonical.phash || '?'}</span></div>
+                  </div>
+                `;
+                // Duplicates list
+                const dupCards = dups.map(dup => `
+                  <div class="duplicate-card" data-clip-id="${dup.id}">
+                    <img src="/thumbs/${dup.thumbnail_path ? dup.thumbnail_path.split('/').pop() : 'missing.jpg'}" alt="Duplicate thumbnail">
+                    <div>
+                      <b>${dup.filename}</b><br>
+                      <span class="meta">ID: ${dup.id} | Duration: ${dup.duration || '?'} | Size: ${dup.size || '?'}<br>pHash: <span style="font-family:monospace;">${dup.phash || '?'}</span></span>
+                    </div>
+                    <div class="duplicate-actions">
+                      <button onclick="window.handleDuplicateAction(${dup.id}, 'keep', ${canonical.id})">Keep</button>
+                      <button onclick="window.handleDuplicateAction(${dup.id}, 'delete', ${canonical.id})">Delete</button>
+                      <button onclick="window.handleDuplicateAction(${dup.id}, 'ignore', ${canonical.id})">Ignore</button>
+                      <button onclick="window.handleDuplicateAction(${dup.id}, 'merge', ${canonical.id})">Merge</button>
+                    </div>
+                  </div>
+                `).join('');
+                const groupDiv = document.createElement('div');
+                groupDiv.className = 'duplicate-group';
+                groupDiv.innerHTML = canonicalCard + `<div class="duplicate-clips">${dupCards}</div>`;
+                container.appendChild(groupDiv);
+            });
+        })
+        .catch(err => {
+            container.innerHTML = `<div class="error">Failed to load duplicates: ${err}</div>`;
+        });
+};
+
+/**
+ * Handle actions for a duplicate: keep, delete, ignore.
+ * (Backend endpoints for these actions must be implemented.)
+ */
+window.handleDuplicateAction = function(dupId, action, canonicalId) {
+    fetch('/api/duplicate_action', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({dup_id: dupId, action, canonical_id: canonicalId})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.error) {
+            showToast('Action failed: ' + data.error, true);
+            return;
+        }
+        // Remove the duplicate card from the UI
+        const card = document.querySelector(`.duplicate-card[data-clip-id='${dupId}']`);
+        if (card) {
+            const group = card.closest('.duplicate-group');
+            card.remove();
+            // If no more duplicates in group, remove the group
+            if (group && group.querySelectorAll('.duplicate-card').length === 0) {
+                group.remove();
+            }
+        }
+        let msg = '';
+        if (action === 'keep') msg = 'Marked as not duplicate.';
+        else if (action === 'delete') msg = 'Duplicate deleted.';
+        else if (action === 'ignore') msg = 'Duplicate ignored.';
+        else if (action === 'merge') {
+            msg = 'Merged tags/playlists and deleted duplicate.';
+            if (data.tags_merged && data.tags_merged.length > 0) {
+                msg += ` Tags merged: ${data.tags_merged.join(', ')}.`;
+            }
+            if (data.playlists_merged && data.playlists_merged.length > 0) {
+                msg += ` Playlists merged: ${data.playlists_merged.join(', ')}.`;
+            }
+        }
+        showToast(msg);
+        // If no groups left, show empty message
+        const container = document.getElementById('duplicate-review-container');
+        if (container && container.querySelectorAll('.duplicate-group').length === 0) {
+            container.innerHTML = '<div class="empty">No duplicates flagged for review.</div>';
+        }
+    })
+    .catch(err => {
+        showToast('Action error: ' + err, true);
+    });
+}; 

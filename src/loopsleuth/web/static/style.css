@@ -75,7 +75,8 @@ h1 {
     border: 2px solid #3fa7ff;
     background: rgba(63, 167, 255, 0.13);
     box-shadow: 0 0 0 2px #3fa7ff33;
-    transition: border 0.15s, background 0.15s, box-shadow 0.15s;
+    outline: 3px solid #ff00ff !important; /* DEBUG: strong magenta outline for selection */
+    transition: border 0.15s, background 0.15s, box-shadow 0.15s, outline 0.15s;
 }
 
 .thumb {
