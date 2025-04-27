@@ -62,15 +62,20 @@ def ingest_directory(
         extensions: A set of lowercase file extensions to look for.
         force_rescan: If True, update duration and regenerate thumbnail for all files, even if they already exist.
     """
-    if not start_path.is_dir():
-        print(f"Error: Invalid start path '{start_path}' is not a directory.", file=sys.stderr)
-        return
-
     progress_path = Path(".loopsleuth_data/scan_progress.json")
     try:
         progress_path.parent.mkdir(parents=True, exist_ok=True)
     except Exception:
         pass
+    # Immediately write a 'scanning' status so the UI sees progress right away
+    try:
+        with progress_path.open("w") as f:
+            json.dump({"total": 0, "done": 0, "status": "scanning"}, f)
+    except Exception:
+        pass
+    if not start_path.is_dir():
+        print(f"Error: Invalid start path '{start_path}' is not a directory.", file=sys.stderr)
+        return
 
     print(f"Scanning {start_path} for video files ({', '.join(extensions)})...")
 

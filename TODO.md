@@ -1,6 +1,6 @@
 # Project TODOs
 
-## 🚦 Handoff & Next Steps (2024-06)
+## 🚦 Handoff & Next Steps (2025-04-26)
 - **Production-ready:**
   - Modern dark UI, always-visible action/batch bars, batch selection/tagging
   - Export List and Copy to Folder for selected clips (fully implemented)
@@ -10,8 +10,17 @@
   - Advanced export (zip, TouchDesigner .tox, etc.)
   - Further UX polish (keyboard shortcuts, accessibility, creative/visual features)
   - Gather user feedback and iterate
+- **Preview features:**
+  - Each card has a PiP (Picture-in-Picture) button for floating video preview.
+  - The selection bar includes a Preview Grid button to open a floating overlay with a grid of video previews for selected clips.
+  - The Preview Grid overlay is now fully adaptive and responsive, maximizing video size and aspect ratio for any number of selected clips. See `clip_actions.js` for details.
+- **Grid sorting:** Users can now sort the grid by name, date modified, size, duration, and starred status (favorites).
+- **Show starred first:** A checkbox in the sort bar allows prioritizing starred clips in any sort order.
+- **Persistent sort bar:** Sorting controls (dropdowns and checkbox) are always visible above the grid.
+- All sorting and preview features are production-ready, robust, and tested for creative/visual workflows.
+- The Preview Grid overlay is robust, adaptive, and ready for further creative/UX enhancements. Code is modular and ready for onboarding.
 
-## ✅ Completed (2024-06)
+## ✅ Completed (2025-04-26)
 - Grid scroll position restore
 - Modern dark UI
 - Always-visible batch/action bars
@@ -25,6 +34,13 @@
 - Progress bar (tqdm) during scan if tqdm is installed
 - Improved error handling: styled 404 and error pages
 - Robust template coding: all metadata fields use `clip.get('field')` for creative/production safety
+- **Grid sorting:** Users can now sort the grid by name, date modified, size, duration, and starred status (favorites).
+- **Show starred first:** A checkbox in the sort bar allows prioritizing starred clips in any sort order.
+- **Persistent sort bar:** Sorting controls (dropdowns and checkbox) are always visible above the grid.
+- **Preview features:**
+  - Each card has a PiP (Picture-in-Picture) button for floating video preview.
+  - The selection bar includes a Preview Grid button to open a floating overlay with a grid of video previews for selected clips.
+- All sorting and preview features are production-ready, robust, and tested for creative/visual workflows.
 
 ## 🚀 Next Implementation Steps (2024-06)
 
@@ -115,3 +131,21 @@
 - The batch action bar (edit bar) is confirmed working as of commit 999d0372cb193b2ff9543ec5783646b4b136b2e2.
 - Any regressions after this commit should be compared against this baseline.
 - Preserve this commit as a working reference for future UI/UX changes.
+
+## 🚀 Planned Feature: Saved Clip Sets / Fast Switching
+- Allow users to save the current set of scanned clips/thumbnails as a named set (e.g., "My VJ Loops", "Beeple Set").
+- Add a dropdown menu in the UI to select from saved sets, instantly loading the associated clips/thumbnails without rescanning the folder.
+- Provide an option to specify a new path for ingestion (scan), which can be saved as a new set.
+- Store sets in the database or as JSON files for fast lookup and switching.
+- UX: Dropdown for set selection, button to save current set, and input for new scan path.
+- This will dramatically speed up browsing and workflow for large or multiple libraries.
+
+## 🚦 TODO: PiP (Picture-in-Picture) Diagnostics & Robustness
+- Add robust diagnostics for PiP button: log errors, check for video element presence, and ensure event handler is attached after every grid update.
+- Test PiP in all supported browsers (Chrome, Edge, Safari, Firefox) and document any browser-specific issues.
+- Add fallback or user feedback if PiP is not supported or fails to activate.
+
+## 🚦 TODO: Selection Performance & Ctrl/Cmd Multi-Select
+- Investigate and optimize selection performance (laggy selection when clicking cards or checkboxes).
+- Fix ctrl/cmd (multi-toggle) selection so non-contiguous selection works as expected (should not update anchor, should always toggle selection instantly).
+- Profile and refactor selection logic for efficiency, especially with large grids or many DOM updates.

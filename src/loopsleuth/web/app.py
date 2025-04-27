@@ -5,7 +5,7 @@ LoopSleuth Web Frontend (FastAPI)
 - Will support video playback, tagging, starring, and export
 - Uses Jinja2 templates and static files
 """
-from fastapi import FastAPI, Request, HTTPException, Form, Body, status, BackgroundTasks
+from fastapi import FastAPI, Request, HTTPException, Form, Body, status, BackgroundTasks, Query
 from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -256,9 +256,18 @@ def scan_folder(folder_path: str = Form(...), force_rescan: bool = Form(False), 
                 lock_path.unlink()
 
     if background_tasks is not None:
-        background_tasks.add_task(wrapped_ingest, Path(folder_path), get_default_db_path(), False, force_rescan)
+        background_tasks.add_task(
+            wrapped_ingest,
+            Path(folder_path),
+            db_path=get_default_db_path(),
+            force_rescan=force_rescan
+        )
     else:
-        wrapped_ingest(Path(folder_path), db_path=get_default_db_path(), force_rescan=force_rescan)
+        wrapped_ingest(
+            Path(folder_path),
+            db_path=get_default_db_path(),
+            force_rescan=force_rescan
+        )
     return RedirectResponse(url="/", status_code=303)
 
 @app.post("/star/{clip_id}")
@@ -748,6 +757,38 @@ def scan_progress():
         return JSONResponse(data)
     except Exception as e:
         return JSONResponse({"status": "error", "error": str(e)})
+
+@app.get("/api/clips")
+def api_clips(
+    offset: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500)
+):
+    """
+    Returns a window of clips for virtualized/infinite scrolling.
+    """
+    conn = get_db_connection(get_default_db_path())
+    cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) FROM clips")
+    total = cursor.fetchone()[0]
+    cursor.execute("""
+        SELECT id, filename, path, thumbnail_path, duration, size, starred, modified_at
+        FROM clips
+        ORDER BY id ASC
+        LIMIT ? OFFSET ?
+    """, (limit, offset))
+    clips = []
+    for row in cursor.fetchall():
+        clips.append({
+            "id": row[0],
+            "filename": row[1],
+            "path": row[2],
+            "thumb_url": f"/thumbs/{os.path.basename(row[3])}" if row[3] else None,
+            "duration": row[4],
+            "size": row[5],
+            "starred": row[6],
+            "modified_at": row[7],
+        })
+    return {"clips": clips, "total": total}
 
 # TODO: Add API endpoints for clips, tagging, starring, etc.
 # TODO: Add video playback route 

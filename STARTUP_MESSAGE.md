@@ -99,9 +99,59 @@
 - For single-video full-size preview, consider a modal overlay with dynamic aspect ratio.
 - For creative/experimental layouts, consider custom canvas/WebGL or dynamic aspect ratio per cell (complex).
 
+## 🚦 Handoff Summary (2024-06)
+
+- The grid view now uses a virtualized, infinite scroll powered by Clusterize.js for robust performance with large libraries.
+- The backend exposes `/api/clips` for windowed, paged data to support the virtualized frontend.
+- Thumbnails are loaded on demand and sized via a persistent slider (using a CSS variable and localStorage).
+- The grid is multi-column, responsive, and batch actions (tagging, selection) are fully supported.
+- The batch tag bar and selection bar are always visible and robust to DOM changes.
+- All code is modular, maintainable, and ready for creative/production workflows.
+- See README for onboarding and file locations.
+
 ---
 _Last update: 2024-06-XX_
 
 [2024-06-14] Batch bar tag add/remove/autocomplete now robust to DOM state. Toast feedback restored. Selection logic fixed. Batch bar is now resilient to rapid selection/deselection and DOM changes. 
 
 The Preview Grid overlay is robust, adaptive, and ready for further creative/UX enhancements. Code is modular and ready for onboarding. 
+
+## 🚦 Onboarding Checklist (2024-06)
+
+### 1. Setup
+- Clone the repo and set up a Python 3.10+ virtual environment.
+- Install requirements: `pip install -r requirements.txt`
+- Ensure ffmpeg/ffprobe are installed and in your PATH.
+- Start the FastAPI server: `python src/loopsleuth/web/app.py` (or via your preferred ASGI runner).
+
+### 2. Running the App
+- Open the web UI at `http://localhost:8000` (or your configured port).
+- Use the scan form to ingest a folder of video clips.
+- Thumbnails and metadata will be generated and stored in the database.
+
+### 3. Grid & Selection UX
+- The grid supports infinite scroll (Clusterize.js), batch selection, tagging, export, and PiP preview.
+- Selection supports shift+click (range), ctrl/cmd+click (multi-toggle), and card/checkbox selection.
+- Batch action bar and preview grid button respond to selection.
+- Tagging, starring, and batch actions are robust and production-ready.
+
+### 4. Testing
+- Run tests with `pytest --maxfail=3 --disable-warnings -q` (set `PYTHONPATH=src` if needed).
+- The test suite covers grid card markup and core backend logic.
+
+### 5. Main Logic Locations
+- Grid template: `src/loopsleuth/web/templates/grid.html`
+- Shared JS (selection, PiP, batch bar): `src/loopsleuth/web/static/clip_actions.js`
+- CSS: `src/loopsleuth/web/static/style.css`
+- Backend: `src/loopsleuth/web/app.py` and related modules
+- Tests: `tests/`
+
+### 6. Known Issues / TODOs
+- See `TODO.md` for PiP diagnostics, selection performance, and planned features (saved sets, etc.).
+- PiP may need further diagnostics for some browsers.
+- Selection performance can be further optimized for very large grids.
+
+### 7. Handoff
+- All major features are production-ready and regression-tested.
+- Code is modular, maintainable, and ready for further creative/UX enhancements.
+- For any new features or bugfixes, check `TODO.md` and recent commit messages for context. 

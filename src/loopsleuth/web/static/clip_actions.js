@@ -771,9 +771,7 @@ if (document.getElementById('batch-action-bar')) {
                     showToast('Batch add failed: ' + data.error, true);
                     return;
                 }
-                for (const [clipId, tags] of Object.entries(data)) {
-                    renderTagChips(clipId, tags);
-                }
+                updateAllTagChips(data);
                 showToast('Tags added to selected clips.');
                 batchAddTagsState.length = 0;
                 renderBatchTagChips('add');
@@ -803,9 +801,7 @@ if (document.getElementById('batch-action-bar')) {
                     showToast('Batch remove failed: ' + data.error, true);
                     return;
                 }
-                for (const [clipId, tags] of Object.entries(data)) {
-                    renderTagChips(clipId, tags);
-                }
+                updateAllTagChips(data);
                 showToast('Tags removed from selected clips.');
                 batchRemoveTagsState.length = 0;
                 renderBatchTagChips('remove');
@@ -832,9 +828,7 @@ if (document.getElementById('batch-action-bar')) {
                     showToast('Batch clear failed: ' + data.error, true);
                     return;
                 }
-                for (const [clipId, tags] of Object.entries(data)) {
-                    renderTagChips(clipId, tags);
-                }
+                updateAllTagChips(data);
                 showToast('All tags cleared from selected clips.');
             })
             .catch(err => {
@@ -864,88 +858,50 @@ if (document.getElementById('batch-action-bar')) {
         const cards = document.querySelectorAll('.card[data-clip-id]');
         cards.forEach(card => {
             card.setAttribute('tabindex', '0');
+            // Visual hover/focus effect
+            card.addEventListener('mouseover', () => card.classList.add('card-hover'));
+            card.addEventListener('mouseout', () => card.classList.remove('card-hover'));
+            card.addEventListener('focus', () => card.classList.add('card-hover'));
+            card.addEventListener('blur', () => card.classList.remove('card-hover'));
+            // Keyboard navigation to detail view
             card.addEventListener('keydown', function(e) {
-                // Only trigger if not typing in an input/textarea/contenteditable
-                if (['INPUT', 'TEXTAREA'].includes(e.target.tagName) || e.target.isContentEditable) return;
+                if (["INPUT", "TEXTAREA"].includes(e.target.tagName) || e.target.isContentEditable) return;
                 if (e.key === 'e' || e.key === 'Enter') {
                     const editLink = card.querySelector('.edit-tag-btn-link');
                     if (editLink) {
-                        // Navigate to detail view for tag editing
                         window.location.href = editLink.href;
                         e.preventDefault();
                     }
                 }
             });
-        });
-        // Make tag section in detail view focusable and keyboard accessible
-        const tagSections = document.querySelectorAll('.meta .tags');
-        tagSections.forEach(section => {
-            section.setAttribute('tabindex', '0');
-            section.addEventListener('keydown', function(e) {
-                // Only trigger if not typing in an input/textarea/contenteditable
-                if (['INPUT', 'TEXTAREA'].includes(e.target.tagName) || e.target.isContentEditable) return;
-                if (e.key === 'e' || e.key === 'Enter') {
-                    const editBtn = section.querySelector('.edit-tag-btn');
-                    if (editBtn) {
-                        editBtn.click();
-                        setTimeout(() => {
-                            const clipId = editBtn.getAttribute('data-clip-id');
-                            const input = document.getElementById(`tag-input-new-${clipId}`);
-                            if (input) input.focus();
-                        }, 10);
-                        e.preventDefault();
-                    }
-                }
-            });
-        });
-
-        function getCardElements() {
-            return Array.from(document.querySelectorAll('.card[data-clip-id]'));
-        }
-
-        document.querySelectorAll('.card[data-clip-id]').forEach((card, idx, allCards) => {
-            const clipId = card.getAttribute('data-clip-id');
-            const checkbox = card.querySelector('.select-clip-checkbox');
-            // Checkbox click
-            checkbox.addEventListener('click', function(e) {
-                console.log('[DEBUG] Checkbox clicked for clip', clipId, 'checked:', checkbox.checked);
-                e.stopPropagation();
-                // FIX: Always toggle only this card, never clear others
-                if (checkbox.checked) {
-                    selectedClipIds.add(clipId);
-                } else {
-                    selectedClipIds.delete(clipId);
-                }
-                lastSelectedIndex = idx;
-                updateCardSelectionUI();
-            });
-            // Card click (not on links/buttons/inputs)
+            // Card-wide click for selection (except on links/buttons/inputs)
             card.addEventListener('click', function(e) {
                 if (e.target.closest('a,button,input')) return;
-                // Save scroll position before navigating to detail
                 sessionStorage.setItem('gridScrollY', window.scrollY);
-                console.log('[DEBUG] Card clicked for clip', clipId);
+                const clipId = card.getAttribute('data-clip-id');
+                const allCards = Array.from(document.querySelectorAll('.card[data-clip-id]'));
+                const idx = allCards.indexOf(card);
                 const isCtrl = e.ctrlKey || e.metaKey;
                 const isShift = e.shiftKey;
                 if (isShift && lastSelectedIndex !== null) {
-                    // Range select
-                    const cards = getCardElements();
-                    const thisIndex = cards.indexOf(card);
-                    const [start, end] = [lastSelectedIndex, thisIndex].sort((a, b) => a - b);
+                    // Range select: select all between lastSelectedIndex and idx
+                    const [start, end] = [lastSelectedIndex, idx].sort((a, b) => a - b);
                     for (let i = start; i <= end; i++) {
-                        selectedClipIds.add(cards[i].getAttribute('data-clip-id'));
+                        selectedClipIds.add(allCards[i].getAttribute('data-clip-id'));
                     }
+                    // Update anchor to end of range for further shift+clicks
+                    lastSelectedIndex = idx;
                 } else if (isCtrl) {
-                    // Toggle only this
+                    // Multi-toggle: do NOT update lastSelectedIndex (keeps anchor for shift+click)
                     if (selectedClipIds.has(clipId)) {
                         selectedClipIds.delete(clipId);
                     } else {
                         selectedClipIds.add(clipId);
                     }
-                    lastSelectedIndex = idx;
+                    // lastSelectedIndex remains unchanged
                 } else {
-                    // Normal click: select only this if not already selected
-                    if (!selectedClipIds.has(clipId)) {
+                    // Normal click: select only this, update anchor
+                    if (!selectedClipIds.has(clipId) || selectedClipIds.size > 1) {
                         selectedClipIds.clear();
                         selectedClipIds.add(clipId);
                     } else {
@@ -1360,4 +1316,184 @@ function openPreviewGrid(selectedClipIds) {
     document.body.appendChild(overlay);
     console.log('Preview grid overlay appended to DOM');
     document.getElementById('close-preview-grid').onclick = () => overlay.remove();
-} 
+}
+
+// --- Patch: Always update tag chips in grid and detail after batch tag actions ---
+function updateAllTagChips(data) {
+    for (const [clipId, tags] of Object.entries(data)) {
+        renderTagChips(clipId, tags);
+        // Also update detail view if present
+        const detailTags = document.getElementById(`tags-text-detail-${clipId}`);
+        if (detailTags) {
+            detailTags.innerHTML = '';
+            if (!tags || tags.length === 0) {
+                detailTags.innerHTML = '<span class="tag-chip tag-empty">No tags</span>';
+            } else {
+                tags.forEach(tag => {
+                    const chip = document.createElement('span');
+                    chip.className = 'tag-chip';
+                    chip.appendChild(document.createTextNode(tag));
+                    detailTags.appendChild(chip);
+                });
+            }
+        }
+    }
+}
+
+// --- Patch: Preview grid button enable/disable and click handler ---
+function patchSelectedClipsBarForPreviewGrid() {
+    const bar = document.getElementById('selected-clips-bar');
+    if (!bar) return;
+    let btn = document.getElementById('selected-preview-grid-btn');
+    if (!btn) {
+        btn = document.createElement('button');
+        btn.id = 'selected-preview-grid-btn';
+        btn.className = 'selected-bar-btn';
+        btn.innerHTML = '<span class="selected-bar-icon">🎬</span> Preview Grid';
+        btn.title = 'Preview selected clips in a floating grid';
+        bar.appendChild(btn);
+    }
+    function updateBtn() {
+        const selected = document.querySelectorAll('.card.selected');
+        btn.disabled = selected.length === 0;
+    }
+    btn.onclick = function() {
+        const selected = Array.from(document.querySelectorAll('.card.selected')).map(card => card.getAttribute('data-clip-id'));
+        if (selected.length > 0) openPreviewGrid(selected);
+    };
+    document.addEventListener('selectionchange', updateBtn);
+    document.addEventListener('click', updateBtn);
+    updateBtn();
+}
+document.addEventListener('DOMContentLoaded', patchSelectedClipsBarForPreviewGrid);
+
+// --- Attach all card event handlers (selection, hover, checkbox, PiP) ---
+function attachCardEventHandlers() {
+    const cards = document.querySelectorAll('.card[data-clip-id]');
+    cards.forEach(card => {
+        card.setAttribute('tabindex', '0');
+        // Remove previous handlers to avoid duplicates
+        card.onmouseover = card.onmouseout = card.onfocus = card.onblur = null;
+        card.onclick = null;
+        // Visual hover/focus effect
+        card.addEventListener('mouseover', () => card.classList.add('card-hover'));
+        card.addEventListener('mouseout', () => card.classList.remove('card-hover'));
+        card.addEventListener('focus', () => card.classList.add('card-hover'));
+        card.addEventListener('blur', () => card.classList.remove('card-hover'));
+        // Card-wide click for selection (except on links/buttons/inputs)
+        card.addEventListener('click', function(e) {
+            if (e.target.closest('a,button,input')) return;
+            sessionStorage.setItem('gridScrollY', window.scrollY);
+            const clipId = card.getAttribute('data-clip-id');
+            const allCards = Array.from(document.querySelectorAll('.card[data-clip-id]'));
+            const idx = allCards.indexOf(card);
+            const isCtrl = e.ctrlKey || e.metaKey;
+            const isShift = e.shiftKey;
+            if (isShift && lastSelectedIndex !== null) {
+                const [start, end] = [lastSelectedIndex, idx].sort((a, b) => a - b);
+                for (let i = start; i <= end; i++) {
+                    selectedClipIds.add(allCards[i].getAttribute('data-clip-id'));
+                }
+                // Update anchor to end of range for further shift+clicks
+                lastSelectedIndex = idx;
+            } else if (isCtrl) {
+                // Multi-toggle: do NOT update lastSelectedIndex (keeps anchor for shift+click)
+                if (selectedClipIds.has(clipId)) {
+                    selectedClipIds.delete(clipId);
+                } else {
+                    selectedClipIds.add(clipId);
+                }
+                // lastSelectedIndex remains unchanged
+            } else {
+                // Normal click: select only this, update anchor
+                if (!selectedClipIds.has(clipId) || selectedClipIds.size > 1) {
+                    selectedClipIds.clear();
+                    selectedClipIds.add(clipId);
+                } else {
+                    selectedClipIds.delete(clipId);
+                }
+                lastSelectedIndex = idx;
+            }
+            updateCardSelectionUI();
+        });
+        // Checkbox click
+        const checkbox = card.querySelector('.select-clip-checkbox');
+        if (checkbox) {
+            checkbox.onclick = function(e) {
+                e.stopPropagation();
+                const clipId = card.getAttribute('data-clip-id');
+                if (checkbox.checked) {
+                    selectedClipIds.add(clipId);
+                } else {
+                    selectedClipIds.delete(clipId);
+                }
+                lastSelectedIndex = Array.from(document.querySelectorAll('.card[data-clip-id]')).indexOf(card);
+                updateCardSelectionUI();
+            };
+        }
+        // PiP button click
+        const pipBtn = card.querySelector('.pip-btn');
+        if (pipBtn) {
+            pipBtn.onclick = function(e) {
+                e.stopPropagation();
+                const clipId = card.getAttribute('data-clip-id');
+                const video = document.getElementById('pip-video-' + clipId);
+                if (video && card) {
+                    const videoUrl = '/media/' + card.getAttribute('data-path');
+                    video.src = videoUrl;
+                    video.currentTime = 0;
+                    video.load();
+                    video.muted = true;
+                    video.onerror = null;
+                    video.addEventListener('error', function onVideoError() {
+                        let errMsg = 'Unknown error';
+                        if (video.error) {
+                            switch (video.error.code) {
+                                case 1: errMsg = 'MEDIA_ERR_ABORTED'; break;
+                                case 2: errMsg = 'MEDIA_ERR_NETWORK'; break;
+                                case 3: errMsg = 'MEDIA_ERR_DECODE'; break;
+                                case 4: errMsg = 'MEDIA_ERR_SRC_NOT_SUPPORTED'; break;
+                            }
+                        }
+                        showToast('Video error: ' + errMsg + ' (' + video.src + ')', 6000);
+                    }, { once: true });
+                    let canplayTimeout = setTimeout(() => {
+                        showToast('Could not load video for PiP: ' + videoUrl, 6000);
+                        video.removeEventListener('canplay', onCanPlay);
+                    }, 10000);
+                    function onCanPlay() {
+                        clearTimeout(canplayTimeout);
+                        video.removeEventListener('canplay', onCanPlay);
+                        video.play().then(() => {
+                            if (document.pictureInPictureElement) {
+                                document.exitPictureInPicture();
+                            }
+                            if (video.webkitSupportsPresentationMode && typeof video.webkitSetPresentationMode === 'function') {
+                                try {
+                                    video.webkitSetPresentationMode('picture-in-picture');
+                                } catch (err) {
+                                    showToast('Picture-in-Picture not supported in this browser.');
+                                }
+                            } else if (video.requestPictureInPicture) {
+                                video.requestPictureInPicture().catch(err => {
+                                    showToast('Picture-in-Picture not supported or failed.');
+                                });
+                            } else {
+                                showToast('Picture-in-Picture not supported in this browser.');
+                            }
+                        }).catch(err => {
+                            showToast('Could not play video for PiP.');
+                        });
+                    }
+                    video.addEventListener('canplay', onCanPlay);
+                }
+            };
+        }
+    });
+}
+// Call attachCardEventHandlers after every grid update and on DOMContentLoaded
+function afterGridUpdate() {
+    attachCardEventHandlers();
+    updateCardSelectionUI();
+}
+document.addEventListener('DOMContentLoaded', afterGridUpdate); 

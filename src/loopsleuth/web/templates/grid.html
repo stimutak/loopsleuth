@@ -51,71 +51,11 @@ LoopSleuth Web: Grid View Template
             <input type="text" id="folder_path" name="folder_path" placeholder="E:/downloads" size="40" required style="margin:0 1em;" />
             <button type="submit">Scan</button>
         </form>
-        {% if clips %}
-            <div class="grid">
-                {% for clip in clips %}
-                    <div class="card" data-clip-id="{{ clip.id }}" data-path="{{ clip.path }}">
-                        <label class="custom-checkbox-label">
-                            <input type="checkbox" class="select-clip-checkbox" aria-label="Select clip {{ clip.filename }}" />
-                            <span class="custom-checkbox"></span>
-                        </label>
-                        {% if clip.thumbnail_path %}
-                            <a class="card-link" href="/clip/{{ clip.id }}">
-                                <img class="thumb" src="/thumbs/{{ clip.thumb_filename }}" alt="Thumbnail for {{ clip.filename }}" />
-                            </a>
-                        {% else %}
-                            <div class="thumb placeholder">No Thumbnail</div>
-                        {% endif %}
-                        <div class="meta">
-                            <a class="card-link" href="/clip/{{ clip.id }}">
-                                <div class="filename">{{ clip.filename }}</div>
-                            </a>
-                            {% if clip.duration %}
-                                <div class="duration">{{ (clip.duration // 60)|int }}:{{ '%02d' % (clip.duration % 60) }} min</div>
-                            {% endif %}
-                            {% if clip.size %}
-                                <div class="size">{{ clip.size|filesizeformat }}</div>
-                            {% endif %}
-                            {% if clip.modified_at %}
-                                <div class="modified">{{ clip.modified_at[:10] }} {{ clip.modified_at[11:16] }}</div>
-                            {% endif %}
-                            <div class="star" style="cursor:pointer;" data-clip-id="{{ clip.id }}" onclick="toggleStar(event)" title="Toggle star">{% if clip.starred %}★{% else %}☆{% endif %}</div>
-                            <button class="pip-btn" data-clip-id="{{ clip.id }}" title="Picture-in-Picture preview">⧉ PiP</button>
-                            <video id="pip-video-{{ clip.id }}" src="/media/{{ clip.path | urlencode }}" style="width:1px;height:1px;opacity:0.01;position:fixed;top:0;left:0;z-index:-1;" muted playsinline></video>
-                            <div class="tags">
-                                <!-- Tags are always visible as static chips -->
-                                <span class="tags-text" id="tags-text-{{ clip.id }}">
-                                    {% for tag in clip.tags %}
-                                        <span class="tag-chip">{{ tag }}</span>
-                                    {% else %}
-                                        <span class="tag-chip tag-empty">No tags</span>
-                                    {% endfor %}
-                                </span>
-                                <a href="/clip/{{ clip.id }}" class="edit-tag-btn-link" style="margin-left:0.5em; font-size:0.9em; text-decoration:none;" title="Edit tags in detail view">✎</a>
-                            </div>
-                        </div>
-                    </div>
-                {% endfor %}
-            </div>
-            <!-- Pagination controls -->
-            {% set total_clips = total_clips | default(0) %}
-            {% set per_page = per_page | default(100) %}
-            {% set page = page | default(1) %}
-            <div class="pagination-bar" style="margin:2em 0; display:flex; justify-content:center; align-items:center; gap:1em;">
-                {% set total_pages = (total_clips // per_page) + (1 if total_clips % per_page else 0) %}
-                {% if page > 1 %}
-                    <a href="?page={{ page-1 }}&per_page={{ per_page }}&sort={{ sort }}&order={{ order }}{% if starred_first %}&starred_first=1{% endif %}" class="pagination-btn">&laquo; Prev</a>
-                {% endif %}
-                <span>Page {{ page }} of {{ total_pages }}</span>
-                {% if page < total_pages %}
-                    <a href="?page={{ page+1 }}&per_page={{ per_page }}&sort={{ sort }}&order={{ order }}{% if starred_first %}&starred_first=1{% endif %}" class="pagination-btn">Next &raquo;</a>
-                {% endif %}
-            </div>
-            <!-- Floating batch action bar -->
-            <div id="batch-action-bar" style="display:none;"></div>
-        {% else %}
-            <p>No clips found. (This is a placeholder page.)</p>
-        {% endif %}
+        <!-- Replace the classic grid and pagination with a virtualized scroll area -->
+        <div id="clip-scroll-area" style="height:80vh;overflow:auto;">
+            <div id="clip-content-area"></div>
+        </div>
+        <div id="batch-action-bar"></div>
     </div>
     <div id="selected-clips-bar"><!-- Persistent selection bar (populated by JS) --></div>
     <!-- Scan Progress Modal -->
@@ -130,6 +70,8 @@ LoopSleuth Web: Grid View Template
     </div>
     <!-- Toast notification -->
     <div id="toast" style="display:none; position:fixed; left:50%; bottom:2.5em; transform:translateX(-50%); background:#23232a; color:#fff; padding:1em 2em; border-radius:1em; box-shadow:0 2px 16px #000a; z-index:4000; font-size:1.1em; pointer-events:none; opacity:0.97; transition:opacity 0.3s;"></div>
+    <!-- Add Clusterize.js for virtualized grid -->
+    <script src="https://unpkg.com/clusterize.js/clusterize.min.js"></script>
 </body>
 <script src="/static/clip_actions.js"></script>
 <script>
@@ -364,9 +306,15 @@ function patchSelectedClipsBarForPreviewGrid() {
 document.addEventListener('DOMContentLoaded', patchSelectedClipsBarForPreviewGrid);
 // --- Scan Progress Modal Logic ---
 let scanProgressInterval = null;
+let scanProgressRetryTimeout = null;
+let scanProgressStartTime = null;
 
-function showScanProgressModal() {
-    document.getElementById('scan-progress-modal').style.display = 'flex';
+function showScanProgressModal(msg) {
+    const modal = document.getElementById('scan-progress-modal');
+    modal.style.display = 'flex';
+    if (msg) {
+        document.getElementById('scan-progress-status').textContent = msg;
+    }
 }
 
 function hideScanProgressModal() {
@@ -399,6 +347,7 @@ function pollScanProgress() {
             if (data.status === 'scanning') {
                 showScanProgressModal();
                 updateScanProgressBar(data.done, data.total);
+                scanProgressStartTime = null; // reset wait timer
                 // Show a message in the grid area if empty
                 const grid = document.querySelector('.grid');
                 if (grid && grid.children.length === 0) {
@@ -412,28 +361,67 @@ function pollScanProgress() {
                     window.location.reload();
                 }, 1200);
                 clearInterval(scanProgressInterval);
+                clearTimeout(scanProgressRetryTimeout);
+                scanProgressStartTime = null;
             } else if (data.status === 'error') {
                 document.getElementById('scan-progress-status').textContent =
                     'Error: ' + (data.error || 'Unknown error');
                 setTimeout(hideScanProgressModal, 3000);
                 showToast('Scan failed: ' + (data.error || 'Unknown error'), 4000);
                 clearInterval(scanProgressInterval);
+                clearTimeout(scanProgressRetryTimeout);
+                scanProgressStartTime = null;
             } else {
-                // idle or unknown
-                hideScanProgressModal();
-                clearInterval(scanProgressInterval);
+                // idle or unknown: retry for up to 10 seconds before showing failure
+                if (!scanProgressStartTime) {
+                    scanProgressStartTime = Date.now();
+                }
+                const elapsed = Date.now() - scanProgressStartTime;
+                if (elapsed < 10000) { // 10 seconds
+                    showScanProgressModal('Waiting for scan to start...');
+                    // Schedule another poll in 1s if not already scheduled
+                    if (!scanProgressRetryTimeout) {
+                        scanProgressRetryTimeout = setTimeout(() => {
+                            scanProgressRetryTimeout = null;
+                            pollScanProgress();
+                        }, 1000);
+                    }
+                } else {
+                    hideScanProgressModal();
+                    showToast('Scan failed to start. Please try again.', 4000);
+                    clearInterval(scanProgressInterval);
+                    clearTimeout(scanProgressRetryTimeout);
+                    scanProgressStartTime = null;
+                }
             }
         })
         .catch(() => {
-            document.getElementById('scan-progress-status').textContent = 'Error polling progress.';
-            setTimeout(hideScanProgressModal, 3000);
-            showToast('Scan failed: error polling progress', 4000);
-            clearInterval(scanProgressInterval);
+            // On fetch error, treat as idle and retry for up to 10 seconds
+            if (!scanProgressStartTime) {
+                scanProgressStartTime = Date.now();
+            }
+            const elapsed = Date.now() - scanProgressStartTime;
+            if (elapsed < 10000) {
+                showScanProgressModal('Waiting for scan to start...');
+                if (!scanProgressRetryTimeout) {
+                    scanProgressRetryTimeout = setTimeout(() => {
+                        scanProgressRetryTimeout = null;
+                        pollScanProgress();
+                    }, 1000);
+                }
+            } else {
+                hideScanProgressModal();
+                showToast('Scan failed to start (network error).', 4000);
+                clearInterval(scanProgressInterval);
+                clearTimeout(scanProgressRetryTimeout);
+                scanProgressStartTime = null;
+            }
         });
 }
 
 function startScanProgressPolling() {
     showScanProgressModal();
+    scanProgressStartTime = null;
     pollScanProgress(); // immediate
     scanProgressInterval = setInterval(pollScanProgress, 1000);
 }
@@ -456,6 +444,106 @@ window.addEventListener('DOMContentLoaded', () => {
                 startScanProgressPolling();
             }
         });
+});
+// --- Persist scan folder location logic ---
+document.addEventListener('DOMContentLoaded', function() {
+    const folderInput = document.getElementById('folder_path');
+    if (folderInput) {
+        // Restore last used folder from localStorage
+        const lastFolder = localStorage.getItem('lastScanFolder');
+        if (lastFolder) {
+            folderInput.value = lastFolder;
+        }
+        // Save on form submit
+        const scanForm = document.getElementById('scan-form');
+        if (scanForm) {
+            scanForm.addEventListener('submit', function() {
+                localStorage.setItem('lastScanFolder', folderInput.value);
+            });
+        }
+    }
+});
+// --- Virtualized Infinite Grid Logic (Multi-Column Flex Rows) ---
+let offset = 0;
+const limit = 100;
+let loading = false;
+let allLoaded = false;
+const cardsPerRow = 5; // Set your preferred number of columns here
+const clusterize = new Clusterize({
+    rows: [],
+    scrollId: 'clip-scroll-area',
+    contentId: 'clip-content-area'
+});
+
+function renderClipCard(clip) {
+    return `
+        <div class="card" data-clip-id="${clip.id}" data-path="${encodeURIComponent(clip.path)}">
+            <label class="custom-checkbox-label">
+                <input type="checkbox" class="select-clip-checkbox" aria-label="Select clip ${clip.filename}" />
+                <span class="custom-checkbox"></span>
+            </label>
+            <a class="card-link" href="/clip/${clip.id}">
+                <img class="thumb" src="${clip.thumb_url || '/static/placeholder.png'}" alt="Thumbnail for ${clip.filename}" />
+            </a>
+            <div class="meta">
+                <a class="card-link" href="/clip/${clip.id}">
+                    <div class="filename">${clip.filename}</div>
+                </a>
+                ${clip.duration ? `<div class="duration">${Math.floor(clip.duration/60)}:${('0'+Math.floor(clip.duration%60)).slice(-2)} min</div>` : ''}
+                ${clip.size ? `<div class="size">${clip.size}</div>` : ''}
+                ${clip.modified_at ? `<div class="modified">${clip.modified_at.slice(0,10)} ${clip.modified_at.slice(11,16)}</div>` : ''}
+                <div class="star" style="cursor:pointer;" data-clip-id="${clip.id}" title="Toggle star">${clip.starred ? '★' : '☆'}</div>
+                <button class="pip-btn" data-clip-id="${clip.id}" title="Picture-in-Picture preview">⧉ PiP</button>
+                <video id="pip-video-${clip.id}" src="/media/${encodeURIComponent(clip.path)}" style="display:none;" muted playsinline></video>
+                <div class="tags">
+                    <span class="tags-text" id="tags-text-${clip.id}">
+                        ${clip.tags && clip.tags.length
+                            ? clip.tags.map(tag => `<span class="tag-chip">${tag}</span>`).join('')
+                            : '<span class="tag-chip tag-empty">No tags</span>'}
+                    </span>
+                    <a href="/clip/${clip.id}" class="edit-tag-btn-link" style="margin-left:0.5em; font-size:0.9em; text-decoration:none;" title="Edit tags in detail view">✎</a>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function renderClipRows(clips, cardsPerRow = 5) {
+    let rows = [];
+    for (let i = 0; i < clips.length; i += cardsPerRow) {
+        const rowClips = clips.slice(i, i + cardsPerRow);
+        rows.push(
+            `<div class="clip-row">${rowClips.map(renderClipCard).join('')}</div>`
+        );
+    }
+    return rows;
+}
+
+async function loadMoreClips() {
+    if (loading || allLoaded) return;
+    loading = true;
+    const resp = await fetch(`/api/clips?offset=${offset}&limit=${limit}`);
+    const data = await resp.json();
+    if (data.clips.length === 0) {
+        allLoaded = true;
+        return;
+    }
+    const newRows = renderClipRows(data.clips, cardsPerRow);
+    clusterize.append(newRows);
+    afterGridUpdate();
+    offset += data.clips.length;
+    loading = false;
+}
+
+// Initial load
+loadMoreClips().then(afterGridUpdate);
+
+// Infinite scroll trigger
+const scrollArea = document.getElementById('clip-scroll-area');
+scrollArea.addEventListener('scroll', function() {
+    if (scrollArea.scrollTop + scrollArea.clientHeight >= scrollArea.scrollHeight - 200) {
+        loadMoreClips();
+    }
 });
 </script>
 </html> 

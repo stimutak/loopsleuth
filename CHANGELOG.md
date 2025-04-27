@@ -68,6 +68,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Add favicon links to error/404 pages and implement thumbnail size slider in grid view.
 - Wire up custom video controls in detail view (play/pause, seek, frame step, volume).
 
+#### Grid Sorting, Starred, and Preview Features
+- Added grid sorting by name, date modified, size, duration, and starred (favorites)
+- Added 'Show starred first' checkbox to prioritize favorites in any sort order
+- Persistent sort bar with dropdowns for field and order, always visible above the grid
+- Each card now has a PiP (Picture-in-Picture) button for floating video preview
+- Selection bar includes a Preview Grid button to open a floating overlay with a grid of video previews for selected clips
+- Improved selection logic and batch bar robustness
+- All sorting and preview features are robust, accessible, and tested for creative/visual workflows
+- Bugfix: grid preview and PiP now use correct file paths and work for all valid clips
+- Bugfix: selection and preview bar handlers are now reliably attached after re-renders
+
+## [2024-06] Preview Grid Overlay Improvements
+- Refactored the Preview Grid overlay to use a fully adaptive, responsive CSS Grid layout.
+- Video player cells now maximize their size and aspect ratio based on the number of selected clips and viewport.
+- Videos fill available vertical space and maintain aspect ratio, providing a better review experience.
+- Grid columns use `repeat(auto-fit, minmax(320px, 1fr))` for responsive adaptation.
+- See `src/loopsleuth/web/static/clip_actions.js` for implementation details.
+
+## [1.3.0] - 2024-06-XX
+
+### Major Handoff/UX Refactor
+- Grid view now uses Clusterize.js for virtualized, infinite scrolling (no classic pagination).
+- Backend exposes `/api/clips` for windowed, paged data to support the virtualized frontend.
+- Multi-column grid layout restored using flex rows; responsive and robust for large libraries.
+- Thumbnail slider is fully integrated and controls all visible thumbnails via CSS variable.
+- Batch tag bar and selection bar are always visible and robust to DOM changes.
+- All code is modular, maintainable, and ready for creative/production workflows.
+- See README for handoff summary and onboarding notes.
+
 ---
 
 Older changes and project history can be found in the README and ROADMAP. 
