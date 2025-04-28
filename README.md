@@ -199,33 +199,20 @@ LoopSleuth uses `pytest` and `pytest-cov` for automated testing and coverage rep
 - Copy to Folder: Copy selected files to a user-specified folder
 - Custom checkboxes, grid scroll restore, robust batch UX
 
-## 🚀 Playlist Management (2024-06)
+## 🚀 Playlist Management & Selection UX (2024-06)
 
-LoopSleuth now supports (or is adding) robust playlist management for creative workflows:
+LoopSleuth now supports robust playlist management for creative workflows:
 
-- **Database:**
-  - `playlists` table: id, name, created_at
-  - `playlist_clips` join table: playlist_id, clip_id, position (ordering)
-- **Backend API:**
-  - Create, rename, delete playlists
-  - Add/remove clips (batch)
-  - Reorder clips (drag-and-drop or up/down)
-  - List playlists and their clips
-  - Export playlist as .txt, .zip, or .tox (TouchDesigner)
-- **Frontend UI:**
-  - Playlist sidebar or modal for management
-  - Add/remove selected clips to playlists
-  - Drag-and-drop or up/down for ordering
-  - Export/download and preview (play all/step-through)
-- **Workflow:**
-  - Add/remove multiple selected clips to playlists in one go
-  - Show which playlists a clip belongs to in grid/detail views
-  - Visual feedback: badges/highlights for playlist membership
-- **Testing:**
-  - Unit tests for all endpoints and ordering logic
-  - UI tests for playlist creation, modification, and export
-
-_Stretch:_ .tox export, multi-user/concurrent edits, creative integrations (TouchDesigner/Notch hooks).
+- **Sidebar checkboxes** select *target* playlists for add/remove actions, not for filtering.
+- **Filter icon** (🔍) next to each playlist name filters the grid by that playlist.
+- **Batch add/remove to multiple playlists** from the grid is fully supported.
+- **Creating a new playlist with clips selected** immediately adds those clips to the new playlist.
+- **Playlist pills on each grid card** now have a remove (✖) button to remove a clip from a playlist, with instant UI update and toast feedback.
+- **Grid view reloads** after playlist changes to reflect new membership.
+- **All playlist pill rendering is now handled in JS**, not Jinja, to avoid context errors and server errors.
+- **Persistent selection bar and batch bar** are robust and always reflect current selection state.
+- **Visual feedback (toast/snackbar)** for all playlist actions.
+- All major UI/UX bugs (including 500 errors from Jinja context) have been fixed.
 
 ## 🚀 UI & Layout Modernization (2024-06)
 - The app now uses a robust flexbox layout: the playlist sidebar and grid never overlap, and the grid always fills the available space.
@@ -253,22 +240,20 @@ _Stretch:_ .tox export, multi-user/concurrent edits, creative integrations (Touc
 ## 🚦 Handoff & Path Forward (2024-06)
 
 ### Current State
-- Playlist management is robust: create, rename, delete, reorder, and export playlists from the sidebar.
-- Playlist badges in the detail view are now fully interactive:
-  - Clicking a badge highlights it, selects the playlist in the sidebar, and auto-scrolls the sidebar to the selected playlist.
-  - Visual feedback is immediate and robust for both badge and sidebar selection.
-- Batch tag editing, selection bar, and all core grid/detail UX are production-ready.
+- All core playlist, tagging, and selection workflows are robust and production-ready.
+- The codebase is modular, maintainable, and well-documented.
+- All major UI/UX bugs are resolved.
+- The onboarding and handoff notes are up to date.
+- Remaining work is mostly advanced/creative features and polish, not core stability.
 
-### Path Forward
-- **For new contributors or maintainers:**
-  1. Review the sidebar and detail view playlist sync logic in `clip_detail.html` and `clip_actions.js`.
-  2. For further UX polish, consider:
-     - Keyboard navigation for playlist badges and sidebar
-     - Drag-and-drop playlist reordering in the sidebar
-     - Multi-clip add/remove to playlists from both grid and detail views
-     - Playlist export as .zip or TouchDesigner .tox
-  3. See `TODO.md` for granular next steps and open issues.
-  4. All code is modular and documented for rapid onboarding.
+### Pending / Next Steps
+- Playlist reordering (drag-and-drop), playlist folders, playlist export (zip, .tox), playlist preview (play all/step through).
+- Advanced export: zip, TouchDesigner .tox, etc.
+- Further UX polish: keyboard shortcuts, accessibility improvements, creative/visual features (e.g., animated transitions, custom playlist covers).
+- Detail view polish: needs a full redesign for usability and creative workflows (larger video, better tag/playlist controls, responsive layout).
+- Duplicate detection: pHash duplicate detection, batch review/merge UI, cross-database duplicate scan.
+- Performance: selection performance with very large grids, further optimization.
+- Testing: expand automated test coverage, especially for new playlist and batch features.
 
 ### Onboarding Checklist
 - [x] All playlist and tag features are tested and robust

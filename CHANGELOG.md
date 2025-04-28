@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## [Unreleased]
 - Ongoing bug fixes and UI polish.
+- Playlist sidebar checkboxes now select target playlists for add/remove, not for filtering.
+- Added filter icon (🔍) for explicit filtering by playlist.
+- Grid card checkboxes are now larger, lighter, and flush to the upper-left for better accessibility and usability.
+- Multi-playlist add/remove is now fully supported from the grid.
+- The grid and sidebar are decoupled for a more flexible, creative workflow.
+- **Playlist pills on grid cards now have a remove (✖) button to remove a clip from a playlist, with instant UI update and toast feedback.**
+- **Grid view reloads after playlist changes to reflect new playlist membership.**
+- **Creating a new playlist with clips selected immediately adds those clips to the new playlist.**
+- **All playlist pill rendering is now handled in JS, not Jinja, to avoid context errors and server errors.**
+- **Fixed 500 Internal Server Error caused by Jinja referencing 'clip' outside of a valid context.**
+- **All core playlist, tagging, and selection workflows are robust and production-ready.**
+- **This is a stable handoff point for onboarding or further development.**
 
 ## [1.2.0] - 2025-04-26
 

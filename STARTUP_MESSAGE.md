@@ -101,6 +101,11 @@
 
 ## 🚦 Handoff Summary (2024-06)
 
+- Playlist sidebar checkboxes now select target playlists for add/remove actions (not for filtering the grid).
+- Filter icon (🔍) next to each playlist name filters the grid by that playlist.
+- Grid card checkboxes are larger, lighter, and flush to the upper-left for easy, accessible multi-select.
+- Batch add/remove to multiple playlists is fully supported from the grid.
+- The grid and sidebar are decoupled for a more flexible, creative workflow.
 - The grid view now uses a virtualized, infinite scroll powered by Clusterize.js for robust performance with large libraries.
 - The backend exposes `/api/clips` for windowed, paged data to support the virtualized frontend.
 - Thumbnails are loaded on demand and sized via a persistent slider (using a CSS variable and localStorage).

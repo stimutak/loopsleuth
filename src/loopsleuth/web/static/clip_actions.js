@@ -746,7 +746,7 @@ if (document.getElementById('batch-action-bar')) {
             <div class="batch-bar-section">
                 <button class="batch-bar-btn" id="batch-clear-btn" ${count === 0 ? 'disabled' : ''}>Clear all tags</button>
             </div>
-            <span class="batch-bar-help" title="Shift+Click: range select, Ctrl/Cmd+Click: multi-select. Add/Remove tags for all selected clips.">?</span>
+            <span class="batch-bar-help" title="Shift+Click: range select. Ctrl+Click (Windows/Linux) for multi-select. Cmd+Click may not work on macOS in all browsers. Use checkboxes for robust multi-select.">?</span>
         `;
         renderBatchTagChips('add');
         renderBatchTagChips('remove');
@@ -852,6 +852,7 @@ if (document.getElementById('batch-action-bar')) {
         // Show/hide batch action bar and render controls
         renderBatchActionBar();
         syncBatchRemoveTagsWithSelection();
+        renderSelectedClipsBar();
     }
 
     document.addEventListener('DOMContentLoaded', function() {
@@ -885,84 +886,38 @@ function renderTagChips(clipId, tags) {
     }
 }
 
-// --- Playlist selection state ---
-let selectedPlaylistId = null;
-
-// Patch selectPlaylist to update selectedPlaylistId and re-render details and bar
-function selectPlaylist(playlistId) {
-    selectedPlaylistId = playlistId;
-    const detailsDiv = document.getElementById('playlist-details');
-    const listDiv = document.getElementById('playlist-list');
-    if (!detailsDiv) return;
-    // Highlight selected
-    Array.from(listDiv.children).forEach(child => {
-        child.classList.toggle('selected', child.dataset.playlistId == playlistId);
-    });
-    fetch(`/playlists/${playlistId}`)
-        .then(r => r.json())
-        .then(data => {
-            if (data.error) {
-                detailsDiv.innerHTML = `<span style="color:#f55">${data.error}</span>`;
-                return;
-            }
-            // Render playlist details: name, created_at, clip count, and list of clips
-            let html = `<div><b>${data.name}</b> <span style='color:#888;font-size:0.9em;'>(${data.clips.length} clips)</span></div>`;
-            html += `<div style='font-size:0.9em;color:#888;'>Created: ${data.created_at}</div>`;
-            html += `<div style='margin-top:0.7em;'>
-                <button id='playlist-rename-btn' class='sidebar-btn' style='margin-right:0.5em;'>Rename</button>
-                <button id='playlist-delete-btn' class='sidebar-btn' style='background:#c0392b;color:#fff;'>Delete</button>
-            </div>`;
-            if (data.clips.length === 0) {
-                html += '<div style="margin-top:1em;color:#aaa;">No clips in this playlist.</div>';
-            } else {
-                html += '<ol style="margin-top:1em;padding-left:1.2em;">';
-                data.clips.forEach((clip, i) => {
-                    html += `<li>${clip.filename} <span style='color:#3fa7ff;font-size:0.9em;'>[id:${clip.id}]</span></li>`;
-                });
-                html += '</ol>';
-            }
-            detailsDiv.innerHTML = html;
-            // Wire up rename
-            document.getElementById('playlist-rename-btn').onclick = () => {
-                const newName = prompt('Rename playlist:', data.name);
-                if (!newName || newName.trim() === data.name) return;
-                fetch(`/playlists/${playlistId}`, {
-                    method: 'PATCH',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({name: newName.trim()})
-                })
-                .then(r => r.json())
-                .then(resp => {
-                    if (resp.error) {
-                        showToast('Rename failed: ' + resp.error, true);
-                        return;
-                    }
-                    showToast('Playlist renamed.');
-                    renderPlaylistSidebar(() => selectPlaylist(playlistId));
-                });
-            };
-            // Wire up delete
-            document.getElementById('playlist-delete-btn').onclick = () => {
-                if (!confirm('Delete this playlist? This cannot be undone.')) return;
-                fetch(`/playlists/${playlistId}`, {method: 'DELETE'})
-                .then(r => r.json())
-                .then(resp => {
-                    if (resp.error) {
-                        showToast('Delete failed: ' + resp.error, true);
-                        return;
-                    }
-                    showToast('Playlist deleted.');
-                    selectedPlaylistId = null;
-                    renderPlaylistSidebar();
-                    document.getElementById('playlist-details').innerHTML = '<em>Select a playlist to view details.</em>';
-                    renderSelectedClipsBar();
-                });
-            };
-            renderSelectedClipsBar();
-        });
+// --- PATCH: Decouple playlist filtering from target selection ---
+// Filtering uses ?playlist_id in the URL, target selection uses selectedPlaylistIds (sidebar checkboxes)
+function getActiveFilterPlaylistId() {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('playlist_id') || null;
 }
 
-// --- Playlist Sidebar ---
+// --- On page load, do NOT set selectedPlaylistIds from filter param ---
+document.addEventListener('DOMContentLoaded', function() {
+    // Only initialize selectedPlaylistIds as empty; sidebar checkboxes will update it
+    selectedPlaylistIds = [];
+    renderSelectedClipsBar();
+    renderPlaylistSidebar();
+    // Show/hide clear filter button
+    const clearBtn = document.getElementById('clear-playlist-filter-btn');
+    if (clearBtn) {
+        clearBtn.style.display = getActiveFilterPlaylistId() ? '' : 'none';
+        clearBtn.onclick = function() {
+            const params = new URLSearchParams(window.location.search);
+            params.delete('playlist_id');
+            window.location.search = params.toString();
+        };
+        clearBtn.onkeydown = function(e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                clearBtn.click();
+            }
+        };
+    }
+});
+
+// --- In renderPlaylistSidebar, checkboxes reflect only selectedPlaylistIds, not filter ---
 function renderPlaylistSidebar(cbAfter) {
     const listDiv = document.getElementById('playlist-list');
     const createBtn = document.getElementById('playlist-create-btn');
@@ -973,13 +928,62 @@ function renderPlaylistSidebar(cbAfter) {
         .then(data => {
             if (!data.playlists) return;
             listDiv.innerHTML = '';
-            data.playlists.forEach(pl => {
+            data.playlists.forEach((pl, idx) => {
                 const item = document.createElement('div');
                 item.className = 'playlist-item';
-                item.textContent = pl.name;
                 item.dataset.playlistId = pl.id;
-                item.onclick = () => selectPlaylist(pl.id);
-                if (selectedPlaylistId && pl.id == selectedPlaylistId) item.classList.add('selected');
+                // --- Multi-select checkbox (target for add/remove) ---
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.className = 'playlist-checkbox';
+                checkbox.tabIndex = 0;
+                checkbox.setAttribute('aria-label', `Select playlist ${pl.name} as target`);
+                checkbox.checked = selectedPlaylistIds.includes(String(pl.id));
+                checkbox.onclick = (e) => {
+                    e.stopPropagation();
+                    if (selectedPlaylistIds.includes(String(pl.id))) {
+                        selectedPlaylistIds = selectedPlaylistIds.filter(id => id !== String(pl.id));
+                    } else {
+                        selectedPlaylistIds = [...selectedPlaylistIds, String(pl.id)];
+                    }
+                    renderSelectedClipsBar();
+                    item.classList.toggle('selected', checkbox.checked);
+                };
+                item.appendChild(checkbox);
+                // --- Playlist name (no filtering on click) ---
+                const nameSpan = document.createElement('span');
+                nameSpan.textContent = pl.name;
+                nameSpan.className = 'playlist-name';
+                nameSpan.style.marginLeft = '0.5em';
+                item.appendChild(nameSpan);
+                // --- Filter icon/button ---
+                const filterBtn = document.createElement('button');
+                filterBtn.className = 'playlist-filter-btn';
+                filterBtn.title = 'Filter grid by this playlist';
+                filterBtn.innerHTML = '<span style="font-size:1.1em;">🔍</span>';
+                filterBtn.style.marginLeft = '0.7em';
+                filterBtn.style.background = 'none';
+                filterBtn.style.border = 'none';
+                filterBtn.style.cursor = 'pointer';
+                filterBtn.tabIndex = 0;
+                filterBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    const params = new URLSearchParams(window.location.search);
+                    params.set('playlist_id', pl.id);
+                    window.location.search = params.toString();
+                };
+                item.appendChild(filterBtn);
+                filterBtn.onkeydown = (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        filterBtn.click();
+                    }
+                };
+                // --- Highlight if selected as target ---
+                if (selectedPlaylistIds.includes(String(pl.id))) {
+                    item.classList.add('selected');
+                    item.classList.add('selected-multi');
+                }
                 listDiv.appendChild(item);
             });
             if (cbAfter) cbAfter();
@@ -998,11 +1002,82 @@ function renderPlaylistSidebar(cbAfter) {
                 showToast('Create failed: ' + data.error, true);
                 return;
             }
-            showToast('Playlist created.');
-            renderPlaylistSidebar(() => selectPlaylist(data.id)); // Auto-select new playlist
+            // --- PATCH: If clips are selected, immediately add them to the new playlist ---
+            const newPlaylistId = data.id;
+            const selectedClips = Array.from(selectedClipIds);
+            if (selectedClips.length > 0) {
+                fetch('/playlists/clips', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ clip_ids: selectedClips.map(Number), playlist_ids: [newPlaylistId] })
+                })
+                .then(resp => resp.ok ? resp.json() : Promise.reject(resp))
+                .then(() => {
+                    // Show toast and highlight affected clips
+                    showToast(`Created playlist and added ${selectedClips.length} clip${selectedClips.length > 1 ? 's' : ''} to "${name}"`);
+                    renderPlaylistSidebar(() => {
+                        selectedPlaylistIds = [...selectedPlaylistIds, String(newPlaylistId)];
+                        attachPlaylistCheckboxHandlers();
+                        renderSelectedClipsBar();
+                    });
+                    // Highlight affected clips
+                    setTimeout(() => {
+                        selectedClips.forEach(id => {
+                            const card = document.querySelector(`.card[data-clip-id='${id}']`);
+                            if (card) {
+                                card.classList.add('playlist-added-highlight');
+                                setTimeout(() => card.classList.remove('playlist-added-highlight'), 3500);
+                            }
+                        });
+                    }, 400);
+                })
+                .catch(() => {
+                    showToast('Playlist created, but failed to add clips.', true);
+                    renderPlaylistSidebar(() => {
+                        selectedPlaylistIds = [...selectedPlaylistIds, String(newPlaylistId)];
+                        attachPlaylistCheckboxHandlers();
+                        renderSelectedClipsBar();
+                    });
+                });
+            } else {
+                showToast('Playlist created.');
+                renderPlaylistSidebar(() => {
+                    selectedPlaylistIds = [...selectedPlaylistIds, String(newPlaylistId)];
+                    attachPlaylistCheckboxHandlers();
+                    renderSelectedClipsBar();
+                });
+            }
         });
     };
     detailsDiv.innerHTML = '<em>Select a playlist to view details.</em>';
+}
+
+// --- PATCH: Utility to re-attach checkbox event handlers after sidebar updates ---
+function attachPlaylistCheckboxHandlers() {
+    const listDiv = document.getElementById('playlist-list');
+    if (!listDiv) return;
+    const items = listDiv.querySelectorAll('.playlist-item');
+    items.forEach(item => {
+        const checkbox = item.querySelector('.playlist-checkbox');
+        if (checkbox) {
+            checkbox.onclick = (e) => {
+                e.stopPropagation();
+                const plId = item.dataset.playlistId;
+                if (selectedPlaylistIds.includes(String(plId))) {
+                    selectedPlaylistIds = selectedPlaylistIds.filter(id => id !== String(plId));
+                } else {
+                    selectedPlaylistIds = [...selectedPlaylistIds, String(plId)];
+                }
+                renderSelectedClipsBar();
+                item.classList.toggle('selected', checkbox.checked);
+            };
+        }
+    });
+}
+
+// --- Pills: highlight all active pills for selected playlists ---
+function getActivePlaylistIds() {
+    return selectedPlaylistIds;
 }
 
 // --- Selected Clips Bar: Always Visible, Responsive ---
@@ -1011,7 +1086,7 @@ function renderSelectedClipsBar() {
     const bar = document.getElementById('selected-clips-bar');
     if (!bar) return;
     const count = selectedClipIds.size;
-    const playlistEnabled = count > 0 && selectedPlaylistId !== null;
+    const playlistEnabled = count > 0 && selectedPlaylistIds.length > 0;
     bar.style.display = '';
     bar.innerHTML = `
         <span class="selected-bar-label">${count} selected</span>
@@ -1104,33 +1179,51 @@ function renderSelectedClipsBar() {
         }
     };
     document.getElementById('selected-add-to-playlist-btn').onclick = async (e) => {
-        if (!selectedPlaylistId || selectedClipIds.length === 0) return;
+        // Multi-playlist support: send both selectedPlaylistIds and selectedClipIds
+        if (!selectedPlaylistIds.length || selectedClipIds.size === 0) return;
         const ids = Array.from(selectedClipIds).map(Number);
+        const playlistIds = selectedPlaylistIds.map(Number);
+        // --- PATCH: Store summary for post-reload feedback ---
+        // Fetch playlist names for summary
+        let playlistNames = [];
         try {
-            const resp = await fetch(`/playlists/${selectedPlaylistId}/clips`, {
+            const resp = await fetch('/playlists');
+            const data = await resp.json();
+            if (data && data.playlists) {
+                playlistNames = data.playlists.filter(pl => playlistIds.includes(pl.id)).map(pl => pl.name);
+            }
+        } catch {}
+        try {
+            const resp = await fetch('/playlists/clips', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ clip_ids: ids })
+                body: JSON.stringify({ clip_ids: ids, playlist_ids: playlistIds })
             });
             if (resp.ok) {
-                showToast('Added to playlist!', 'success');
-                // Deselect all clips after adding to playlist to prevent accidental repeated actions
+                // --- PATCH: Store summary in localStorage for feedback after reload ---
+                localStorage.setItem('playlistAddSummary', JSON.stringify({
+                    clipIds: ids,
+                    playlistNames: playlistNames,
+                    count: ids.length
+                }));
+                showToast('Added to selected playlist(s)!', 'success');
                 clearSelection();
+                setTimeout(() => window.location.reload(), 600); // Give toast time to show, then reload grid
             } else {
-                showToast('Failed to add to playlist', 'error');
+                showToast('Failed to add to playlist(s)', 'error');
             }
         } finally {
             document.getElementById('selected-add-to-playlist-btn').disabled = false;
         }
     };
     document.getElementById('selected-remove-from-playlist-btn').onclick = async (e) => {
-        if (!selectedPlaylistId) {
+        if (!selectedPlaylistIds.length) {
             showToast('Select a playlist first.', true);
             return;
         }
         const ids = Array.from(selectedClipIds).map(Number);
         try {
-            const resp = await fetch(`/playlists/${selectedPlaylistId}/clips/remove`, {
+            const resp = await fetch('/playlists/clips/remove', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({clip_ids: ids})
@@ -1141,7 +1234,9 @@ function renderSelectedClipsBar() {
                 return;
             }
             showToast('Removed from playlist.');
-            selectPlaylist(selectedPlaylistId);
+            selectPlaylist(selectedPlaylistIds[0]);
+            // --- PATCH: Reload grid to show updated playlist pills ---
+            setTimeout(() => window.location.reload(), 600);
         } catch (err) {
             showToast('Remove from playlist error: ' + err, true);
         }
@@ -1444,6 +1539,7 @@ function afterGridUpdate() {
     console.log('[afterGridUpdate] called');
     attachCardEventHandlers();
     updateCardSelectionUI();
+    attachPlaylistPillRemoveHandlers(); // Attach remove handlers for playlist pills
 }
 document.addEventListener('DOMContentLoaded', afterGridUpdate);
 
@@ -1553,4 +1649,69 @@ window.handleDuplicateAction = function(dupId, action, canonicalId) {
     .catch(err => {
         showToast('Action error: ' + err, true);
     });
-}; 
+};
+
+// --- PATCH: On page load, show persistent toast and highlight affected clips if playlistAddSummary exists ---
+document.addEventListener('DOMContentLoaded', function() {
+    const summaryRaw = localStorage.getItem('playlistAddSummary');
+    if (summaryRaw) {
+        localStorage.removeItem('playlistAddSummary');
+        try {
+            const summary = JSON.parse(summaryRaw);
+            let msg = '';
+            if (summary.count && summary.playlistNames && summary.playlistNames.length > 0) {
+                msg = `Added ${summary.count} clip${summary.count > 1 ? 's' : ''} to playlist${summary.playlistNames.length > 1 ? 's' : ''}: ${summary.playlistNames.join(', ')}`;
+            } else {
+                msg = 'Clips added to playlist.';
+            }
+            // Show persistent toast (longer duration)
+            showToast(msg);
+            // Highlight affected clips
+            setTimeout(() => {
+                summary.clipIds.forEach(id => {
+                    const card = document.querySelector(`.card[data-clip-id='${id}']`);
+                    if (card) {
+                        card.classList.add('playlist-added-highlight');
+                        setTimeout(() => card.classList.remove('playlist-added-highlight'), 3500);
+                    }
+                });
+            }, 400); // Wait for grid to render
+        } catch {}
+    }
+});
+
+/* Add this CSS to your style.css for the highlight effect:
+.playlist-added-highlight {
+    box-shadow: 0 0 0 4px #3fa7ffcc, 0 2px 12px #000a;
+    background: #1a6fff22 !important;
+    transition: box-shadow 0.3s, background 0.3s;
+}
+*/
+
+// --- PATCH: Add support for removing a clip from a playlist directly from the grid ---
+function attachPlaylistPillRemoveHandlers() {
+    document.querySelectorAll('.playlist-pill[data-clip-id][data-playlist-id] .playlist-pill-remove').forEach(btn => {
+        btn.onclick = function(e) {
+            e.stopPropagation();
+            const clipId = btn.closest('.playlist-pill').getAttribute('data-clip-id');
+            const playlistId = btn.closest('.playlist-pill').getAttribute('data-playlist-id');
+            if (!clipId || !playlistId) return;
+            fetch('/playlists/clips/remove', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({clip_ids: [Number(clipId)], playlist_id: Number(playlistId)})
+            })
+            .then(resp => resp.json())
+            .then(data => {
+                if (data && !data.error) {
+                    // Remove the pill from the UI
+                    btn.closest('.playlist-pill').remove();
+                    showToast('Removed from playlist.');
+                } else {
+                    showToast('Failed to remove from playlist.', true);
+                }
+            })
+            .catch(() => showToast('Remove from playlist error.', true));
+        };
+    });
+} 

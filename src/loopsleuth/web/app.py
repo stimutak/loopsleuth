@@ -6,7 +6,7 @@ LoopSleuth Web Frontend (FastAPI)
 - Uses Jinja2 templates and static files
 """
 from fastapi import FastAPI, Request, HTTPException, Form, Body, status, BackgroundTasks, Query
-from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse, JSONResponse
+from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
@@ -26,6 +26,7 @@ import subprocess
 import json
 from datetime import datetime, timedelta
 import re
+import io
 
 def get_db_path_from_request(request: Request) -> Path:
     """
@@ -70,11 +71,10 @@ THUMB_DIR = Path(".loopsleuth_data/thumbnails")
 def grid(request: Request):
     """
     Main grid view: shows all clips with thumbnails and info. Now paginated.
+    Supports filtering by playlist_id (if provided as a query param).
     """
     db_path = get_db_path_from_request(request)
-    # Default scan folder for UI (patched to E:/Downloads)
     default_scan_folder = "E:/Downloads"
-    # --- Sorting logic ---
     sort = request.query_params.get("sort", "filename")
     order = request.query_params.get("order", "asc")
     valid_sorts = {"filename", "modified_at", "size", "duration", "starred"}
@@ -84,7 +84,7 @@ def grid(request: Request):
     if order not in valid_orders:
         order = "asc"
     starred_first = request.query_params.get("starred_first", "0") == "1"
-    # Pagination
+    playlist_id = request.query_params.get("playlist_id")
     try:
         page = int(request.query_params.get("page", 1))
         if page < 1:
@@ -98,12 +98,10 @@ def grid(request: Request):
     except Exception:
         per_page = 100
     offset = (page - 1) * per_page
-    # SQL injection safe: use validated field names only
     if starred_first:
         order_by = f"starred DESC, {sort} {order.upper()}"
     else:
         order_by = f"{sort} {order.upper()}"
-    # Connect to the database and fetch paginated clips
     conn = None
     clips = []
     total_clips = 0
@@ -120,15 +118,32 @@ def grid(request: Request):
         row = cursor.fetchone()
         latest_scan_id = row[0] if row else None
         if latest_scan_id is not None:
-            cursor.execute("SELECT COUNT(*) FROM clips WHERE scan_id = ?", (latest_scan_id,))
-            total_clips = cursor.fetchone()[0]
-            cursor.execute(f"""
-                SELECT id, filename, path, duration, thumbnail_path, starred, size, modified_at
-                FROM clips
-                WHERE scan_id = ?
-                ORDER BY {order_by}
-                LIMIT ? OFFSET ?
-            """, (latest_scan_id, per_page, offset))
+            if playlist_id:
+                # Filter by playlist membership
+                cursor.execute("""
+                    SELECT COUNT(*) FROM playlist_clips pc
+                    JOIN clips c ON pc.clip_id = c.id
+                    WHERE pc.playlist_id = ? AND c.scan_id = ?
+                """, (playlist_id, latest_scan_id))
+                total_clips = cursor.fetchone()[0]
+                cursor.execute(f"""
+                    SELECT c.id, c.filename, c.path, c.duration, c.thumbnail_path, c.starred, c.size, c.modified_at
+                    FROM playlist_clips pc
+                    JOIN clips c ON pc.clip_id = c.id
+                    WHERE pc.playlist_id = ? AND c.scan_id = ?
+                    ORDER BY pc.position ASC, c.id ASC
+                    LIMIT ? OFFSET ?
+                """, (playlist_id, latest_scan_id, per_page, offset))
+            else:
+                cursor.execute("SELECT COUNT(*) FROM clips WHERE scan_id = ?", (latest_scan_id,))
+                total_clips = cursor.fetchone()[0]
+                cursor.execute(f"""
+                    SELECT id, filename, path, duration, thumbnail_path, starred, size, modified_at
+                    FROM clips
+                    WHERE scan_id = ?
+                    ORDER BY {order_by}
+                    LIMIT ? OFFSET ?
+                """, (latest_scan_id, per_page, offset))
         else:
             total_clips = 0
             cursor.execute("SELECT id, filename, path, duration, thumbnail_path, starred, size, modified_at FROM clips WHERE 0")
@@ -615,6 +630,10 @@ class PlaylistReorderRequest(BaseModel):
 class PlaylistExportFormat(str):
     pass  # For future: enum for 'txt', 'zip', 'tox'
 
+class MultiPlaylistClipUpdateRequest(BaseModel):
+    clip_ids: List[int]
+    playlist_ids: List[int]
+
 # --- Playlist Endpoints ---
 @app.post("/playlists")
 def create_playlist(req: PlaylistCreateRequest):
@@ -699,24 +718,33 @@ def get_playlist(request: Request, playlist_id: int):
     clips = [dict(row) for row in cursor.fetchall()]
     return {"id": playlist[0], "name": playlist[1], "created_at": playlist[2], "clips": clips}
 
-@app.post("/playlists/{playlist_id}/clips")
-def add_clips_to_playlist(playlist_id: int, req: PlaylistClipUpdateRequest):
-    """Add one or more clips to a playlist (appends to end)."""
+@app.post("/playlists/clips")
+def add_clips_to_multiple_playlists(req: MultiPlaylistClipUpdateRequest):
+    """Add one or more clips to one or more playlists (multi-playlist support)."""
     conn = None
+    summary = {}
     try:
         conn = get_db_connection(get_default_db_path())
         cursor = conn.cursor()
-        # Get current max position
-        cursor.execute("SELECT MAX(position) FROM playlist_clips WHERE playlist_id = ?", (playlist_id,))
-        row = cursor.fetchone()
-        start_pos = (row[0] + 1) if row and row[0] is not None else 0
-        for i, clip_id in enumerate(req.clip_ids):
-            cursor.execute("""
-                INSERT OR IGNORE INTO playlist_clips (playlist_id, clip_id, position)
-                VALUES (?, ?, ?)
-            """, (playlist_id, clip_id, start_pos + i))
+        for playlist_id in req.playlist_ids:
+            # Get current max position for this playlist
+            cursor.execute("SELECT MAX(position) FROM playlist_clips WHERE playlist_id = ?", (playlist_id,))
+            row = cursor.fetchone()
+            start_pos = (row[0] + 1) if row and row[0] is not None else 0
+            added = []
+            for i, clip_id in enumerate(req.clip_ids):
+                cursor.execute(
+                    """
+                    INSERT OR IGNORE INTO playlist_clips (playlist_id, clip_id, position)
+                    VALUES (?, ?, ?)
+                    """,
+                    (playlist_id, clip_id, start_pos + i)
+                )
+                if cursor.rowcount > 0:
+                    added.append(clip_id)
+            summary[playlist_id] = added
         conn.commit()
-        return {"playlist_id": playlist_id, "added": req.clip_ids}
+        return {"added": summary}
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
     finally:
@@ -762,9 +790,53 @@ def reorder_playlist_clips(playlist_id: int, req: PlaylistReorderRequest):
 
 @app.get("/playlists/{playlist_id}/export")
 def export_playlist(playlist_id: int, format: str = "txt"):
-    """Export playlist in the requested format (txt, zip, tox). Stub for now."""
-    # TODO: Implement export logic for txt, zip, tox
-    return JSONResponse({"message": f"Export for playlist {playlist_id} as {format} not yet implemented."}, status_code=501)
+    """Export playlist in the requested format (txt, zip, tox)."""
+    # Only txt implemented for now
+    if format not in ("txt", "zip", "tox"):
+        return JSONResponse({"error": f"Unsupported export format: {format}"}, status_code=400)
+    conn = None
+    try:
+        conn = get_db_connection(get_default_db_path())
+        cursor = conn.cursor()
+        # Get playlist name (for filename)
+        cursor.execute("SELECT name FROM playlists WHERE id = ?", (playlist_id,))
+        row = cursor.fetchone()
+        if not row:
+            return JSONResponse({"error": "Playlist not found"}, status_code=404)
+        playlist_name = row[0]
+        # Get all clip paths in order
+        cursor.execute("""
+            SELECT c.path FROM playlist_clips pc
+            JOIN clips c ON pc.clip_id = c.id
+            WHERE pc.playlist_id = ?
+            ORDER BY pc.position ASC
+        """, (playlist_id,))
+        paths = [r[0] for r in cursor.fetchall()]
+        if format == "txt":
+            if not paths:
+                return JSONResponse({"error": "Playlist is empty."}, status_code=400)
+            # Build text content
+            content = "\n".join(paths) + "\n"
+            filename = f"playlist_{playlist_id}.txt"
+            # Use StreamingResponse for download
+            return StreamingResponse(
+                io.BytesIO(content.encode("utf-8")),
+                media_type="text/plain",
+                headers={
+                    "Content-Disposition": f"attachment; filename={filename}"
+                }
+            )
+        elif format == "zip":
+            # TODO: Implement zip export
+            return JSONResponse({"error": "ZIP export not yet implemented."}, status_code=501)
+        elif format == "tox":
+            # TODO: Implement TouchDesigner .tox export
+            return JSONResponse({"error": ".tox export not yet implemented."}, status_code=501)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+    finally:
+        if conn:
+            conn.close()
 
 @app.post("/open_in_system/{clip_id}")
 def open_in_system(clip_id: int):
@@ -824,20 +896,48 @@ def api_clips(request: Request, offset: int = Query(0, ge=0), limit: int = Query
     """
     Returns a window of clips for virtualized/infinite scrolling.
     Uses the selected DB from the request for multi-library support.
+    Supports filtering by playlist_id (if provided as a query param).
     """
     db_path = get_db_path_from_request(request)
+    playlist_id = request.query_params.get("playlist_id")
     conn = get_db_connection(db_path)
     cursor = conn.cursor()
-    cursor.execute("SELECT COUNT(*) FROM clips")
-    total = cursor.fetchone()[0]
-    cursor.execute("""
-        SELECT id, filename, path, thumbnail_path, duration, size, starred, modified_at
-        FROM clips
-        ORDER BY id ASC
-        LIMIT ? OFFSET ?
-    """, (limit, offset))
+    if playlist_id:
+        # Filter by playlist membership
+        cursor.execute("""
+            SELECT COUNT(*) FROM playlist_clips pc
+            JOIN clips c ON pc.clip_id = c.id
+            WHERE pc.playlist_id = ?
+        """, (playlist_id,))
+        total = cursor.fetchone()[0]
+        cursor.execute("""
+            SELECT c.id, c.filename, c.path, c.thumbnail_path, c.duration, c.size, c.starred, c.modified_at
+            FROM playlist_clips pc
+            JOIN clips c ON pc.clip_id = c.id
+            WHERE pc.playlist_id = ?
+            ORDER BY pc.position ASC, c.id ASC
+            LIMIT ? OFFSET ?
+        """, (playlist_id, limit, offset))
+    else:
+        cursor.execute("SELECT COUNT(*) FROM clips")
+        total = cursor.fetchone()[0]
+        cursor.execute("""
+            SELECT id, filename, path, thumbnail_path, duration, size, starred, modified_at
+            FROM clips
+            ORDER BY id ASC
+            LIMIT ? OFFSET ?
+        """, (limit, offset))
     clips = []
     for row in cursor.fetchall():
+        clip_id = row[0]
+        # Fetch playlist memberships for this clip
+        cursor.execute("""
+            SELECT p.id, p.name FROM playlist_clips pc
+            JOIN playlists p ON pc.playlist_id = p.id
+            WHERE pc.clip_id = ?
+            ORDER BY p.name ASC
+        """, (clip_id,))
+        playlists = [ {"id": r[0], "name": r[1]} for r in cursor.fetchall() ]
         clips.append({
             "id": row[0],
             "filename": row[1],
@@ -847,6 +947,7 @@ def api_clips(request: Request, offset: int = Query(0, ge=0), limit: int = Query
             "size": row[5],
             "starred": row[6],
             "modified_at": row[7],
+            "playlists": playlists,
         })
     return {"clips": clips, "total": total}
 

@@ -41,13 +41,29 @@
   - Each card has a PiP (Picture-in-Picture) button for floating video preview.
   - The selection bar includes a Preview Grid button to open a floating overlay with a grid of video previews for selected clips.
 - All sorting and preview features are production-ready, robust, and tested for creative/visual workflows.
+- Playlist sidebar checkboxes now select target playlists for add/remove actions (not for filtering the grid)
+- Filter icon (🔍) next to each playlist name filters the grid by that playlist
+- Grid card checkboxes are larger, lighter, and flush to the upper-left for easy, accessible multi-select
+- Batch add/remove to multiple playlists is fully supported from the grid
+- The grid and sidebar are decoupled for a more flexible, creative workflow
+- **Playlist pills on grid cards now have a remove (✖) button to remove a clip from a playlist, with instant UI update and toast feedback.**
+- **Grid view reloads after playlist changes to reflect new playlist membership.**
+- **Creating a new playlist with clips selected immediately adds those clips to the new playlist.**
+- **All playlist pill rendering is now handled in JS, not Jinja, to avoid context errors and server errors.**
+- **Fixed 500 Internal Server Error caused by Jinja referencing 'clip' outside of a valid context.**
+- **All core playlist, tagging, and selection workflows are robust and production-ready.**
+- **Codebase is stable and ready for handoff.**
 
 ## 🚀 Next Implementation Steps (2024-06)
 
 ### ⏭️ Next Planned Features
-- Playlist management for selected clips
+- Playlist reordering (drag-and-drop), playlist folders, playlist export (zip, .tox), playlist preview (play all/step through)
 - Advanced export (.zip, .tox, etc.)
-- Further UX polish and creative integrations
+- Further UX polish and creative integrations (keyboard shortcuts, accessibility, creative/visual features)
+- Detail view polish (larger video, better tag/playlist controls, responsive layout)
+- Duplicate detection (pHash, batch review/merge UI, cross-database scan)
+- Performance: selection performance with very large grids, further optimization
+- Testing: expand automated test coverage, especially for new playlist and batch features
 
 ## 🚀 UI Modernization (2024-06)
 - In progress: Modern, compact, high-contrast look with blue accents (#3fa7ff)

@@ -18,8 +18,17 @@ LoopSleuth Web: Grid View Template
 <body>
     <!-- Playlist Sidebar -->
     <div id="playlist-sidebar">
-        <div class="sidebar-header">Playlists</div>
-        <div id="playlist-list"></div>
+        <div class="sidebar-header" style="display:flex;align-items:center;justify-content:space-between;">
+            <span>Playlists</span>
+            <button id="clear-playlist-filter-btn" style="display:none; margin-left:0.7em; font-size:0.93em; background:#23232a; color:#3fa7ff; border:1px solid #3fa7ff; border-radius:999px; padding:0.18em 0.9em; cursor:pointer;" tabindex="0">Clear Filter</button>
+        </div>
+        <div id="playlist-list">
+            <!-- Playlist items will be rendered by JS. Each item will have:
+                 - A checkbox for target selection (add/remove clips)
+                 - Playlist name (text)
+                 - A filter icon/button to filter the grid by this playlist
+                 Decoupling filtering from target selection for better UX. -->
+        </div>
         <button id="playlist-create-btn" class="sidebar-btn">+ New Playlist</button>
         <div id="playlist-details"></div>
     </div>
@@ -276,6 +285,8 @@ LoopSleuth Web: Grid View Template
     <script src="https://unpkg.com/clusterize.js/clusterize.min.js"></script>
 </body>
 <script src="/static/clip_actions.js"></script>
+<!-- SortableJS for drag-and-drop playlist reordering -->
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 <script>
 // Restore scroll position if returning from detail view
 window.addEventListener('DOMContentLoaded', function() {
@@ -677,54 +688,27 @@ const clusterize = new Clusterize({
     contentId: 'clip-content-area'
 });
 
-function renderClipCard(clip) {
-    return `
-        <div class="card" data-clip-id="${clip.id}" data-path="${encodeURIComponent(clip.path)}">
-            <label class="custom-checkbox-label">
-                <input type="checkbox" class="select-clip-checkbox" aria-label="Select clip ${clip.filename}" />
-                <span class="custom-checkbox"></span>
-            </label>
-            <a class="card-link" href="/clip/${clip.id}">
-                <img class="thumb" src="${clip.thumb_url || '/static/placeholder.png'}" alt="Thumbnail for ${clip.filename}" />
-            </a>
-            <div class="meta">
-                <a class="card-link" href="/clip/${clip.id}">
-                    <div class="filename">${clip.filename}</div>
-                </a>
-                ${clip.duration ? `<div class="duration">${Math.floor(clip.duration/60)}:${('0'+Math.floor(clip.duration%60)).slice(-2)} min</div>` : ''}
-                ${clip.size ? `<div class="size">${clip.size}</div>` : ''}
-                ${clip.modified_at ? `<div class="modified">${clip.modified_at.slice(0,10)} ${clip.modified_at.slice(11,16)}</div>` : ''}
-                <div class="star" style="cursor:pointer;" data-clip-id="${clip.id}" title="Toggle star">${clip.starred ? '★' : '☆'}</div>
-                <button class="pip-btn" data-clip-id="${clip.id}" title="Picture-in-Picture preview">⧉ PiP</button>
-                <video id="pip-video-${clip.id}" src="/media/${encodeURIComponent(clip.path)}" style="display:none;" muted playsinline></video>
-                <div class="tags">
-                    <span class="tags-text" id="tags-text-${clip.id}">
-                        ${clip.tags && clip.tags.length
-                            ? clip.tags.map(tag => `<span class="tag-chip">${tag}</span>`).join('')
-                            : '<span class="tag-chip tag-empty">No tags</span>'}
-                    </span>
-                    <a href="/clip/${clip.id}" class="edit-tag-btn-link" style="margin-left:0.5em; font-size:0.9em; text-decoration:none;" title="Edit tags in detail view">✎</a>
-                </div>
-            </div>
-        </div>
-    `;
-}
-
-function renderClipRows(clips, cardsPerRow = 5) {
-    let rows = [];
-    for (let i = 0; i < clips.length; i += cardsPerRow) {
-        const rowClips = clips.slice(i, i + cardsPerRow);
-        rows.push(
-            `<div class="clip-row">${rowClips.map(renderClipCard).join('')}</div>`
-        );
+// --- PATCH: Robustly re-attach selection handlers and update selection bar after every grid update ---
+function afterGridUpdate() {
+    // Attach selection handlers to all cards and checkboxes
+    if (window.attachCardEventHandlers) {
+        window.attachCardEventHandlers();
     }
-    return rows;
+    // Update selection bar and batch bar
+    if (window.updateCardSelectionUI) {
+        window.updateCardSelectionUI();
+    }
 }
 
+// --- Load more clips and always call afterGridUpdate ---
 async function loadMoreClips() {
     if (loading || allLoaded) return;
     loading = true;
-    const resp = await fetch(`/api/clips?offset=${offset}&limit=${limit}`);
+    // Build params from URL
+    const params = new URLSearchParams(window.location.search);
+    params.set('offset', offset);
+    params.set('limit', limit);
+    const resp = await fetch(`/api/clips?${params.toString()}`);
     const data = await resp.json();
     if (data.clips.length === 0) {
         allLoaded = true;
@@ -732,7 +716,7 @@ async function loadMoreClips() {
     }
     const newRows = renderClipRows(data.clips, cardsPerRow);
     clusterize.append(newRows);
-    afterGridUpdate();
+    afterGridUpdate(); // <-- Always re-attach handlers and update bar
     offset += data.clips.length;
     loading = false;
 }
@@ -783,5 +767,81 @@ scrollArea.addEventListener('scroll', function() {
         }
     });
 })();
+// --- Playlist pill badge interactivity: click to filter grid by playlist ---
+document.addEventListener('DOMContentLoaded', function() {
+    // Delegate click event for playlist pills (works for dynamically loaded cards)
+    document.body.addEventListener('click', function(e) {
+        const pill = e.target.closest('.playlist-pill');
+        if (pill && pill.dataset.playlistId) {
+            // Update URL with ?playlist_id=... and reload
+            const playlistId = pill.dataset.playlistId;
+            const params = new URLSearchParams(window.location.search);
+            params.set('playlist_id', playlistId);
+            // Remove offset for infinite scroll
+            params.delete('offset');
+            window.location.search = params.toString();
+        }
+    });
+});
+// --- Restore required grid rendering functions for Clusterize/infinite scroll ---
+function getActivePlaylistIds() {
+    const params = new URLSearchParams(window.location.search);
+    const playlistIds = [];
+    for (const [key, value] of params.entries()) {
+        if (key.startsWith('playlist_id')) {
+            playlistIds.push(value);
+        }
+    }
+    return playlistIds;
+}
+
+function renderClipCard(clip) {
+    const activePlaylistIds = getActivePlaylistIds();
+    return `
+        <div class="card" data-clip-id="${clip.id}" data-path="${encodeURIComponent(clip.path)}">
+            <label class="custom-checkbox-label">
+                <input type="checkbox" class="select-clip-checkbox" aria-label="Select clip ${clip.filename}" />
+                <span class="custom-checkbox"></span>
+            </label>
+            <a class="card-link" href="/clip/${clip.id}">
+                <img class="thumb" src="${clip.thumb_url || '/static/placeholder.png'}" alt="Thumbnail for ${clip.filename}" />
+            </a>
+            <div class="meta">
+                <a class="card-link" href="/clip/${clip.id}">
+                    <div class="filename">${clip.filename}</div>
+                </a>
+                ${clip.duration ? `<div class="duration">${Math.floor(clip.duration/60)}:${('0'+Math.floor(clip.duration%60)).slice(-2)} min</div>` : ''}
+                ${clip.size ? `<div class="size">${clip.size}</div>` : ''}
+                ${clip.modified_at ? `<div class="modified">${clip.modified_at.slice(0,10)} ${clip.modified_at.slice(11,16)}</div>` : ''}
+                <div class="star" style="cursor:pointer;" data-clip-id="${clip.id}" title="Toggle star">${clip.starred ? '★' : '☆'}</div>
+                <button class="pip-btn" data-clip-id="${clip.id}" title="Picture-in-Picture preview">⧉ PiP</button>
+                <video id="pip-video-${clip.id}" src="/media/${encodeURIComponent(clip.path)}" style="display:none;" muted playsinline></video>
+                <div class="tags">
+                    <span class="tags-text" id="tags-text-${clip.id}">
+                        ${clip.tags && clip.tags.length
+                            ? clip.tags.map(tag => `<span class="tag-chip">${tag}</span>`).join('')
+                            : '<span class="tag-chip tag-empty">No tags</span>'}
+                    </span>
+                    <a href="/clip/${clip.id}" class="edit-tag-btn-link" style="margin-left:0.5em; font-size:0.9em; text-decoration:none;" title="Edit tags in detail view">✎</a>
+                </div>
+                <!-- Playlist pill badges: highlight all active pills for selected playlists -->
+                <div class="playlists">
+                    <!-- Pills are rendered by JS in renderClipCard; do not use Jinja here. -->
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function renderClipRows(clips, cardsPerRow = 5) {
+    let rows = [];
+    for (let i = 0; i < clips.length; i += cardsPerRow) {
+        const rowClips = clips.slice(i, i + cardsPerRow);
+        rows.push(
+            `<div class="clip-row">${rowClips.map(renderClipCard).join('')}</div>`
+        );
+    }
+    return rows;
+}
 </script>
 </html> 

@@ -254,62 +254,57 @@ h1 {
     vertical-align: middle;
 }
 
+/* --- Improved grid card checkbox for selection UX --- */
 .custom-checkbox-label {
     position: absolute;
-    left: 0.5em;
-    top: 0.5em;
-    z-index: 100;
+    top: 0;
+    left: 0;
+    width: 36px;
+    height: 36px;
+    z-index: 10;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
+    justify-content: flex-start;
     cursor: pointer;
-    user-select: none;
+    /* Large hit area for easy selection */
 }
-
-.select-clip-checkbox {
+.custom-checkbox {
+    width: 28px;
+    height: 28px;
+    border: 2px solid #bbb;
+    background: #f4f4f7;
+    border-radius: 7px;
+    display: inline-block;
+    margin: 0;
+    box-shadow: 0 1px 3px #0002;
+    transition: border-color 0.15s, background 0.15s;
+}
+.custom-checkbox-label input[type="checkbox"] {
     opacity: 0;
-    width: 1.2em;
-    height: 1.2em;
+    width: 36px;
+    height: 36px;
+    margin: 0;
     position: absolute;
     left: 0;
     top: 0;
-    margin: 0;
-    z-index: 101;
+    cursor: pointer;
+    z-index: 11;
 }
-
-.custom-checkbox {
-    width: 1.2em;
-    height: 1.2em;
-    background: #23232a;
-    border: 2px solid #222;
-    border-radius: 4px;
-    display: inline-block;
-    position: relative;
-    transition: border-color 0.15s, background 0.15s;
-    box-sizing: border-box;
-}
-
+.custom-checkbox-label:hover .custom-checkbox,
 .custom-checkbox-label:focus-within .custom-checkbox {
-    outline: 2px solid #3fa7ff;
-    outline-offset: 2px;
-}
-
-.select-clip-checkbox:checked + .custom-checkbox {
-    background: #23232a;
     border-color: #3fa7ff;
+    background: #eaf6ff;
 }
-
-.select-clip-checkbox:checked + .custom-checkbox::after {
-    content: '';
-    display: block;
-    position: absolute;
-    left: 0.32em;
-    top: 0.08em;
-    width: 0.35em;
-    height: 0.7em;
-    border: solid #3fa7ff;
-    border-width: 0 0.18em 0.18em 0;
-    transform: rotate(45deg);
+.custom-checkbox-label input[type="checkbox"]:checked + .custom-checkbox {
+    background: #3fa7ff;
+    border-color: #3fa7ff;
+    box-shadow: 0 2px 8px #3fa7ff44;
 }
+/* Ensure checkbox is always above card content */
+.card {
+    position: relative;
+}
+/* Rationale: These changes make the selection checkbox the primary, most visible interaction for multi-select, with a large, accessible hit area flush to the upper left. */
 
 #selected-clips-bar {
     min-height: 2em;
@@ -670,4 +665,83 @@ button:hover, button:focus, input[type="submit"]:hover, input[type="submit"]:foc
 #clip-content-area .thumb {
   width: var(--thumb-size, 120px) !important;
   height: calc(var(--thumb-size, 120px) * 0.566) !important;
+}
+
+/* Playlist pill badges for grid cards */
+.playlist-pill {
+    display: inline-block;
+    background: #3fa7ff;
+    color: #fff;
+    border-radius: 999px;
+    padding: 0.08em 0.7em;
+    margin: 0 0.08em 0.08em 0;
+    font-size: 0.85em;
+    line-height: 1.3;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    box-shadow: 0 1px 4px #0002;
+    border: none;
+    cursor: default;
+    user-select: none;
+    transition: background 0.15s, color 0.15s;
+}
+
+.meta .playlists {
+    margin-top: 0.18em;
+    margin-bottom: 0.1em;
+    min-height: 1.2em;
+    text-align: center;
+    white-space: nowrap;
+    overflow-x: auto;
+}
+
+.playlist-pill-active {
+    background: #1a6fff !important;
+    color: #fff !important;
+    font-weight: 800;
+    box-shadow: 0 0 0 2px #3fa7ff88, 0 2px 8px #0004;
+    border: 2px solid #3fa7ff !important;
+    outline: none;
+    z-index: 2;
+    position: relative;
+    transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+}
+
+#clear-playlist-filter-btn {
+    background: #23232a;
+    color: #3fa7ff;
+    border: 1.5px solid #3fa7ff;
+    border-radius: 999px;
+    padding: 0.18em 0.9em;
+    font-size: 0.93em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border 0.15s;
+    outline: none;
+}
+#clear-playlist-filter-btn:focus, #clear-playlist-filter-btn:hover {
+    background: #3fa7ff;
+    color: #fff;
+    border-color: #3fa7ff;
+}
+
+/* Playlist sidebar multi-select checkboxes */
+.playlist-checkbox {
+    margin-right: 0.5em;
+    accent-color: #3fa7ff;
+    cursor: pointer;
+    vertical-align: middle;
+}
+.playlist-item.selected-multi {
+    background: #3fa7ff33 !important;
+    color: #3fa7ff !important;
+    font-weight: 700;
+    border-left: 4px solid #3fa7ff;
+}
+
+/* Highlight effect for clips just added to a playlist (see clip_actions.js) */
+.playlist-added-highlight {
+    box-shadow: 0 0 0 4px #3fa7ffcc, 0 2px 12px #000a;
+    background: #1a6fff22 !important;
+    transition: box-shadow 0.3s, background 0.3s;
 } 
