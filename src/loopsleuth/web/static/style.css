@@ -39,6 +39,8 @@ h1 {
     gap: 0.7em;
     margin-top: 1em;
     width: 100%;
+    margin-left: 0.7em;
+    box-sizing: border-box;
 }
 
 .card, .card.selected {
@@ -60,8 +62,9 @@ h1 {
     border: 1.5px solid #23232a;
     flex: 1 1 0;
     min-width: 180px;
-    max-width: 1fr;
+    max-width: 100%;
     box-sizing: border-box;
+    overflow: hidden;
 }
 
 .card-hover {
@@ -97,6 +100,8 @@ h1 {
     width: 100%;
     text-align: center;
     margin-top: 0.1em;
+    overflow: hidden;
+    word-break: break-word;
 }
 
 .filename {
@@ -105,6 +110,11 @@ h1 {
     color: #bbb;
     font-size: 0.98em;
     letter-spacing: 0.01em;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: block;
 }
 
 .star {
@@ -120,6 +130,7 @@ h1 {
     max-width: 100%;
     overflow-x: auto;
     white-space: nowrap;
+    text-overflow: ellipsis;
 }
 
 .tag-chip {
@@ -133,6 +144,11 @@ h1 {
     line-height: 1.3;
     font-weight: 500;
     border: 1px solid #222;
+    max-width: 100px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: bottom;
 }
 
 .tag-chip.tag-empty {
@@ -161,24 +177,30 @@ h1 {
     line-height: 1;
 }
 
-#batch-action-bar, #selected-clips-bar {
+#batch-action-bar,
+#selected-clips-bar {
     position: fixed;
     left: 0;
     right: 0;
-    bottom: 0;
-    background: #181a1bee;
-    border-top: 1.5px solid #222;
-    box-shadow: 0 -2px 16px #000b;
-    padding: 0.3em 0.5em;
+    width: 100vw;
+    border-top: 2.5px solid #444;
+    box-shadow: 0 -2px 24px #000b, 0 -1px 0 #222, 0 0 12px 2px #2228;
+    background: #20222aee !important;
+    transition: box-shadow 0.18s, border 0.18s, background 0.18s;
     display: flex;
     align-items: center;
     gap: 0.5em;
-    z-index: 2100;
-    font-size: 0.89em;
-    color: #bbb;
-    min-height: 1.7em;
-    transition: background 0.18s, border 0.18s;
-    flex-wrap: wrap;
+    min-height: 2.2em;
+    padding: 0.3em 0.5em;
+    z-index: 3200;
+}
+#batch-action-bar {
+    bottom: 2.4em; /* stack above selected-clips-bar */
+    z-index: 3100;
+}
+#selected-clips-bar {
+    bottom: 0;
+    z-index: 3200;
 }
 
 #batch-action-bar .batch-bar-section, #selected-clips-bar .selected-bar-section {
@@ -254,230 +276,6 @@ h1 {
     vertical-align: middle;
 }
 
-/* --- Improved grid card checkbox for selection UX --- */
-.custom-checkbox-label {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 36px;
-    height: 36px;
-    z-index: 10;
-    display: flex;
-    align-items: flex-start;
-    justify-content: flex-start;
-    cursor: pointer;
-    /* Large hit area for easy selection */
-}
-.custom-checkbox {
-    width: 28px;
-    height: 28px;
-    border: 2px solid #bbb;
-    background: #f4f4f7;
-    border-radius: 7px;
-    display: inline-block;
-    margin: 0;
-    box-shadow: 0 1px 3px #0002;
-    transition: border-color 0.15s, background 0.15s;
-}
-.custom-checkbox-label input[type="checkbox"] {
-    opacity: 0;
-    width: 36px;
-    height: 36px;
-    margin: 0;
-    position: absolute;
-    left: 0;
-    top: 0;
-    cursor: pointer;
-    z-index: 11;
-}
-.custom-checkbox-label:hover .custom-checkbox,
-.custom-checkbox-label:focus-within .custom-checkbox {
-    border-color: #3fa7ff;
-    background: #eaf6ff;
-}
-.custom-checkbox-label input[type="checkbox"]:checked + .custom-checkbox {
-    background: #3fa7ff;
-    border-color: #3fa7ff;
-    box-shadow: 0 2px 8px #3fa7ff44;
-}
-/* Ensure checkbox is always above card content */
-.card {
-    position: relative;
-}
-/* Rationale: These changes make the selection checkbox the primary, most visible interaction for multi-select, with a large, accessible hit area flush to the upper left. */
-
-#selected-clips-bar {
-    min-height: 2em;
-    padding: 0.32em 0.7em;
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 2100;
-    background: #181a1bee;
-    border-top: 1.5px solid #222;
-    border-bottom: none;
-}
-
-#batch-action-bar {
-    display: flex !important;
-    min-height: 2em;
-    padding: 0.55em 1.1em 1.2em 1.1em;
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 2em;
-    z-index: 2200;
-    max-height: 30vh;
-    overflow-y: auto;
-    background: #181a1bee;
-    border-top: none;
-    border-bottom: 1.5px solid #222;
-    box-shadow: 0 -4px 24px #000c, 0 0 0 2px #3fa7ff33;
-}
-
-@media (max-width: 700px) {
-    .container { max-width: 100vw; }
-    .grid { grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 0.3em; }
-    .card { padding: 0.2em; min-height: 80px; font-size: 0.85em; }
-    #selected-clips-bar, #batch-action-bar { font-size: 0.81em; padding: 0.15em 0.1em; }
-}
-
-/* Custom dark scrollbar for tags and scrollable elements */
-.tags, .tag-chip, .tags-edit, .batch-bar-section, .container, .grid {
-  scrollbar-width: thin;
-  scrollbar-color: #23232a #181a1b;
-}
-
-/* For Webkit browsers (Chrome, Edge, Safari) */
-.tags::-webkit-scrollbar,
-.tag-chip::-webkit-scrollbar,
-.tags-edit::-webkit-scrollbar,
-.batch-bar-section::-webkit-scrollbar,
-.container::-webkit-scrollbar,
-.grid::-webkit-scrollbar {
-  height: 7px;
-  width: 7px;
-  background: #181a1b;
-}
-.tags::-webkit-scrollbar-thumb,
-.tag-chip::-webkit-scrollbar-thumb,
-.tags-edit::-webkit-scrollbar-thumb,
-.batch-bar-section::-webkit-scrollbar-thumb,
-.container::-webkit-scrollbar-thumb,
-.grid::-webkit-scrollbar-thumb {
-  background: #23232a;
-  border-radius: 6px;
-  border: 1px solid #222;
-}
-.tags::-webkit-scrollbar-thumb:hover,
-.tag-chip::-webkit-scrollbar-thumb:hover,
-.tags-edit::-webkit-scrollbar-thumb:hover,
-.batch-bar-section::-webkit-scrollbar-thumb:hover,
-.container::-webkit-scrollbar-thumb:hover,
-.grid::-webkit-scrollbar-thumb:hover {
-  background: #23232a;
-  border-color: #3fa7ff;
-}
-
-/* Playlist Sidebar Styles */
-#playlist-sidebar {
-  width: 260px;
-  min-width: 260px;
-  max-width: 260px;
-  height: 100vh;
-  position: relative;
-  z-index: 2100;
-  flex-shrink: 0;
-  background: #181a1b;
-  color: #e0e6ef;
-  border-right: 1px solid #222;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 2px 0 8px #000a;
-  font-size: 1em;
-  box-sizing: border-box;
-}
-.sidebar-header {
-  font-weight: bold;
-  font-size: 1.15em;
-  padding: 1.1em 1.2em 0.7em 1.2em;
-  letter-spacing: 0.04em;
-  color: #bbb;
-  border-bottom: 1px solid #222;
-}
-#playlist-list {
-  flex: 0 0 auto;
-  padding: 0.7em 1.2em 0.7em 1.2em;
-  overflow-y: auto;
-  max-height: 30vh;
-}
-#playlist-list .playlist-item {
-  padding: 0.4em 0.2em;
-  cursor: pointer;
-  border-radius: 4px;
-  transition: background 0.15s;
-  margin-bottom: 2px;
-}
-#playlist-list .playlist-item.selected {
-  background: #232b36;
-  color: #bbb;
-}
-#playlist-list .playlist-item:hover {
-  background: #222c3a;
-}
-.sidebar-btn {
-  margin: 0.5em 1.2em 0.5em 1.2em;
-  padding: 0.5em 1em;
-  background: #232b36;
-  color: #bbb;
-  border: none;
-  border-radius: 4px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-}
-.sidebar-btn:hover {
-  background: #3fa7ff;
-  color: #181a1b;
-}
-#playlist-details {
-  flex: 1 1 auto;
-  padding: 1em 1.2em;
-  overflow-y: auto;
-  border-top: 1px solid #222;
-  font-size: 0.98em;
-}
-
-@media (max-width: 900px) {
-  body {
-    flex-direction: column;
-  }
-  #playlist-sidebar {
-    width: 100%;
-    min-width: 0;
-    max-width: 100vw;
-    height: auto;
-    min-height: 60px;
-    max-height: 120px;
-    box-shadow: none;
-    border-right: none;
-    border-bottom: 1px solid #222;
-    flex-direction: row;
-    position: static;
-  }
-  .container {
-    max-width: 100vw;
-  }
-}
-
-/* Clearfix for .container if needed */
-.container::after {
-  content: "";
-  display: table;
-  clear: both;
-}
-
 /* --- Layout Robustness: Sidebar/Grid --- */
 html, body {
     height: 100%;
@@ -498,17 +296,22 @@ body {
     left: 0;
     width: 260px;
     height: 100vh;
-    background: #181a1b;
-    z-index: 2100;
+    background: linear-gradient(180deg, #181a1b 80%, #20232a 100%);
+    z-index: 1800;
     box-sizing: border-box;
-    /* ...rest of your sidebar styles... */
+    box-shadow: 6px 0 32px 0 #000b, 2px 0 0 0 #23232a, 16px 0 40px -8px #3fa7ff22;
+    border-right: 1px solid #23232a;
 }
 
 .container {
-    margin-left: 260px !important; /* Force margin to avoid overlap */
-    max-width: calc(100vw - 260px);
+    margin-left: 276px !important;
+    max-width: calc(100vw - 276px);
     box-sizing: border-box;
-    /* ...rest of your container styles... */
+}
+
+.grid {
+    margin-left: 0.7em;
+    box-sizing: border-box;
 }
 
 @media (max-width: 900px) {
@@ -522,6 +325,7 @@ body {
         border-right: none;
         border-bottom: 1px solid #222;
         flex-direction: row;
+        z-index: 2200;
     }
     .container {
         margin-left: 0 !important;
@@ -548,6 +352,18 @@ body {
     font-weight: 600;
     border: 1.5px solid #3fa7ff;
     letter-spacing: 0.01em;
+    box-shadow: 0 2px 8px #3fa7ff22;
+    padding-left: 1.6em;
+    position: relative;
+}
+.playlist-badge::before {
+    content: "\1F3B5"; /* Unicode for musical note */
+    position: absolute;
+    left: 0.5em;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.9em;
+    opacity: 0.7;
 }
 .playlist-badge.playlist-empty {
     background: #181a1b;
@@ -661,6 +477,7 @@ button:hover, button:focus, input[type="submit"]:hover, input[type="submit"]:foc
   gap: 1em;
   margin-bottom: 1em;
   width: 100%;
+  overflow: hidden;
 }
 #clip-content-area .thumb {
   width: var(--thumb-size, 120px) !important;
@@ -744,4 +561,127 @@ button:hover, button:focus, input[type="submit"]:hover, input[type="submit"]:foc
     box-shadow: 0 0 0 4px #3fa7ffcc, 0 2px 12px #000a;
     background: #1a6fff22 !important;
     transition: box-shadow 0.3s, background 0.3s;
+}
+
+/* --- Custom Checkbox Styling --- */
+.custom-checkbox-label {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 36px;
+    height: 36px;
+    z-index: 10;
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-start;
+    cursor: pointer;
+}
+.custom-checkbox {
+    width: 28px;
+    height: 28px;
+    border: 1.5px solid #23232a;
+    background: #16171a;
+    border-radius: 7px;
+    display: inline-block;
+    margin: 0;
+    box-shadow: 0 1px 4px #0006;
+    transition: border-color 0.15s, background 0.15s;
+    position: relative;
+}
+.custom-checkbox-label input[type="checkbox"] {
+    opacity: 0;
+    width: 36px;
+    height: 36px;
+    margin: 0;
+    position: absolute;
+    left: 0;
+    top: 0;
+    cursor: pointer;
+    z-index: 11;
+}
+.custom-checkbox-label:hover .custom-checkbox,
+.custom-checkbox-label:focus-within .custom-checkbox {
+    border-color: #3fa7ff;
+    background: #23232a;
+}
+.custom-checkbox-label input[type="checkbox"]:checked + .custom-checkbox {
+    background: #23232a;
+    border-color: #3fa7ff;
+    box-shadow: 0 2px 8px #3fa7ff44;
+}
+.custom-checkbox::after {
+    content: '';
+    display: none;
+    position: absolute;
+    left: 7px;
+    top: 4px;
+    width: 10px;
+    height: 16px;
+    border-right: 2.5px solid #3fa7ff;
+    border-bottom: 2.5px solid #3fa7ff;
+    transform: rotate(35deg);
+    opacity: 0.95;
+}
+.custom-checkbox-label input[type="checkbox"]:checked + .custom-checkbox::after {
+    display: block;
+}
+/* Remove default outline for checkbox, rely on border and shadow */
+.custom-checkbox:focus {
+    outline: none;
+}
+
+@media (max-width: 900px) {
+    #batch-action-bar,
+    #selected-clips-bar {
+        width: 100vw;
+        margin-left: 0;
+    }
+}
+
+/* --- Sidebar Professional Enhancements (2024-06) --- */
+/* Playlist item: hover/selected state with left accent */
+#playlist-list .playlist-item {
+    padding: 0.5em 1em;
+    border-left: 3px solid transparent;
+    border-radius: 6px;
+    transition: background 0.18s, border-color 0.18s;
+}
+#playlist-list .playlist-item:hover,
+#playlist-list .playlist-item.selected {
+    background: #23243a;
+    border-left: 3px solid #3fa7ff;
+}
+
+/* Playlist name: improved typography */
+#playlist-list .playlist-name {
+    font-weight: 500;
+    letter-spacing: 0.03em;
+    font-size: 1.04em;
+    color: #e0e6ef;
+}
+
+/* Sidebar button: icon + text, consistent sizing */
+.sidebar-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5em;
+    width: 90%;
+    margin: 0.7em auto 0 auto;
+    font-weight: 600;
+    font-size: 1em;
+    padding: 0.5em 0;
+}
+.sidebar-btn::before {
+    content: "+";
+    font-size: 1.2em;
+    color: #3fa7ff;
+    margin-right: 0.3em;
+}
+
+/* Accessibility: clear focus ring for all sidebar interactive elements */
+#playlist-sidebar button:focus, #playlist-sidebar input:focus, #playlist-sidebar .playlist-item:focus {
+    outline: 2px solid #3fa7ff;
+    outline-offset: 2px;
+    z-index: 2;
 } 
