@@ -18,6 +18,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **Fixed 500 Internal Server Error caused by Jinja referencing 'clip' outside of a valid context.**
 - **All core playlist, tagging, and selection workflows are robust and production-ready.**
 - **This is a stable handoff point for onboarding or further development.**
+- Sidebar playlist items now use flexbox for perfect alignment; filter icon always stays aligned, even for long names.
+- Playlist names are truncated with ellipsis and show a tooltip on hover.
+- Active playlist filter is visually highlighted with a blue bar, without shifting content.
+- Grid checkboxes are now absolutely positioned in the upper-left of each card, with a modern, minimal look.
+- Grid card selection state uses a soft blue border and background, with smooth transitions (no debug outlines).
+- General sidebar and grid UI/UX polish for a more professional, Notch-inspired look.
 
 ## [1.2.0] - 2025-04-26
 
