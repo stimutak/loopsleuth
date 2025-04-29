@@ -954,6 +954,7 @@ function renderPlaylistSidebar(cbAfter) {
                 const nameSpan = document.createElement('span');
                 nameSpan.textContent = pl.name;
                 nameSpan.className = 'playlist-name';
+                nameSpan.title = pl.name;
                 nameSpan.style.marginLeft = '0.5em';
                 item.appendChild(nameSpan);
                 // --- Filter icon/button ---
@@ -986,6 +987,13 @@ function renderPlaylistSidebar(cbAfter) {
                 }
                 listDiv.appendChild(item);
             });
+            // --- Highlight the currently filtered playlist ---
+            const params = new URLSearchParams(window.location.search);
+            const activeFilterId = params.get('playlist_id');
+            if (activeFilterId) {
+                const activeItem = listDiv.querySelector(`.playlist-item[data-playlist-id="${activeFilterId}"]`);
+                if (activeItem) activeItem.classList.add('active-filter');
+            }
             if (cbAfter) cbAfter();
         });
     createBtn.onclick = () => {

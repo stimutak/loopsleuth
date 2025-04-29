@@ -65,6 +65,8 @@ h1 {
     max-width: 100%;
     box-sizing: border-box;
     overflow: hidden;
+    padding-top: 1.2em; /* space for checkbox */
+    padding-left: 0.2em;
 }
 
 .card-hover {
@@ -76,10 +78,10 @@ h1 {
 
 .card.selected {
     border: 2px solid #3fa7ff;
-    background: rgba(63, 167, 255, 0.13);
-    box-shadow: 0 0 0 2px #3fa7ff33;
-    outline: 3px solid #ff00ff !important; /* DEBUG: strong magenta outline for selection */
-    transition: border 0.15s, background 0.15s, box-shadow 0.15s, outline 0.15s;
+    background: rgba(63, 167, 255, 0.08);
+    box-shadow: 0 0 0 2px #3fa7ff22;
+    outline: none !important;
+    transition: border 0.15s, background 0.15s, box-shadow 0.15s;
 }
 
 .thumb {
@@ -290,17 +292,111 @@ body {
     overflow-x: hidden;
 }
 
+/* --- Notch/Cursor-Inspired Floating Sidebar (2024-06) --- */
 #playlist-sidebar {
     position: fixed;
-    top: 0;
-    left: 0;
-    width: 260px;
-    height: 100vh;
-    background: linear-gradient(180deg, #181a1b 80%, #20232a 100%);
-    z-index: 1800;
+    top: 2.2em; /* leave space for header, if any */
+    left: 1.2em;
+    width: 210px;
+    height: calc(100vh - 2.4em);
+    background: rgba(24,26,27,0.92);
+    border-radius: 18px;
+    box-shadow: 0 8px 32px #000b, 0 1.5px 0 #23232a, 0 0 0 1.5px #23232a;
+    border: none;
+    backdrop-filter: blur(8px);
+    z-index: 2000;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transition: box-shadow 0.18s, background 0.18s, border-radius 0.18s, left 0.18s, width 0.18s;
+}
+@media (max-width: 900px) {
+    #playlist-sidebar {
+        position: static;
+        width: 100vw;
+        height: auto;
+        min-height: 60px;
+        max-height: 120px;
+        border-radius: 0;
+        left: 0;
+        top: 0;
+        margin: 0;
+        box-shadow: none;
+        backdrop-filter: none;
+    }
+}
+.sidebar-header {
+    text-align: left;
+    padding-left: 1.2em;
+    padding-right: 0;
+    font-size: 0.89em;
+    font-weight: 400;
+    letter-spacing: 0.16em;
+    color: #3fa7ff;
+    text-transform: uppercase;
+    padding: 1.1em 1.2em 0.5em 1.2em;
+    opacity: 0.78;
+    background: none;
+    border: none;
+}
+#playlist-list .playlist-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    padding-left: 1.1em;
     box-sizing: border-box;
-    box-shadow: 6px 0 32px 0 #000b, 2px 0 0 0 #23232a, 16px 0 40px -8px #3fa7ff22;
-    border-right: 1px solid #23232a;
+    position: relative;
+}
+#playlist-list .playlist-name {
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+.playlist-filter-btn {
+    flex: 0 0 auto;
+    margin-left: 0.5em;
+    display: flex;
+    align-items: center;
+}
+#playlist-list .playlist-item.active-filter {
+    color: #3fa7ff;
+    font-weight: 600;
+}
+#playlist-list .playlist-item.active-filter::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: #3fa7ff;
+    border-radius: 3px;
+}
+.sidebar-btn {
+    justify-content: flex-start;
+    text-align: left;
+    margin-left: 1.2em;
+    margin-right: 0;
+    width: calc(100% - 2.4em);
+    border-radius: 999px;
+    background: #23232a;
+    color: #3fa7ff;
+    font-weight: 600;
+    font-size: 1em;
+    padding: 0.5em 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    box-shadow: 0 2px 8px #0002;
+    transition: background 0.15s, color 0.15s;
+}
+.sidebar-btn:hover, .sidebar-btn:focus {
+    background: #3fa7ff;
+    color: #181a1b;
 }
 
 .container {
@@ -563,60 +659,35 @@ button:hover, button:focus, input[type="submit"]:hover, input[type="submit"]:foc
     transition: box-shadow 0.3s, background 0.3s;
 }
 
-/* --- Custom Checkbox Styling --- */
-.custom-checkbox-label {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 36px;
-    height: 36px;
-    z-index: 10;
-    display: flex;
-    align-items: flex-start;
-    justify-content: flex-start;
-    cursor: pointer;
-}
+/* --- Custom Checkbox Redesign: Sidebar & Grid (2024-06) --- */
 .custom-checkbox {
-    width: 28px;
-    height: 28px;
-    border: 1.5px solid #23232a;
-    background: #16171a;
-    border-radius: 7px;
+    width: 22px;
+    height: 22px;
+    border: 1.5px solid #444;
+    background: #181a1b;
+    border-radius: 6px;
     display: inline-block;
-    margin: 0;
-    box-shadow: 0 1px 4px #0006;
     transition: border-color 0.15s, background 0.15s;
     position: relative;
+    box-shadow: 0 1px 2px #0003;
 }
-.custom-checkbox-label input[type="checkbox"] {
-    opacity: 0;
-    width: 36px;
-    height: 36px;
-    margin: 0;
-    position: absolute;
-    left: 0;
-    top: 0;
-    cursor: pointer;
-    z-index: 11;
-}
-.custom-checkbox-label:hover .custom-checkbox,
-.custom-checkbox-label:focus-within .custom-checkbox {
-    border-color: #3fa7ff;
+.custom-checkbox-label input[type="checkbox"]:focus + .custom-checkbox,
+.custom-checkbox-label:hover .custom-checkbox {
+    border-color: #3fa7ff88;
     background: #23232a;
 }
 .custom-checkbox-label input[type="checkbox"]:checked + .custom-checkbox {
-    background: #23232a;
-    border-color: #3fa7ff;
-    box-shadow: 0 2px 8px #3fa7ff44;
+    background: #23243a;
+    border-color: #3fa7ffcc;
 }
 .custom-checkbox::after {
     content: '';
     display: none;
     position: absolute;
-    left: 7px;
-    top: 4px;
-    width: 10px;
-    height: 16px;
+    left: 5px;
+    top: 2px;
+    width: 8px;
+    height: 14px;
     border-right: 2.5px solid #3fa7ff;
     border-bottom: 2.5px solid #3fa7ff;
     transform: rotate(35deg);
@@ -624,10 +695,6 @@ button:hover, button:focus, input[type="submit"]:hover, input[type="submit"]:foc
 }
 .custom-checkbox-label input[type="checkbox"]:checked + .custom-checkbox::after {
     display: block;
-}
-/* Remove default outline for checkbox, rely on border and shadow */
-.custom-checkbox:focus {
-    outline: none;
 }
 
 @media (max-width: 900px) {
@@ -638,50 +705,42 @@ button:hover, button:focus, input[type="submit"]:hover, input[type="submit"]:foc
     }
 }
 
-/* --- Sidebar Professional Enhancements (2024-06) --- */
-/* Playlist item: hover/selected state with left accent */
-#playlist-list .playlist-item {
-    padding: 0.5em 1em;
-    border-left: 3px solid transparent;
-    border-radius: 6px;
-    transition: background 0.18s, border-color 0.18s;
-}
-#playlist-list .playlist-item:hover,
-#playlist-list .playlist-item.selected {
-    background: #23243a;
-    border-left: 3px solid #3fa7ff;
-}
-
 /* Playlist name: improved typography */
 #playlist-list .playlist-name {
-    font-weight: 500;
-    letter-spacing: 0.03em;
-    font-size: 1.04em;
-    color: #e0e6ef;
-}
-
-/* Sidebar button: icon + text, consistent sizing */
-.sidebar-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5em;
-    width: 90%;
-    margin: 0.7em auto 0 auto;
-    font-weight: 600;
-    font-size: 1em;
-    padding: 0.5em 0;
-}
-.sidebar-btn::before {
-    content: "+";
-    font-size: 1.2em;
-    color: #3fa7ff;
-    margin-right: 0.3em;
+    display: inline-block;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: middle;
 }
 
 /* Accessibility: clear focus ring for all sidebar interactive elements */
 #playlist-sidebar button:focus, #playlist-sidebar input:focus, #playlist-sidebar .playlist-item:focus {
     outline: 2px solid #3fa7ff;
     outline-offset: 2px;
+    z-index: 2;
+}
+
+/* --- Restore Custom Checkbox Label Styles (2024-06) --- */
+.custom-checkbox-label {
+    position: absolute;
+    top: 0.5em;
+    left: 0.5em;
+    z-index: 10;
+    display: flex;
+    align-items: flex-start;
+    width: 22px;
+    height: 22px;
+}
+.custom-checkbox-label input[type="checkbox"] {
+    opacity: 0;
+    width: 22px;
+    height: 22px;
+    margin: 0;
+    position: absolute;
+    left: 0;
+    top: 0;
+    cursor: pointer;
     z-index: 2;
 } 
