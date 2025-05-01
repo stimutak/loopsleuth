@@ -1,13 +1,64 @@
 # LoopSleuth
 
-> **Note (2025-04-22 to 2025-04-26): Major UI/UX improvements and handoff readiness**
-> - Favicons are now present on all pages (grid, detail, error, 404) for consistent branding.
-> - A persistent, real-time thumbnail size slider is available above the grid view (per-browser persistence).
-> - The detail view features fully custom video controls (play/pause, seek, frame step, volume) in addition to native controls.
-> - All forms and buttons use a modern, thin, Notch-inspired typographic style for a clean, creative look.
-> - The "Open in System" feature selects files in Explorer/Finder or opens the folder on Linux.
-> - All major UI/UX changes are documented in `BUG_HANDBOOK.md` for handoff/debug.
-> - See `CHANGELOG.md` for a detailed, date-accurate version history and recent changes.
+## Overview
+LoopSleuth is a modern, production-ready web app for creative video library management, inspired by Notch, TouchDesigner, and Cursor. It features a robust, dark UI, advanced batch selection and tagging, playlist management, and seamless creative workflows.
+
+## Key Features (2024-06)
+- **Grid View:** Infinite scroll, responsive multi-column layout, and robust selection logic (single, Ctrl/Cmd, Shift+Click for multi/range select).
+- **Playlist Pills:** Interactive playlist badges on each grid card, with instant add/remove and visual feedback. Pills are fully accessible and support direct removal from the grid.
+- **Batch Actions:** Floating batch bar for tag add/remove/clear, with chip-style input, autocomplete, and keyboard accessibility. All actions are robust to DOM changes and large libraries.
+- **Detail View:** Notch/Cursor-inspired glassmorphic sidebar, large video preview, and modern metadata/tags/playlists. Fully accessible and responsive.
+- **Sidebar:** Playlist management (create, select, filter, reorder), with decoupled selection/filtering and instant feedback.
+- **Export/Copy:** Export selected clips to keepers.txt or copy/move to a folder, with robust error handling and feedback.
+- **Preview Grid:** Floating overlay for multi-clip video preview, adaptive grid layout, and custom controls.
+- **Tag System:** Normalized tags, chip-style editing, and batch/single-clip parity. All tag changes are persisted and reflected instantly.
+- **Production-Ready:** All core workflows are robust, accessible, and tested. See CHANGELOG.md for details.
+
+## Selection UX
+- **Single click:** Selects only the clicked card (sets anchor).
+- **Ctrl/Cmd+Click:** Toggles selection of a card (multi-select, does not update anchor).
+- **Shift+Click:** Selects a range from anchor to clicked card (updates anchor).
+- **Checkboxes:** Support all selection modes, robust to DOM changes.
+- **Selection Bar:** Always visible, with batch actions, preview, and playlist controls.
+
+## Playlist Pills
+- Pills show all playlists a clip belongs to, with color/hover feedback.
+- Remove a clip from a playlist directly from the grid (✖ button on pill).
+- Pills are accessible, keyboard-navigable, and update instantly.
+
+## Handoff & Onboarding
+- See `TODO.md` for next steps, creative/technical enhancements, and open issues.
+- See `STARTUP_MESSAGE.md` for a full project state, onboarding checklist, and handoff notes.
+- All code is modular, maintainable, and ready for further creative/production workflows.
+- For new contributors: review the last commits, TODO.md, and STARTUP_MESSAGE.md for context and next actions.
+
+## Contributing
+- Fork the repo and create a feature branch for your changes.
+- Follow the coding style and documentation patterns in the codebase.
+- Run tests with `pytest` (see below) before submitting a PR.
+- Document all new features and changes in CHANGELOG.md.
+
+## Running & Testing
+- Install requirements: `pip install -r requirements.txt`
+- Start the server: `python src/loopsleuth/web/app.py`
+- Open the app at `http://localhost:8000`
+- Run tests: `pytest --maxfail=3 --disable-warnings -q`
+
+## File Locations
+- Grid: `src/loopsleuth/web/templates/grid.html`
+- Detail: `src/loopsleuth/web/templates/clip_detail.html`
+- JS: `src/loopsleuth/web/static/clip_actions.js`
+- CSS: `src/loopsleuth/web/static/style.css`
+- Backend: `src/loopsleuth/web/app.py`
+- Tests: `tests/`
+
+## Support & Handoff
+- For onboarding, see `STARTUP_MESSAGE.md` and `TODO.md`.
+- For bug reports, see `BUG_HANDBOOK.md`.
+- For roadmap and creative ideas, see `ROADMAP.md`.
+
+---
+_Last update: 2024-06-XX_
 
 ## 🚦 Handoff & Next Steps (2024-06)
 - **Production-ready:**

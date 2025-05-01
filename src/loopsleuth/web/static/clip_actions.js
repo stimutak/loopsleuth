@@ -429,6 +429,26 @@ function showToast(message, isError = false) {
     setTimeout(() => { toast.style.opacity = 0; }, 2200);
 }
 
+// --- Always available: updateCardSelectionUI for card/checkbox selection ---
+function updateCardSelectionUI() {
+    console.log('[updateCardSelectionUI] called');
+    document.querySelectorAll('.card[data-clip-id]').forEach(card => {
+        const clipId = card.getAttribute('data-clip-id');
+        const checkbox = card.querySelector('.select-clip-checkbox');
+        if (selectedClipIds.has(clipId)) {
+            card.classList.add('selected');
+            checkbox.checked = true;
+        } else {
+            card.classList.remove('selected');
+            checkbox.checked = false;
+        }
+    });
+    // Show/hide batch action bar and render controls
+    if (typeof renderBatchActionBar === 'function') renderBatchActionBar();
+    if (typeof syncBatchRemoveTagsWithSelection === 'function') syncBatchRemoveTagsWithSelection();
+    if (typeof renderSelectedClipsBar === 'function') renderSelectedClipsBar();
+}
+
 if (document.getElementById('batch-action-bar')) {
     // --- Batch selection: checkbox and card click
     function renderBatchTagChips(type) {
@@ -836,38 +856,20 @@ if (document.getElementById('batch-action-bar')) {
             });
         };
     }
-    function updateCardSelectionUI() {
-        console.log('[updateCardSelectionUI] called');
-        document.querySelectorAll('.card[data-clip-id]').forEach(card => {
-            const clipId = card.getAttribute('data-clip-id');
-            const checkbox = card.querySelector('.select-clip-checkbox');
-            if (selectedClipIds.has(clipId)) {
-                card.classList.add('selected');
-                checkbox.checked = true;
-            } else {
-                card.classList.remove('selected');
-                checkbox.checked = false;
-            }
-        });
-        // Show/hide batch action bar and render controls
-        renderBatchActionBar();
-        syncBatchRemoveTagsWithSelection();
-        renderSelectedClipsBar();
-    }
-
-    document.addEventListener('DOMContentLoaded', function() {
-        // --- Removed redundant card event handler block ---
-        // All card event handlers (selection, checkbox, PiP, etc.) are now attached exclusively
-        // via afterGridUpdate() and attachCardEventHandlers() for robustness and maintainability.
-        // See the end of this file for afterGridUpdate definition and usage.
-        //
-        // This prevents duplicate handlers and ensures consistent selection logic after grid updates.
-        //
-        // If you need to add new per-card logic, do so in attachCardEventHandlers().
-        //
-        // (No card selection logic here.)
-    });
 }
+
+document.addEventListener('DOMContentLoaded', function() {
+    // --- Removed redundant card event handler block ---
+    // All card event handlers (selection, checkbox, PiP, etc.) are now attached exclusively
+    // via afterGridUpdate() and attachCardEventHandlers() for robustness and maintainability.
+    // See the end of this file for afterGridUpdate definition and usage.
+    //
+    // This prevents duplicate handlers and ensures consistent selection logic after grid updates.
+    //
+    // If you need to add new per-card logic, do so in attachCardEventHandlers().
+    //
+    // (No card selection logic here.)
+});
 
 // --- Utility: Render static tag chips for a clip (used by both grid and detail views) ---
 function renderTagChips(clipId, tags) {
@@ -1435,15 +1437,13 @@ function attachCardEventHandlers() {
         card.addEventListener('blur', () => card.classList.remove('card-hover'));
         // Card-wide click for selection (except on links/buttons/inputs/checkboxes/PiP)
         card.addEventListener('click', function(e) {
-            e.preventDefault(); // Prevent default browser behavior
             const clipId = card.getAttribute('data-clip-id');
-            // Only skip if the target is a link, button, input, or certain controls
-            if (e.target.closest('a,button,input,.pip-btn,.custom-checkbox,.select-clip-checkbox')) return;
-            // --- Selection logic with Cmd/Ctrl+Click enabled for testing ---
             const allCards = Array.from(document.querySelectorAll('.card[data-clip-id]'));
             const idx = allCards.indexOf(card);
             const isShift = e.shiftKey;
-            const isCtrl = e.ctrlKey || e.metaKey; // Enable Cmd/Ctrl+Click for multi-select
+            const isCtrl = e.ctrlKey || e.metaKey;
+            const isLink = !!e.target.closest('a');
+
             if (isShift && lastSelectedIndex !== null) {
                 // Shift+Click: range select
                 const [start, end] = [lastSelectedIndex, idx].sort((a, b) => a - b);
@@ -1452,33 +1452,58 @@ function attachCardEventHandlers() {
                 }
                 lastSelectedIndex = idx;
             } else if (isCtrl) {
-                // Cmd/Ctrl+Click: toggle selection, never clear all
+                // Ctrl/Cmd+Click: toggle selection, do not update anchor
                 if (selectedClipIds.has(clipId)) {
                     selectedClipIds.delete(clipId);
                 } else {
                     selectedClipIds.add(clipId);
                 }
-                // Do not update lastSelectedIndex (keeps anchor for shift+click)
+                // Do not update lastSelectedIndex
             } else {
-                // Single click: always select only this card
+                // Single click: select only this card, set anchor
                 selectedClipIds.clear();
                 selectedClipIds.add(clipId);
                 lastSelectedIndex = idx;
             }
             updateCardSelectionUI();
+
+            // Only prevent default if not clicking a link
+            if (!isLink) {
+                e.preventDefault();
+            }
         });
-        // Checkbox click: always toggle selection, never clear all
+        // Checkbox click: robust selection logic (matches card click handler)
         const checkbox = card.querySelector('.select-clip-checkbox');
         if (checkbox) {
             checkbox.onclick = function(e) {
                 e.stopPropagation();
                 const clipId = card.getAttribute('data-clip-id');
-                if (checkbox.checked) {
-                    selectedClipIds.add(clipId);
+                const allCards = Array.from(document.querySelectorAll('.card[data-clip-id]'));
+                const idx = allCards.indexOf(card);
+                const isShift = e.shiftKey;
+                const isCtrl = e.ctrlKey || e.metaKey;
+
+                if (isShift && lastSelectedIndex !== null) {
+                    // Shift+Click: range select
+                    const [start, end] = [lastSelectedIndex, idx].sort((a, b) => a - b);
+                    for (let i = start; i <= end; i++) {
+                        selectedClipIds.add(allCards[i].getAttribute('data-clip-id'));
+                    }
+                    lastSelectedIndex = idx;
+                } else if (isCtrl) {
+                    // Ctrl/Cmd+Click: toggle selection, do not update anchor
+                    if (checkbox.checked) {
+                        selectedClipIds.add(clipId);
+                    } else {
+                        selectedClipIds.delete(clipId);
+                    }
+                    // Do not update lastSelectedIndex
                 } else {
-                    selectedClipIds.delete(clipId);
+                    // Single click: select only this card, set anchor
+                    selectedClipIds.clear();
+                    selectedClipIds.add(clipId);
+                    lastSelectedIndex = idx;
                 }
-                lastSelectedIndex = Array.from(document.querySelectorAll('.card[data-clip-id]')).indexOf(card);
                 updateCardSelectionUI();
             };
         }
@@ -1723,3 +1748,70 @@ function attachPlaylistPillRemoveHandlers() {
         };
     });
 } 
+
+function renderClipCard(clip) {
+    // Debug: Log playlists for each clip
+    console.log('[renderClipCard] clip.id:', clip.id, 'playlists:', clip.playlists);
+    const activePlaylistIds = getActivePlaylistIds();
+    // Render playlist pills
+    let playlistPills = '';
+    if (clip.playlists && Array.isArray(clip.playlists) && clip.playlists.length > 0) {
+        playlistPills = clip.playlists.map(pl => `
+            <span class="playlist-pill" data-clip-id="${clip.id}" data-playlist-id="${pl.id}" title="${pl.name}">
+                ${pl.name}
+                <button class="playlist-pill-remove" title="Remove from playlist" tabindex="0" aria-label="Remove from playlist ${pl.name}">✖</button>
+            </span>
+        `).join('');
+    } else {
+        playlistPills = '<span class="playlist-pill playlist-empty">No playlists</span>';
+    }
+    return `
+        <div class="card" data-clip-id="${clip.id}" data-path="${encodeURIComponent(clip.path)}">
+            <label class="custom-checkbox-label">
+                <input type="checkbox" class="select-clip-checkbox" aria-label="Select clip ${clip.filename}" />
+                <span class="custom-checkbox"></span>
+            </label>
+            <a class="card-link" href="/clip/${clip.id}">
+                <img class="thumb" src="${clip.thumb_url || '/static/placeholder.png'}" alt="Thumbnail for ${clip.filename}" />
+            </a>
+            <div class="meta">
+                <a class="card-link" href="/clip/${clip.id}">
+                    <div class="filename">${clip.filename}</div>
+                </a>
+                ${clip.duration ? `<div class="duration">${Math.floor(clip.duration/60)}:${('0'+Math.floor(clip.duration%60)).slice(-2)} min</div>` : ''}
+                ${clip.size ? `<div class="size">${clip.size}</div>` : ''}
+                ${clip.modified_at ? `<div class="modified">${clip.modified_at.slice(0,10)} ${clip.modified_at.slice(11,16)}</div>` : ''}
+                <div class="star" style="cursor:pointer;" data-clip-id="${clip.id}" title="Toggle star">${clip.starred ? '★' : '☆'}</div>
+                <button class="pip-btn" data-clip-id="${clip.id}" title="Picture-in-Picture preview">⧉ PiP</button>
+                <video id="pip-video-${clip.id}" src="/media/${encodeURIComponent(clip.path)}" style="display:none;" muted playsinline></video>
+                <div class="tags">
+                    <span class="tags-text" id="tags-text-${clip.id}">
+                        ${clip.tags && clip.tags.length
+                            ? clip.tags.map(tag => `<span class="tag-chip">${tag}</span>`).join('')
+                            : '<span class="tag-chip tag-empty">No tags</span>'}
+                    </span>
+                    <a href="/clip/${clip.id}" class="edit-tag-btn-link" style="margin-left:0.5em; font-size:0.9em; text-decoration:none;" title="Edit tags in detail view">✎</a>
+                </div>
+                <!-- Playlist pill badges: highlight all active pills for selected playlists -->
+                <div class="playlists">
+                    ${playlistPills}
+                </div>
+            </div>
+        </div>
+    `;
+} 
+
+// Add this function to support grid row rendering in the grid view
+function renderClipRows(clips, cardsPerRow = 5) {
+    let rows = [];
+    for (let i = 0; i < clips.length; i += cardsPerRow) {
+        const rowClips = clips.slice(i, i + cardsPerRow);
+        rows.push(
+            `<div class="clip-row">${rowClips.map(renderClipCard).join('')}</div>`
+        );
+    }
+    return rows;
+}
+
+window.renderClipCard = renderClipCard;
+window.renderClipRows = renderClipRows;
