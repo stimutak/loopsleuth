@@ -24,6 +24,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Grid checkboxes are now absolutely positioned in the upper-left of each card, with a modern, minimal look.
 - Grid card selection state uses a soft blue border and background, with smooth transitions (no debug outlines).
 - General sidebar and grid UI/UX polish for a more professional, Notch-inspired look.
+- **Fixed** Tag autocomplete now works correctly in all contexts (batch action bar, clip detail view, etc.)
+- **Fixed** Tag suggestions endpoint mismatch: frontend now uses /api/tag_suggestions instead of /tags
+- **Fixed** Tag suggestions response format is now consistent across all endpoints
+- **Fixed** Tag autocomplete dropdowns are properly positioned and styled in all contexts
 
 ## [1.2.0] - 2025-04-26
 

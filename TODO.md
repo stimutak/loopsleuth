@@ -135,7 +135,11 @@
 ### Tag Autocomplete & Deletion Implementation Plan
 
 #### Tag Autocomplete
-- [x] Backend: `/tags`
+- [x] Backend: `/api/tag_suggestions` endpoint
+- [x] Frontend: Consistent autocomplete behavior across all tag inputs
+- [x] Proper dropdown positioning and styling
+- [x] Keyboard navigation and accessibility
+- [x] Response format standardization
 
 ## 🛠️ UI/UX Issues & Polish Needed
 
@@ -215,3 +219,34 @@
 - Robust duplicate detection ensures a clean, master list of unique files for creative workflows and export.
 - Visual review and auto-merge streamline library management and reduce manual cleanup.
 - Database reloadability and multi-library support enable flexible, non-destructive workflows for artists and VJs working across multiple projects or sets.
+
+# TODO: Next Steps and Enhancements (2024-06)
+
+## Grid View & Playlists
+- [x] Playlist pills now display on grid cards (fixed)
+- [ ] Batch playlist add/remove from grid (multi-select, robust feedback)
+- [ ] Playlist pill interactivity: click to filter, remove pill to remove from playlist, hover/tooltip for details
+- [ ] Visual/UX polish: animations, color coding, accessibility, toast/snackbar feedback
+- [ ] Drag-and-drop clips to playlists in sidebar
+- [ ] Playlist filtering and clear filter button
+- [ ] Playlist color coding or icons
+
+## Creative/Experimental Features
+- [ ] Live preview grid: real-time video preview for selected clips, synchronized playback, overlays
+- [ ] Playlist sets: save/recall sets of playlists for different projects/moods
+- [ ] Export/share: export playlists as .csv, .json, or .tox for TouchDesigner
+
+## Testing & Quality
+- [ ] Expand automated test coverage for playlist actions, pill rendering, edge cases
+- [ ] Profile and optimize grid rendering for large libraries
+
+## Backend/API
+- [ ] Add endpoints for batch playlist operations, playlist reordering, playlist metadata (descriptions, colors)
+- [ ] Add user profiles for per-user playlists and preferences (if multi-user)
+
+---
+
+## Next Focus: Detail View
+- [ ] Detail view is not opening when a clip is clicked (bug)
+- [ ] Needs complete restyling in the image of Notch and Cursor (modern, creative, dark UI)
+- [ ] User wants to move on to this next

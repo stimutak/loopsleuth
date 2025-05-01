@@ -130,18 +130,29 @@ Python ≥ 3.10, ffmpeg/ffprobe, SQLite, Pillow, imagehash, FastAPI, Jinja2, Tex
 ### Tag System (vNext)
 - Tags are now stored in a normalized schema: a `tags` table (unique tag names) and a `clip_tags` join table (many-to-many: clips <-> tags).
 - This enables tag reuse, autocomplete, and efficient tag-based search/filtering.
+- Tag suggestions are provided through a dedicated `/api/tag_suggestions` endpoint with consistent behavior across all contexts.
+- Tag autocomplete is fully implemented with keyboard navigation and accessibility features.
 
 ### Tag Editing UX (2024-06)
-
-- Per-clip tag editing in the detail view is now fully consistent with the batch editor: chip-style input, autocomplete, keyboard navigation, and ARIA/accessibility are all supported. Tag changes are persisted to the database and reflected in both the detail and grid views.
+- Per-clip tag editing in the detail view is now fully consistent with the batch editor:
+  - Chip-style input with removable tags
+  - Real-time tag suggestions with keyboard navigation
+  - Proper dropdown positioning and styling
+  - ARIA/accessibility support
+  - Instant feedback and persistence
+- Tag changes are persisted to the database and reflected in both detail and grid views
+- Tag autocomplete works seamlessly in all contexts:
+  - Batch action bar
+  - Clip detail view
+  - Any other tag input fields
 - The codebase is ready for handoff or onboarding. See STARTUP_MESSAGE.md and TODO.md for the latest project state and next steps.
 
 #### Remaining polish for pro-level UX
 - [x] ARIA roles/attributes for full screen reader support
 - [x] Dropdown scrolls to keep highlight visible (for long lists)
-- Batch tag editing (multi-select)
-- Tag color/category support (optional)
-- Tag reordering (optional)
+- [x] Tag autocomplete with keyboard navigation
+- [ ] Tag color/category support (optional)
+- [ ] Tag reordering (optional)
 
 See code comments for further details and next steps.
 
@@ -367,4 +378,16 @@ _Last update: 2025-04-26_
 - **Scanning Folders:** Use the scan form's combo dropdown to quickly select from recent folders or enter a new location. Recent folders are remembered per user. All scan folders are validated for existence and readability before scanning.
 - **Error Feedback:** Any error (invalid DB name, permission denied, scan in progress, etc.) is shown as a toast notification. No silent failures.
 - **Duplicate Review:** If flagged, review and resolve duplicates from the grid banner or the /duplicates page. Merge tags/playlists, keep, delete, or ignore as needed.
+
+## ⚠️ Known Issue: Batch Action Bar Blank After Grid Virtualization (2025-04)
+
+- After migrating the grid to virtualized rendering (Clusterize.js, JS-only cards), the batch action bar (`#batch-action-bar`) is present in the DOM but remains blank.
+- Attempts to fix by calling `renderBatchActionBar()` after every grid update did **not** resolve the issue.
+- The bar is visible but not populated with controls or tag chips, regardless of selection state.
+- This is a regression from the previous Jinja2-rendered grid, where the bar worked as expected.
+- **Next steps:**
+    - Investigate the interaction between grid rendering, selection state, and batch bar logic.
+    - Ensure the batch bar's rendering logic is compatible with the new JS/virtualized grid.
+    - Review all event and state flows related to selection and batch actions.
+- Handoff to a new developer/model is recommended for further debugging and resolution.
 
