@@ -163,6 +163,14 @@ def grid(request: Request):
                 clip['thumb_filename'] = thumb_path.replace('\\', '/').split('/')[-1]
             else:
                 clip['thumb_filename'] = ''
+            # --- Fetch playlists for this clip ---
+            cursor.execute("""
+                SELECT p.id, p.name FROM playlist_clips pc
+                JOIN playlists p ON pc.playlist_id = p.id
+                WHERE pc.clip_id = ?
+                ORDER BY p.name ASC
+            """, (clip['id'],))
+            clip['playlists'] = [dict(id=r[0], name=r[1]) for r in cursor.fetchall()]
             clips.append(clip)
     except Exception as e:
         print(f"[Error] Could not load clips: {e}")
@@ -193,6 +201,7 @@ def clip_detail(request: Request, clip_id: int):
     conn = None
     clip = None
     video_mime = "video/mp4"  # Default
+    all_playlists = []
     try:
         conn = get_db_connection(db_path)
         cursor = conn.cursor()
@@ -216,6 +225,15 @@ def clip_detail(request: Request, clip_id: int):
             mime, _ = mimetypes.guess_type(clip['path'])
             if mime and mime.startswith('video/'):
                 video_mime = mime
+            # Fetch all playlists and annotate membership
+            cursor.execute("SELECT id, name FROM playlists ORDER BY name ASC")
+            playlists = [dict(id=r[0], name=r[1]) for r in cursor.fetchall()]
+            # Fetch playlist IDs for this clip
+            cursor.execute("SELECT playlist_id FROM playlist_clips WHERE clip_id = ?", (clip['id'],))
+            member_ids = set(r[0] for r in cursor.fetchall())
+            for pl in playlists:
+                pl['is_member'] = pl['id'] in member_ids
+            all_playlists = playlists
         else:
             # Return a custom 404 page if the clip is not found
             return templates.TemplateResponse(
@@ -231,7 +249,7 @@ def clip_detail(request: Request, clip_id: int):
         if conn:
             conn.close()
     return templates.TemplateResponse(
-        "clip_detail.html", {"request": request, "clip": clip, "video_mime": video_mime}
+        "clip_detail.html", {"request": request, "clip": clip, "video_mime": video_mime, "all_playlists": all_playlists}
     )
 
 @app.get("/thumbs/{filename}")
@@ -378,7 +396,7 @@ class TagUpdate(BaseModel):
     tags: List[str]
 
 @app.post("/tag/{clip_id}")
-def update_tags(clip_id: int, tag_update: TagUpdate = Body(...)):
+def update_tags(request: Request, clip_id: int, tag_update: TagUpdate = Body(...)):
     """
     Update the tags for a clip. Accepts JSON {"tags": ["tag1", "tag2", ...]}.
     Updates the tags and clip_tags tables. Returns the new tag list as JSON.
@@ -423,7 +441,7 @@ def update_tags(clip_id: int, tag_update: TagUpdate = Body(...)):
             conn.close()
 
 @app.get("/tags")
-def get_all_tags(q: str = None):
+def get_all_tags(request: Request, q: str = None):
     """Return a list of all tag names for autocomplete/suggestions. If 'q' is provided, return only tags starting with the prefix (case-insensitive)."""
     db_path = get_db_path_from_request(request)
     conn = None
@@ -456,7 +474,7 @@ class BatchTagUpdate(BaseModel):
     clear: Optional[bool] = False
 
 @app.post("/batch_tag")
-def batch_tag_update(batch_update: BatchTagUpdate = Body(...)):
+def batch_tag_update(request: Request, batch_update: BatchTagUpdate = Body(...)):
     """
     Batch tag editing endpoint. Accepts JSON with:
       - clip_ids: list of clip IDs
@@ -636,21 +654,26 @@ class MultiPlaylistClipUpdateRequest(BaseModel):
 
 # --- Playlist Endpoints ---
 @app.post("/playlists")
-def create_playlist(req: PlaylistCreateRequest):
-    """Create a new playlist with the given name."""
-    conn = None
-    try:
-        conn = get_db_connection(get_default_db_path())
-        cursor = conn.cursor()
-        cursor.execute("INSERT INTO playlists (name) VALUES (?)", (req.name,))
-        playlist_id = cursor.lastrowid
-        conn.commit()
-        return {"id": playlist_id, "name": req.name}
-    except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=500)
-    finally:
-        if conn:
-            conn.close()
+def create_playlist(request: Request):
+    """Create a new playlist with a unique name and set its order to the next available value."""
+    db_path = get_db_path_from_request(request)
+    data = request.json() if hasattr(request, 'json') else request._json
+    name = data.get("name")
+    if not name or not name.strip():
+        return JSONResponse({"error": "Playlist name required"}, status_code=400)
+    conn = get_db_connection(db_path)
+    cursor = conn.cursor()
+    # Determine next order value
+    cursor.execute("SELECT MAX(\"order\") FROM playlists")
+    row = cursor.fetchone()
+    next_order = (row[0] + 1) if row and row[0] is not None else 0
+    cursor.execute("INSERT INTO playlists (name, \"order\") VALUES (?, ?)", (name.strip(), next_order))
+    conn.commit()
+    playlist_id = cursor.lastrowid
+    cursor.execute("SELECT id, name, created_at, \"order\" FROM playlists WHERE id = ?", (playlist_id,))
+    playlist = cursor.fetchone()
+    conn.close()
+    return {"id": playlist[0], "name": playlist[1], "created_at": playlist[2], "order": playlist[3]}
 
 @app.patch("/playlists/{playlist_id}")
 def rename_playlist(playlist_id: int, req: PlaylistRenameRequest):
@@ -690,12 +713,17 @@ def delete_playlist(playlist_id: int):
 
 @app.get("/playlists")
 def list_playlists(request: Request):
-    """List all playlists (id, name, created_at) for the selected DB."""
+    """List all playlists (id, name, created_at, order) for the selected DB, ordered by 'order' if present."""
     db_path = get_db_path_from_request(request)
     conn = get_db_connection(db_path)
     cursor = conn.cursor()
-    cursor.execute("SELECT id, name, created_at FROM playlists ORDER BY created_at DESC")
+    # Try to order by 'order', fallback to created_at
+    try:
+        cursor.execute("SELECT id, name, created_at, \"order\" FROM playlists ORDER BY \"order\" ASC, created_at DESC")
+    except Exception:
+        cursor.execute("SELECT id, name, created_at FROM playlists ORDER BY created_at DESC")
     playlists = [dict(row) for row in cursor.fetchall()]
+    conn.close()
     return {"playlists": playlists}
 
 @app.get("/playlists/{playlist_id}")
@@ -938,7 +966,15 @@ def api_clips(request: Request, offset: int = Query(0, ge=0), limit: int = Query
             ORDER BY p.name ASC
         """, (clip_id,))
         playlists = [ {"id": r[0], "name": r[1]} for r in cursor.fetchall() ]
-        clips.append({
+        # Fetch tags for this clip
+        cursor.execute("""
+            SELECT t.name FROM tags t
+            JOIN clip_tags ct ON t.id = ct.tag_id
+            WHERE ct.clip_id = ?
+            ORDER BY t.name ASC
+        """, (clip_id,))
+        tags = [r[0] for r in cursor.fetchall()]
+        clip = {
             "id": row[0],
             "filename": row[1],
             "path": row[2],
@@ -948,8 +984,13 @@ def api_clips(request: Request, offset: int = Query(0, ge=0), limit: int = Query
             "starred": row[6],
             "modified_at": row[7],
             "playlists": playlists,
-        })
-    return {"clips": clips, "total": total}
+            "tags": tags,
+        }
+        clips.append(clip)
+    # Debug: print the first 2 clips for verification
+    print("[api_clips] Returning sample clips:", clips[:2])
+    conn.close()
+    return JSONResponse({"clips": clips, "total": total})
 
 @app.get("/api/duplicates")
 def api_duplicates(request: Request):
@@ -1089,6 +1130,27 @@ def duplicate_action(request: Request):
         return JSONResponse({"error": str(e)}, status_code=500)
     finally:
         conn.close()
+
+@app.get("/api/tag_suggestions")
+def api_tag_suggestions(request: Request, q: str = None):
+    """Return a list of tag suggestions for autocomplete. If 'q' is provided, return only tags starting with the prefix (case-insensitive)."""
+    db_path = get_db_path_from_request(request)
+    conn = None
+    try:
+        conn = get_db_connection(db_path)
+        cursor = conn.cursor()
+        if q:
+            # Use parameterized LIKE for case-insensitive prefix search
+            cursor.execute("SELECT name FROM tags WHERE LOWER(name) LIKE ? ORDER BY name ASC", (q.lower() + '%',))
+        else:
+            cursor.execute("SELECT name FROM tags ORDER BY name ASC")
+        tags = [row[0] for row in cursor.fetchall()]
+        return JSONResponse({"suggestions": tags})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+    finally:
+        if conn:
+            conn.close()
 
 # TODO: Add API endpoints for clips, tagging, starring, etc.
 # TODO: Add video playback route 

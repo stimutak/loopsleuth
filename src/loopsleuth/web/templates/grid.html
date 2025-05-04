@@ -14,6 +14,123 @@ LoopSleuth Web: Grid View Template
     <link rel="icon" type="image/png" sizes="180x180" href="/static/favicon-180x180.png">
     <link rel="icon" type="image/png" sizes="192x192" href="/static/favicon-192x192.png">
     <link rel="apple-touch-icon" sizes="180x180" href="/static/favicon-180x180.png">
+    <style>
+        .batch-tag-group {
+            display: flex;
+            gap: 0.5em;
+            align-items: center;
+        }
+        .batch-bar-section {
+            display: flex;
+            gap: 1em;
+            align-items: center;
+        }
+        .batch-bar-input {
+            min-width: 180px;
+        }
+        .batch-bar-btn {
+            white-space: nowrap;
+        }
+        .batch-bar-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        .tag-suggestions-dropdown {
+            position: absolute;
+            background: #23232a;
+            border: 1px solid #333;
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 3500;
+            display: none;
+        }
+        
+        .tag-suggestion-item {
+            padding: 0.3em 0.8em;
+            cursor: pointer;
+            color: #f0f4fa;
+            font-size: 0.89em;
+        }
+        
+        .tag-suggestion-item:hover,
+        .tag-suggestion-item[aria-selected="true"] {
+            background: #2a3a3a;
+            color: #fff;
+        }
+        
+        /* Batch Action Bar Styles */
+        #batch-action-bar {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: #23232a;
+            padding: 1em;
+            z-index: 2000;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 -2px 12px rgba(0,0,0,0.2);
+        }
+        
+        .batch-bar-section {
+            display: flex;
+            gap: 1em;
+            align-items: center;
+        }
+        
+        .batch-tag-group {
+            display: flex;
+            gap: 0.5em;
+            align-items: center;
+        }
+        
+        .batch-bar-input {
+            background: #2a2a32;
+            border: 1px solid #333;
+            color: #fff;
+            padding: 0.5em;
+            border-radius: 4px;
+            min-width: 180px;
+        }
+        
+        .batch-bar-input:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .batch-bar-btn {
+            background: #2a2a32;
+            border: 1px solid #333;
+            color: #fff;
+            padding: 0.5em 1em;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        .batch-bar-btn:hover:not(:disabled) {
+            background: #333;
+        }
+        
+        .batch-bar-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .batch-bar-label {
+            font-weight: bold;
+            color: #fff;
+        }
+        
+        .batch-bar-help {
+            color: #666;
+            cursor: help;
+            font-size: 1.2em;
+        }
+    </style>
+    <script src="/static/clip_actions.js"></script>
 </head>
 <body>
     <!-- Playlist Sidebar -->
@@ -259,16 +376,28 @@ LoopSleuth Web: Grid View Template
         <div id="clip-scroll-area" style="height:80vh;overflow:auto;">
             <div id="clip-content-area"></div>
         </div>
-        <div id="batch-action-bar">
+        <div id="batch-action-bar" style="position:fixed; left:0; right:0; bottom:0; background:#23232a; padding:1em; z-index:2000; display:flex; align-items:center; justify-content:space-between; box-shadow:0 -2px 12px rgba(0,0,0,0.2);">
+            <span class="batch-bar-label">Batch Actions</span>
+            <div class="batch-bar-section">
+                <div class="batch-tag-group">
+                    <input type="text" class="batch-bar-input" id="batch-add-tags" placeholder="Add tags..." />
+                    <button class="batch-bar-btn" id="batch-add-tags-btn" disabled>Add Tags</button>
+                </div>
+                <div class="batch-tag-group">
+                    <input type="text" class="batch-bar-input" id="batch-remove-tags" placeholder="Remove tags..." />
+                    <button class="batch-bar-btn" id="batch-remove-tags-btn" disabled>Remove Tags</button>
+                </div>
+                <button class="batch-bar-btn" id="batch-clear-tags" disabled>Clear Tags</button>
+            </div>
             <span class="batch-bar-help" title="Use the checkboxes to select multiple clips. Shift+Click selects a range. Modifier keys (Cmd, Option, Ctrl) are not supported for multi-select on macOS browsers.">?</span>
         </div>
+        <div id="selected-clips-bar" style="position:fixed; left:0; right:0; bottom:4em; background:#23232a; padding:1em; z-index:2000; display:flex; align-items:center; gap:1em; box-shadow:0 -2px 12px rgba(0,0,0,0.2);"></div>
         {% if has_duplicates %}
           <div class="duplicate-banner" style="background:#23242a;color:#fff;padding:1em 2em;margin-bottom:1.5em;border-left:6px solid #3fa7ff;font-size:1.1em;display:flex;align-items:center;justify-content:space-between;">
             <span>⚠️ <b>Duplicates flagged for review.</b> <a href="/duplicates" style="color:#3fa7ff;text-decoration:underline;font-weight:bold;">Review now</a></span>
           </div>
         {% endif %}
     </div>
-    <div id="selected-clips-bar"><!-- Persistent selection bar (populated by JS) --></div>
     <!-- Scan Progress Modal -->
     <div id="scan-progress-modal" style="display:none; position:fixed; z-index:5000; left:0; top:0; width:100vw; height:100vh; background:rgba(10,10,20,0.85); color:#fff; align-items:center; justify-content:center; flex-direction:column;">
         <div style="background:#222; padding:2em 3em; border-radius:1em; box-shadow:0 2px 16px #000a; min-width:320px; text-align:center;">
@@ -284,7 +413,6 @@ LoopSleuth Web: Grid View Template
     <!-- Add Clusterize.js for virtualized grid -->
     <script src="https://unpkg.com/clusterize.js/clusterize.min.js"></script>
 </body>
-<script src="/static/clip_actions.js"></script>
 <!-- SortableJS for drag-and-drop playlist reordering -->
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 <script>
@@ -685,7 +813,13 @@ const cardsPerRow = 5; // Set your preferred number of columns here
 const clusterize = new Clusterize({
     rows: [],
     scrollId: 'clip-scroll-area',
-    contentId: 'clip-content-area'
+    contentId: 'clip-content-area',
+    callbacks: {
+        clusterChanged: function() {
+            console.log('[Clusterize] Cluster changed, updating UI');
+            afterGridUpdate();
+        }
+    }
 });
 
 // --- PATCH: Robustly re-attach selection handlers and update selection bar after every grid update ---
@@ -710,19 +844,26 @@ async function loadMoreClips() {
     params.set('limit', limit);
     const resp = await fetch(`/api/clips?${params.toString()}`);
     const data = await resp.json();
+    // Debug: Log the clips data received from the API
+    console.log('[loadMoreClips] Fetched clips:', data.clips);
     if (data.clips.length === 0) {
         allLoaded = true;
         return;
     }
-    const newRows = renderClipRows(data.clips, cardsPerRow);
+    const newRows = window.renderClipRows(data.clips, cardsPerRow);
+    // Debug: Log the rows being rendered
+    console.log('[loadMoreClips] Rendering rows:', newRows);
     clusterize.append(newRows);
     afterGridUpdate(); // <-- Always re-attach handlers and update bar
     offset += data.clips.length;
     loading = false;
 }
 
-// Initial load
-loadMoreClips().then(afterGridUpdate);
+// Initial load with explicit afterGridUpdate
+loadMoreClips().then(() => {
+    console.log('[Initial Load] Complete, updating UI');
+    afterGridUpdate();
+});
 
 // Infinite scroll trigger
 const scrollArea = document.getElementById('clip-scroll-area');
@@ -783,65 +924,5 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 });
-// --- Restore required grid rendering functions for Clusterize/infinite scroll ---
-function getActivePlaylistIds() {
-    const params = new URLSearchParams(window.location.search);
-    const playlistIds = [];
-    for (const [key, value] of params.entries()) {
-        if (key.startsWith('playlist_id')) {
-            playlistIds.push(value);
-        }
-    }
-    return playlistIds;
-}
-
-function renderClipCard(clip) {
-    const activePlaylistIds = getActivePlaylistIds();
-    return `
-        <div class="card" data-clip-id="${clip.id}" data-path="${encodeURIComponent(clip.path)}">
-            <label class="custom-checkbox-label">
-                <input type="checkbox" class="select-clip-checkbox" aria-label="Select clip ${clip.filename}" />
-                <span class="custom-checkbox"></span>
-            </label>
-            <a class="card-link" href="/clip/${clip.id}">
-                <img class="thumb" src="${clip.thumb_url || '/static/placeholder.png'}" alt="Thumbnail for ${clip.filename}" />
-            </a>
-            <div class="meta">
-                <a class="card-link" href="/clip/${clip.id}">
-                    <div class="filename">${clip.filename}</div>
-                </a>
-                ${clip.duration ? `<div class="duration">${Math.floor(clip.duration/60)}:${('0'+Math.floor(clip.duration%60)).slice(-2)} min</div>` : ''}
-                ${clip.size ? `<div class="size">${clip.size}</div>` : ''}
-                ${clip.modified_at ? `<div class="modified">${clip.modified_at.slice(0,10)} ${clip.modified_at.slice(11,16)}</div>` : ''}
-                <div class="star" style="cursor:pointer;" data-clip-id="${clip.id}" title="Toggle star">${clip.starred ? '★' : '☆'}</div>
-                <button class="pip-btn" data-clip-id="${clip.id}" title="Picture-in-Picture preview">⧉ PiP</button>
-                <video id="pip-video-${clip.id}" src="/media/${encodeURIComponent(clip.path)}" style="display:none;" muted playsinline></video>
-                <div class="tags">
-                    <span class="tags-text" id="tags-text-${clip.id}">
-                        ${clip.tags && clip.tags.length
-                            ? clip.tags.map(tag => `<span class="tag-chip">${tag}</span>`).join('')
-                            : '<span class="tag-chip tag-empty">No tags</span>'}
-                    </span>
-                    <a href="/clip/${clip.id}" class="edit-tag-btn-link" style="margin-left:0.5em; font-size:0.9em; text-decoration:none;" title="Edit tags in detail view">✎</a>
-                </div>
-                <!-- Playlist pill badges: highlight all active pills for selected playlists -->
-                <div class="playlists">
-                    <!-- Pills are rendered by JS in renderClipCard; do not use Jinja here. -->
-                </div>
-            </div>
-        </div>
-    `;
-}
-
-function renderClipRows(clips, cardsPerRow = 5) {
-    let rows = [];
-    for (let i = 0; i < clips.length; i += cardsPerRow) {
-        const rowClips = clips.slice(i, i + cardsPerRow);
-        rows.push(
-            `<div class="clip-row">${rowClips.map(renderClipCard).join('')}</div>`
-        );
-    }
-    return rows;
-}
 </script>
 </html> 
