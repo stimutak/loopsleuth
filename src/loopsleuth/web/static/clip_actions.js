@@ -1551,7 +1551,7 @@ function renderClipCard(clip) {
                 <span class="custom-checkbox"></span>
             </label>
             <a class="card-link" href="/clip/${clip.id}">
-                <img class="thumb" src="${clip.thumb_url || '/static/placeholder.png'}" alt="Thumbnail for ${clip.filename}" />
+                <img class="thumb" src="${clip.thumb_url || '/static/placeholder.png'}" alt="Thumbnail for ${clip.filename}" loading="lazy" />
             </a>
             <div class="meta">
                 <a class="card-link" href="/clip/${clip.id}">
@@ -1580,14 +1580,43 @@ function renderClipCard(clip) {
     `;
 } 
 
-// Add this function to support grid row rendering in the grid view
+// --- Debounce loadMoreClips to prevent stacking ---
+let loadMoreClipsTimeout = null;
+let loadMoreClipsInFlight = false;
+async function loadMoreClipsDebounced() {
+    if (loadMoreClipsInFlight) return;
+    loadMoreClipsInFlight = true;
+    await loadMoreClips();
+    loadMoreClipsInFlight = false;
+}
+
+// --- Batch DOM appends in renderClipRows ---
 function renderClipRows(clips, cardsPerRow = 5) {
     let rows = [];
+    const batchSize = 10;
     for (let i = 0; i < clips.length; i += cardsPerRow) {
         const rowClips = clips.slice(i, i + cardsPerRow);
-        rows.push(
-            `<div class="clip-row">${rowClips.map(renderClipCard).join('')}</div>`
-        );
+        rows.push(`<div class="clip-row">${rowClips.map(renderClipCard).join('')}</div>`);
+    }
+    // Batch append rows to DOM using setTimeout
+    if (typeof window !== 'undefined' && window.document) {
+        const contentArea = document.getElementById('clip-content-area');
+        if (contentArea) {
+            let idx = 0;
+            function appendBatch() {
+                const end = Math.min(idx + batchSize, rows.length);
+                for (let j = idx; j < end; j++) {
+                    const tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = rows[j];
+                    contentArea.appendChild(tempDiv.firstChild);
+                }
+                idx = end;
+                if (idx < rows.length) {
+                    setTimeout(appendBatch, 0);
+                }
+            }
+            appendBatch();
+        }
     }
     return rows;
 }

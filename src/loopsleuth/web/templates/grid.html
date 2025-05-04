@@ -869,7 +869,11 @@ loadMoreClips().then(() => {
 const scrollArea = document.getElementById('clip-scroll-area');
 scrollArea.addEventListener('scroll', function() {
     if (scrollArea.scrollTop + scrollArea.clientHeight >= scrollArea.scrollHeight - 800) {
-        loadMoreClips();
+        if (window.loadMoreClipsDebounced) {
+            window.loadMoreClipsDebounced();
+        } else {
+            loadMoreClips();
+        }
     }
 });
 // --- Recent scan folders logic ---
