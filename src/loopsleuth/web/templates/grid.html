@@ -868,7 +868,7 @@ loadMoreClips().then(() => {
 // Infinite scroll trigger
 const scrollArea = document.getElementById('clip-scroll-area');
 scrollArea.addEventListener('scroll', function() {
-    if (scrollArea.scrollTop + scrollArea.clientHeight >= scrollArea.scrollHeight - 200) {
+    if (scrollArea.scrollTop + scrollArea.clientHeight >= scrollArea.scrollHeight - 800) {
         loadMoreClips();
     }
 });
