@@ -129,6 +129,9 @@ LoopSleuth Web: Grid View Template
             cursor: help;
             font-size: 1.2em;
         }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        .spinner { vertical-align: middle; }
+        .container { padding-bottom: 10em !important; }
     </style>
     <script src="/static/clip_actions.js"></script>
 </head>
@@ -372,9 +375,16 @@ LoopSleuth Web: Grid View Template
             });
         })();
         </script>
-        <!-- Replace the classic grid and pagination with a virtualized scroll area -->
-        <div id="clip-scroll-area" style="height:80vh;overflow:auto;">
+        {% if has_duplicates %}
+          <div class="duplicate-banner" style="background:#23242a;color:#fff;padding:1em 2em;margin-bottom:1.5em;border-left:6px solid #3fa7ff;font-size:1.1em;display:flex;align-items:center;justify-content:space-between;z-index:2100;position:relative;">
+            <span>⚠️ <b>Duplicates flagged for review.</b> <a href="/duplicates" style="color:#3fa7ff;text-decoration:underline;font-weight:bold;">Review now</a></span>
+          </div>
+        {% endif %}
+        <div id="clip-scroll-area" style="height:80vh;overflow:auto; padding-bottom:10em;">
             <div id="clip-content-area"></div>
+            <div id="grid-loading-spinner" style="display:none; text-align:center; padding:2em 0;">
+              <span class="spinner" style="display:inline-block;width:2.5em;height:2.5em;border:0.4em solid #3fa7ff;border-top:0.4em solid #23232a;border-radius:50%;animation:spin 1s linear infinite;"></span>
+            </div>
         </div>
         <div id="batch-action-bar" style="position:fixed; left:0; right:0; bottom:0; background:#23232a; padding:1em; z-index:2000; display:flex; align-items:center; justify-content:space-between; box-shadow:0 -2px 12px rgba(0,0,0,0.2);">
             <span class="batch-bar-label">Batch Actions</span>
@@ -392,11 +402,6 @@ LoopSleuth Web: Grid View Template
             <span class="batch-bar-help" title="Use the checkboxes to select multiple clips. Shift+Click selects a range. Modifier keys (Cmd, Option, Ctrl) are not supported for multi-select on macOS browsers.">?</span>
         </div>
         <div id="selected-clips-bar" style="position:fixed; left:0; right:0; bottom:4em; background:#23232a; padding:1em; z-index:2000; display:flex; align-items:center; gap:1em; box-shadow:0 -2px 12px rgba(0,0,0,0.2);"></div>
-        {% if has_duplicates %}
-          <div class="duplicate-banner" style="background:#23242a;color:#fff;padding:1em 2em;margin-bottom:1.5em;border-left:6px solid #3fa7ff;font-size:1.1em;display:flex;align-items:center;justify-content:space-between;">
-            <span>⚠️ <b>Duplicates flagged for review.</b> <a href="/duplicates" style="color:#3fa7ff;text-decoration:underline;font-weight:bold;">Review now</a></span>
-          </div>
-        {% endif %}
     </div>
     <!-- Scan Progress Modal -->
     <div id="scan-progress-modal" style="display:none; position:fixed; z-index:5000; left:0; top:0; width:100vw; height:100vh; background:rgba(10,10,20,0.85); color:#fff; align-items:center; justify-content:center; flex-direction:column;">
@@ -865,16 +870,39 @@ loadMoreClips().then(() => {
     afterGridUpdate();
 });
 
-// Infinite scroll trigger
-const scrollArea = document.getElementById('clip-scroll-area');
-scrollArea.addEventListener('scroll', function() {
-    if (scrollArea.scrollTop + scrollArea.clientHeight >= scrollArea.scrollHeight - 800) {
-        if (window.loadMoreClipsDebounced) {
-            window.loadMoreClipsDebounced();
-        } else {
-            loadMoreClips();
-        }
+// --- Throttle utility ---
+function throttle(func, wait) {
+  let last = 0, timeout = null;
+  return function(...args) {
+    const now = Date.now();
+    if (now - last >= wait) {
+      last = now;
+      func.apply(this, args);
+    } else if (!timeout) {
+      timeout = setTimeout(() => {
+        last = Date.now();
+        timeout = null;
+        func.apply(this, args);
+      }, wait - (now - last));
     }
+  };
+}
+// Patch scroll handler to throttle and show spinner
+const scrollArea = document.getElementById('clip-scroll-area');
+const spinner = document.getElementById('grid-loading-spinner');
+const throttledLoad = throttle(() => {
+  if (window.loadMoreClipsDebounced) {
+    spinner.style.display = 'block';
+    window.loadMoreClipsDebounced().finally(() => { spinner.style.display = 'none'; });
+  } else {
+    spinner.style.display = 'block';
+    loadMoreClips().finally(() => { spinner.style.display = 'none'; });
+  }
+}, 400);
+scrollArea.addEventListener('scroll', function() {
+  if (scrollArea.scrollTop + scrollArea.clientHeight >= scrollArea.scrollHeight - 800) {
+    throttledLoad();
+  }
 });
 // --- Recent scan folders logic ---
 (function() {
