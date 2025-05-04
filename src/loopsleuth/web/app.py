@@ -998,49 +998,55 @@ def api_duplicates(request: Request):
     Returns all clips flagged for duplicate review (needs_review=1), grouped by canonical (duplicate_of).
     Uses the selected DB from the request for multi-library support.
     """
-    db_path = get_db_path_from_request(request)
-    conn = get_db_connection(db_path)
-    cursor = conn.cursor()
-    # Find all clips needing review
-    cursor.execute("SELECT * FROM clips WHERE needs_review = 1")
-    dup_rows = cursor.fetchall()
-    # Group by duplicate_of (canonical id)
-    groups = {}
-    for row in dup_rows:
-        canonical_id = row['duplicate_of']
-        if canonical_id is None:
-            continue  # Defensive: should always be set if needs_review=1
-        if canonical_id not in groups:
-            # Fetch canonical clip
-            cursor.execute("SELECT * FROM clips WHERE id = ?", (canonical_id,))
-            canonical = cursor.fetchone()
-            if not canonical:
-                continue  # Defensive: skip if canonical missing
-            groups[canonical_id] = {
-                'canonical': {
-                    'id': canonical['id'],
-                    'filename': canonical['filename'],
-                    'path': canonical['path'],
-                    'phash': canonical['phash'],
-                    'thumbnail_path': canonical['thumbnail_path'],
-                    'duration': canonical['duration'],
-                    'size': canonical.get('size'),
-                },
-                'duplicates': []
-            }
-        groups[canonical_id]['duplicates'].append({
-            'id': row['id'],
-            'filename': row['filename'],
-            'path': row['path'],
-            'phash': row['phash'],
-            'thumbnail_path': row['thumbnail_path'],
-            'duration': row['duration'],
-            'size': row.get('size'),
-        })
-    # Return as list of groups
-    result = list(groups.values())
-    conn.close()
-    return {"duplicate_groups": result}
+    try:
+        db_path = get_db_path_from_request(request)
+        conn = get_db_connection(db_path)
+        cursor = conn.cursor()
+        # Find all clips needing review
+        cursor.execute("SELECT * FROM clips WHERE needs_review = 1")
+        dup_rows = cursor.fetchall()
+        # Group by duplicate_of (canonical id)
+        groups = {}
+        for row in dup_rows:
+            canonical_id = row['duplicate_of']
+            if canonical_id is None:
+                continue  # Defensive: should always be set if needs_review=1
+            if canonical_id not in groups:
+                # Fetch canonical clip
+                cursor.execute("SELECT * FROM clips WHERE id = ?", (canonical_id,))
+                canonical = cursor.fetchone()
+                if not canonical:
+                    continue  # Defensive: skip if canonical missing
+                groups[canonical_id] = {
+                    'canonical': {
+                        'id': canonical['id'],
+                        'filename': canonical['filename'],
+                        'path': canonical['path'],
+                        'phash': canonical['phash'],
+                        'thumbnail_path': canonical['thumbnail_path'],
+                        'duration': canonical['duration'],
+                        'size': canonical.get('size'),
+                    },
+                    'duplicates': []
+                }
+            groups[canonical_id]['duplicates'].append({
+                'id': row['id'],
+                'filename': row['filename'],
+                'path': row['path'],
+                'phash': row['phash'],
+                'thumbnail_path': row['thumbnail_path'],
+                'duration': row['duration'],
+                'size': row.get('size'),
+            })
+        # Return as list of groups
+        result = list(groups.values())
+        conn.close()
+        return {"duplicate_groups": result}
+    except Exception as e:
+        import traceback
+        print("[api_duplicates] Exception:", e)
+        traceback.print_exc()
+        return JSONResponse({"error": str(e)}, status_code=500)
 
 @app.get("/duplicates", response_class=HTMLResponse)
 def duplicates_review(request: Request):
