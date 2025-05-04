@@ -1234,7 +1234,6 @@ function attachCardEventHandlers() {
     document.querySelectorAll('.card[data-clip-id]').forEach(card => {
         const clipId = card.getAttribute('data-clip-id');
         const checkbox = card.querySelector('.select-clip-checkbox');
-        
         if (checkbox) {
             checkbox.onclick = function(e) {
                 e.stopPropagation();
@@ -1246,15 +1245,12 @@ function attachCardEventHandlers() {
                 updateCardSelectionUI();
             };
         }
-        
         card.onclick = function(e) {
             if (e.target.closest('.tag-chip') || e.target.closest('.playlist-pill') || e.target.closest('.pip-btn')) {
                 return;
             }
-            
             const isShift = e.shiftKey;
             const isCtrl = e.ctrlKey || e.metaKey;
-            
             if (isShift && window.lastSelectedClipId) {
                 // Shift+click: select range
                 const cards = Array.from(document.querySelectorAll('.card[data-clip-id]'));
@@ -1262,7 +1258,6 @@ function attachCardEventHandlers() {
                 const currentIdx = cards.findIndex(c => c === card);
                 const start = Math.min(lastIdx, currentIdx);
                 const end = Math.max(lastIdx, currentIdx);
-                
                 for (let i = start; i <= end; i++) {
                     const rangeClipId = cards[i].getAttribute('data-clip-id');
                     selectedClipIds.add(rangeClipId);
@@ -1279,10 +1274,73 @@ function attachCardEventHandlers() {
                 selectedClipIds.clear();
                 selectedClipIds.add(clipId);
             }
-            
             window.lastSelectedClipId = clipId;
             updateCardSelectionUI();
         };
+        // --- PATCH: Attach PiP button handler ---
+        const pipBtn = card.querySelector('.pip-btn');
+        if (pipBtn) {
+            pipBtn.onclick = function(e) {
+                e.stopPropagation();
+                const video = document.getElementById('pip-video-' + clipId);
+                if (video && card) {
+                    // Use the raw (unencoded) path in data-path, and encode it here for the video URL.
+                    const videoUrl = '/media/' + encodeURIComponent(card.getAttribute('data-path'));
+                    video.src = videoUrl;
+                    video.currentTime = 0;
+                    video.load();
+                    video.muted = true;
+                    // PiP error diagnostics
+                    video.onerror = null;
+                    video.addEventListener('error', function onVideoError() {
+                        let errMsg = 'Unknown error';
+                        if (video.error) {
+                            switch (video.error.code) {
+                                case 1: errMsg = 'MEDIA_ERR_ABORTED'; break;
+                                case 2: errMsg = 'MEDIA_ERR_NETWORK'; break;
+                                case 3: errMsg = 'MEDIA_ERR_DECODE'; break;
+                                case 4: errMsg = 'MEDIA_ERR_SRC_NOT_SUPPORTED'; break;
+                            }
+                        }
+                        console.error('Video element error:', video.error, 'src:', video.src);
+                        showToast('Video error: ' + errMsg + ' (' + video.src + ')', 6000);
+                    }, { once: true });
+                    let canplayTimeout = setTimeout(() => {
+                        showToast('Could not load video for PiP: ' + videoUrl, 6000);
+                        video.removeEventListener('canplay', onCanPlay);
+                    }, 10000); // 10 seconds
+                    function onCanPlay() {
+                        clearTimeout(canplayTimeout);
+                        video.removeEventListener('canplay', onCanPlay);
+                        video.play().then(() => {
+                            if (document.pictureInPictureElement) {
+                                document.exitPictureInPicture();
+                            }
+                            // Prefer Safari's API if available
+                            if (video.webkitSupportsPresentationMode && typeof video.webkitSetPresentationMode === 'function') {
+                                try {
+                                    video.webkitSetPresentationMode('picture-in-picture');
+                                } catch (err) {
+                                    console.error('Safari PiP error:', err);
+                                    showToast('Picture-in-Picture not supported in this browser.');
+                                }
+                            } else if (video.requestPictureInPicture) {
+                                video.requestPictureInPicture().catch(err => {
+                                    console.error('PiP error:', err);
+                                    showToast('Picture-in-Picture not supported or failed.');
+                                });
+                            } else {
+                                showToast('Picture-in-Picture not supported in this browser.');
+                            }
+                        }).catch(err => {
+                            console.error('Video play error:', err);
+                            showToast('Could not play video for PiP.');
+                        });
+                    }
+                    video.addEventListener('canplay', onCanPlay);
+                }
+            };
+        }
     });
 }
 // Call attachCardEventHandlers after every grid update and on DOMContentLoaded
