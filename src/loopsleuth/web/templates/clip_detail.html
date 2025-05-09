@@ -213,10 +213,15 @@ LoopSleuth Web: Clip Detail Page (Notch/Cursor-inspired Redesign)
             .detail-sidebar { max-width: 100vw; min-width: 0; padding: 1.2em 0.7em; border-left: none; border-top: 4px solid #3fa7ff; border-radius: 0 0 18px 18px; }
             .video-player-container { max-width: 100vw; padding: 0.7em 0.2em; }
         }
+        #back-to-grid-btn:hover, #back-to-grid-btn:focus {
+            background: #3fa7ff;
+            color: #181a1b;
+            outline: none;
+        }
     </style>
 </head>
 <body>
-    <button class="back-link" id="back-to-grid-btn" type="button">← Back to grid</button>
+    <button class="back-link" id="back-to-grid-btn" type="button" aria-label="Back to grid" tabindex="0" style="position:fixed;top:1.2em;left:1.2em;z-index:4000;padding:0.6em 1.3em;font-size:1.1em;background:#181a1b;border:2px solid #3fa7ff;border-radius:999px;color:#3fa7ff;box-shadow:0 2px 12px #000a;cursor:pointer;transition:background 0.15s,color 0.15s;">← Back to grid</button>
     <div class="detail-flex">
         <!-- Sidebar: Glassmorphic, blue-accented, modern -->
         <div class="detail-sidebar">
@@ -417,9 +422,11 @@ LoopSleuth Web: Clip Detail Page (Notch/Cursor-inspired Redesign)
     })();
 
     document.getElementById('back-to-grid-btn').onclick = function(e) {
-        // Save scroll position (if any) from sessionStorage or default to 0
-        const scrollY = window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
-        sessionStorage.setItem('gridScrollY', scrollY);
+        if (window.sessionStorage) {
+            const scrollY = window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
+            sessionStorage.setItem('gridScrollY', scrollY);
+            console.log('[BackToGrid] Saved scrollY:', scrollY);
+        }
         window.location.href = '/';
     };
     </script>

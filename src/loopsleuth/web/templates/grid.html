@@ -423,18 +423,18 @@ LoopSleuth Web: Grid View Template
 <script>
 // Restore scroll position if returning from detail view
 window.addEventListener('DOMContentLoaded', function() {
-    const scrollY = sessionStorage.getItem('gridScrollY');
-    if (scrollY !== null) {
-        window.scrollTo(0, parseInt(scrollY, 10));
-        sessionStorage.removeItem('gridScrollY');
-    }
+    // --- PATCH: Robust scroll restoration for grid scroll area ---
+    // Do not use window.scrollTo; use #clip-scroll-area.scrollTop
+    // Restoration is now handled in afterGridUpdate after Clusterize.js renders
 });
+
 // Reload the grid if restored from bfcache (e.g., browser back button)
 window.addEventListener('pageshow', function(event) {
     if (event.persisted) {
         window.location.reload();
     }
 });
+
 // --- Thumbnail size slider logic ---
 (function() {
     const root = document.documentElement;
@@ -454,6 +454,7 @@ window.addEventListener('pageshow', function(event) {
         localStorage.setItem('thumbSizePx', v);
     });
 })();
+
 // --- Sorting dropdown logic ---
 document.addEventListener('DOMContentLoaded', function() {
     const sortField = document.getElementById('sort-field');
@@ -476,6 +477,7 @@ document.addEventListener('DOMContentLoaded', function() {
         starredFirst.addEventListener('change', updateSort);
     }
 });
+
 // --- PiP button logic ---
 document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.pip-btn').forEach(function(btn) {
@@ -546,6 +548,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 });
+
 // --- Preview Grid logic ---
 function openPreviewGrid(selectedClipIds) {
     if (!selectedClipIds || selectedClipIds.length === 0) return;
@@ -622,6 +625,7 @@ function openPreviewGrid(selectedClipIds) {
     document.body.appendChild(overlay);
     document.getElementById('close-preview-grid').onclick = () => overlay.remove();
 }
+
 // Add Preview Grid button to selection bar
 function patchSelectedClipsBarForPreviewGrid() {
     const bar = document.getElementById('selected-clips-bar');
@@ -649,7 +653,9 @@ function patchSelectedClipsBarForPreviewGrid() {
     document.addEventListener('click', updateBtn);
     updateBtn();
 }
+
 document.addEventListener('DOMContentLoaded', patchSelectedClipsBarForPreviewGrid);
+
 // --- Scan Progress Modal Logic ---
 let scanProgressInterval = null;
 let scanProgressRetryTimeout = null;
@@ -781,6 +787,7 @@ if (scanForm) {
         startScanProgressPolling();
     });
 }
+
 // Auto-start polling if a scan is in progress on page load
 window.addEventListener('DOMContentLoaded', () => {
     fetch('/scan_progress')
@@ -791,6 +798,7 @@ window.addEventListener('DOMContentLoaded', () => {
             }
         });
 });
+
 // --- Persist scan folder location logic ---
 document.addEventListener('DOMContentLoaded', function() {
     const folderInput = document.getElementById('folder_path');
@@ -809,6 +817,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 });
+
 // --- Virtualized Infinite Grid Logic (Multi-Column Flex Rows) ---
 let offset = 0;
 const limit = 100;
@@ -827,7 +836,7 @@ const clusterize = new Clusterize({
     }
 });
 
-// --- PATCH: Robustly re-attach selection handlers and update selection bar after every grid update ---
+// --- PATCH: Robust scroll restoration after grid render ---
 function afterGridUpdate() {
     // Attach selection handlers to all cards and checkboxes
     if (window.attachCardEventHandlers) {
@@ -836,6 +845,16 @@ function afterGridUpdate() {
     // Update selection bar and batch bar
     if (window.updateCardSelectionUI) {
         window.updateCardSelectionUI();
+    }
+    // --- PATCH: Restore scroll position if needed ---
+    const scrollArea = document.getElementById('clip-scroll-area');
+    if (scrollArea && window.sessionStorage) {
+        const scrollY = sessionStorage.getItem('gridScrollY');
+        if (scrollY !== null) {
+            scrollArea.scrollTop = parseInt(scrollY, 10);
+            sessionStorage.removeItem('gridScrollY');
+            console.log('[Grid] Restored scrollY to', scrollY);
+        }
     }
 }
 
@@ -887,6 +906,7 @@ function throttle(func, wait) {
     }
   };
 }
+
 // Patch scroll handler to throttle and show spinner
 const scrollArea = document.getElementById('clip-scroll-area');
 const spinner = document.getElementById('grid-loading-spinner');
@@ -904,6 +924,7 @@ scrollArea.addEventListener('scroll', function() {
     throttledLoad();
   }
 });
+
 // --- Recent scan folders logic ---
 (function() {
     const folderInput = document.getElementById('folder_path');
@@ -940,6 +961,7 @@ scrollArea.addEventListener('scroll', function() {
         }
     });
 })();
+
 // --- Playlist pill badge interactivity: click to filter grid by playlist ---
 document.addEventListener('DOMContentLoaded', function() {
     // Delegate click event for playlist pills (works for dynamically loaded cards)
