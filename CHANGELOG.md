@@ -28,6 +28,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **Fixed** Tag suggestions endpoint mismatch: frontend now uses /api/tag_suggestions instead of /tags
 - **Fixed** Tag suggestions response format is now consistent across all endpoints
 - **Fixed** Tag autocomplete dropdowns are properly positioned and styled in all contexts
+- Remove scroll event profiling/debug code from `clip_actions.js` (restored production scroll logic for gridview).
+- Added and then removed profiling hooks for grid rendering and scroll performance tuning.
+- No functional changes to user-facing features; all debugging code is now removed.
 
 ## [1.2.0] - 2025-04-26
 
