@@ -65,6 +65,7 @@ def filesizeformat(value):
 templates.env.filters["filesizeformat"] = filesizeformat
 
 THUMB_DIR = Path(".loopsleuth_data/thumbnails")
+STATIC_DIR = Path(__file__).parent / "static" # Define static dir for placeholder check
 
 # --- Routes ---
 @app.get("/", response_class=HTMLResponse)
@@ -248,12 +249,45 @@ def clip_detail(request: Request, clip_id: int):
 
 @app.get("/thumbs/{filename}")
 def serve_thumbnail(filename: str):
-    """
-    Serve a thumbnail image from the .loopsleuth_data/thumbnails directory.
-    """
+    # Basic security: prevent path traversal
+    if ".." in filename or filename.startswith("/"):
+        print(f"[Serve Thumbnail] Invalid filename attempt: {filename}")
+        raise HTTPException(status_code=400, detail="Invalid filename.")
+
+    print(f"[Serve Thumbnail] Requested filename: {filename}") # Log requested filename
+
+    if filename == "missing.jpg":
+        print(f"[Serve Thumbnail] Explicitly asked for missing.jpg. This is unusual.")
+        # Let's try to serve the actual placeholder if this happens, to avoid deeper errors
+        # This is a temporary diagnostic measure.
+        placeholder_path = STATIC_DIR / "placeholder.png" # Assuming you have this
+        if placeholder_path.is_file():
+            print(f"[Serve Thumbnail] Serving actual placeholder.png for missing.jpg request: {placeholder_path}")
+            return FileResponse(placeholder_path)
+        else:
+            print(f"[Serve Thumbnail] Actual placeholder.png not found at {placeholder_path} when missing.jpg was requested.")
+            raise HTTPException(status_code=404, detail="Fallback placeholder missing.jpg and actual placeholder.png not found.")
+
     thumb_path = THUMB_DIR / filename
-    if not thumb_path.exists():
-        return FileResponse(THUMB_DIR / "missing.jpg", status_code=404)  # Optionally serve a placeholder
+    print(f"[Serve Thumbnail] Attempting to serve: {thumb_path}") # Log full path
+
+    if not thumb_path.is_file():
+        print(f"[Serve Thumbnail] File not found at path: {thumb_path}")
+        # If an _anim.gif is not found, let's try to serve its static .jpg counterpart
+        # This is a more graceful fallback than a generic 404 for the animation
+        if filename.endswith("_anim.gif"):
+            static_filename = filename.replace("_anim.gif", ".jpg")
+            static_thumb_path = THUMB_DIR / static_filename
+            print(f"[Serve Thumbnail] Animated GIF {filename} not found, trying static fallback: {static_thumb_path}")
+            if static_thumb_path.is_file():
+                print(f"[Serve Thumbnail] Serving static fallback {static_filename} for missing animated GIF.")
+                return FileResponse(static_thumb_path)
+            else:
+                print(f"[Serve Thumbnail] Static fallback {static_filename} also not found.")
+        # If still not found (or wasn't an anim.gif request), raise 404 for the original request
+        raise HTTPException(status_code=404, detail=f"Thumbnail {filename} not found, and no suitable fallback available.")
+    
+    print(f"[Serve Thumbnail] Serving file: {thumb_path}")
     return FileResponse(thumb_path)
 
 @app.get("/media/{filename:path}")
