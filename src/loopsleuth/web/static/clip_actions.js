@@ -1592,31 +1592,31 @@ async function loadMoreClipsDebounced() {
 
 // --- Batch DOM appends in renderClipRows ---
 function renderClipRows(clips, cardsPerRow = 5) {
+    // --- PATCH: Filter for unique IDs and log duplicates ---
+    const uniqueClips = [];
+    const seenIds = new Set();
+    const idCounts = {};
+    for (const clip of clips) {
+        if (!clip || !clip.id) continue;
+        idCounts[clip.id] = (idCounts[clip.id] || 0) + 1;
+        if (!seenIds.has(clip.id)) {
+            uniqueClips.push(clip);
+            seenIds.add(clip.id);
+        } else {
+            console.warn('[renderClipRows] Duplicate clip.id detected:', clip.id);
+        }
+    }
+    // Log all duplicate IDs (if any)
+    Object.entries(idCounts).forEach(([id, count]) => {
+        if (count > 1) {
+            console.warn(`[renderClipRows] clip.id ${id} appears ${count} times in data!`);
+        }
+    });
+    clips = uniqueClips;
     let rows = [];
-    const batchSize = 10;
     for (let i = 0; i < clips.length; i += cardsPerRow) {
         const rowClips = clips.slice(i, i + cardsPerRow);
-        rows.push(`<div class="clip-row">${rowClips.map(renderClipCard).join('')}</div>`);
-    }
-    // Batch append rows to DOM using setTimeout
-    if (typeof window !== 'undefined' && window.document) {
-        const contentArea = document.getElementById('clip-content-area');
-        if (contentArea) {
-            let idx = 0;
-            function appendBatch() {
-                const end = Math.min(idx + batchSize, rows.length);
-                for (let j = idx; j < end; j++) {
-                    const tempDiv = document.createElement('div');
-                    tempDiv.innerHTML = rows[j];
-                    contentArea.appendChild(tempDiv.firstChild);
-                }
-                idx = end;
-                if (idx < rows.length) {
-                    setTimeout(appendBatch, 0);
-                }
-            }
-            appendBatch();
-        }
+        rows.push(`<div class=\"clip-row\">${rowClips.map(renderClipCard).join('')}</div>`);
     }
     return rows;
 }
