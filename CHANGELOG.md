@@ -31,6 +31,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **Fixed** Prevented phantom/unselectable duplicate cards in the grid by ensuring all grid DOM updates are handled exclusively by Clusterize.js, removing all manual DOM appends from renderClipRows. This resolves selection and batch action issues caused by duplicate DOM nodes.
 - **Fixed** Star (favorite) toggling now works in both grid and detail views. The root cause was a missing `request` parameter in the `/star/{clip_id}` backend endpoint, which caused a 500 error and prevented the UI from updating. Now, clicking the star icon instantly toggles favorite status and persists it in the database.
 - **Fixed** Grid sort dropdown now works as expected: sorting by name, date, size, duration, or starred status updates the grid order. The `/api/clips` endpoint now respects `sort`, `order`, and `starred_first` query parameters, matching the main grid route.
+- **Fixed** Robust grid scroll restoration: The grid view now reliably restores your previous scroll position when returning from the detail view, both via the browser back button and the "Back to grid" button. The fix uses `window.history.back()` for the button and a retry-until-correct scroll restoration logic to handle Clusterize.js virtualized rendering. This ensures seamless navigation and workflow, even with large libraries and infinite scroll.
 
 ## [1.2.0] - 2025-04-26
 

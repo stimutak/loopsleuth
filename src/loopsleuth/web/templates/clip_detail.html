@@ -421,14 +421,18 @@ LoopSleuth Web: Clip Detail Page (Notch/Cursor-inspired Redesign)
         });
     })();
 
-    document.getElementById('back-to-grid-btn').onclick = function(e) {
-        if (window.sessionStorage) {
-            const scrollY = window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
-            sessionStorage.setItem('gridScrollY', scrollY);
-            console.log('[BackToGrid] Saved scrollY:', scrollY);
-        }
-        window.location.href = '/';
-    };
+    // Use history.back() for scroll restoration, fallback to reload
+    const backBtn = document.getElementById('back-to-grid-btn');
+    if (backBtn) {
+        backBtn.onclick = function(e) {
+            e.preventDefault();
+            if (window.history.length > 1) {
+                window.history.back();
+            } else {
+                window.location.href = '/';
+            }
+        };
+    }
     </script>
 </body>
 </html> 

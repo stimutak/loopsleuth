@@ -836,7 +836,9 @@ const clusterize = new Clusterize({
     }
 });
 
-// --- PATCH: Robust scroll restoration after grid render ---
+// --- PATCH: Robust scroll restoration with retry until correct ---
+window._pendingGridScrollY = null;
+
 function afterGridUpdate() {
     // Attach selection handlers to all cards and checkboxes
     if (window.attachCardEventHandlers) {
@@ -846,14 +848,26 @@ function afterGridUpdate() {
     if (window.updateCardSelectionUI) {
         window.updateCardSelectionUI();
     }
-    // --- PATCH: Restore scroll position if needed ---
+    // --- Robust scroll restoration: try until scrollTop matches desired value ---
     const scrollArea = document.getElementById('clip-scroll-area');
     if (scrollArea && window.sessionStorage) {
-        const scrollY = sessionStorage.getItem('gridScrollY');
-        if (scrollY !== null) {
-            scrollArea.scrollTop = parseInt(scrollY, 10);
-            sessionStorage.removeItem('gridScrollY');
-            console.log('[Grid] Restored scrollY to', scrollY);
+        // On first load, move sessionStorage value to global
+        if (window._pendingGridScrollY === null) {
+            const y = sessionStorage.getItem('gridScrollY');
+            if (y !== null) {
+                window._pendingGridScrollY = parseInt(y, 10);
+                sessionStorage.removeItem('gridScrollY');
+                console.log('[Grid] Will restore scrollY to', window._pendingGridScrollY);
+            }
+        }
+        if (window._pendingGridScrollY !== null) {
+            if (Math.abs(scrollArea.scrollTop - window._pendingGridScrollY) > 2) {
+                scrollArea.scrollTop = window._pendingGridScrollY;
+                console.log('[Grid] Attempted scroll restore to', window._pendingGridScrollY, 'current:', scrollArea.scrollTop);
+            } else {
+                console.log('[Grid] ScrollY restored and confirmed at', scrollArea.scrollTop);
+                window._pendingGridScrollY = null;
+            }
         }
     }
 }
