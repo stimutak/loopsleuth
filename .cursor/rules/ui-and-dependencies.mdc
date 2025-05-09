@@ -6,14 +6,46 @@ alwaysApply: false
 # LoopSleuth UI & Dependencies
 
 **User Interface:**
-*   The primary user interface is a Terminal User Interface (TUI) built with the [Textual](mdc:https:/textual.textualize.io) framework, located in `[src/loopsleuth/tui.py](mdc:src/loopsleuth/tui.py)`.
-*   A Command Line Interface (CLI) using [Typer](mdc:https:/typer.tiangolo.com) is planned for operations like scanning directories and exporting data (likely in `src/loopsleuth/cli.py`, not yet created).
+*   The primary user interface is a modern, production-ready web app built with [FastAPI](mdc:https://fastapi.tiangolo.com), [Jinja2](mdc:https://jinja.palletsprojects.com), and custom JavaScript/CSS. The UI features:
+    - Virtualized, infinite-scroll grid (Clusterize.js) for large libraries
+    - Responsive multi-column layout, persistent selection and batch bars
+    - Playlist sidebar with add/remove, filtering, and instant feedback
+    - Detail view with glassmorphic sidebar, large video, and modern tag/playlist controls
+    - Robust scroll restoration between grid and detail views
+    - All major actions (tagging, starring, playlist, export) are available in the web UI
+*   An experimental React+Vite frontend exists in `[src/loopsleuth/web/react](mdc:src/loopsleuth/web/react)` (not used in production, for future/experimental UI work).
+*   The legacy Terminal UI (TUI) built with [Textual](mdc:https://textual.textualize.io) is available for power users in `[src/loopsleuth/tui.py](mdc:src/loopsleuth/tui.py)`, but is not actively maintained.
 
 **Key Dependencies:**
-*   **External Program:** `ffmpeg` and `ffprobe` must be installed and accessible in the system's PATH for video processing. See `[README.md](mdc:README.md)` for setup details.
-*   **Python Packages:** All required Python packages are listed in `[requirements.txt](mdc:requirements.txt)`. Key packages include `textual`, `pillow`, `imagehash`, `typer` (when added), `rich` (via Textual).
+*   **External Programs:** `ffmpeg` and `ffprobe` (must be installed and in PATH for video processing and thumbnailing).
+*   **Python Packages:**
+    - `fastapi`, `uvicorn[standard]` (web server)
+    - `jinja2` (templating)
+    - `pillow` (image processing)
+    - `imagehash` (perceptual hashing)
+    - `numpy`, `scipy` (media/array utils)
+    - `pytest`, `pytest-cov` (testing)
+    - `python-multipart` (form uploads)
+    - `textual` (TUI, legacy)
+    - `typer` (CLI, planned)
+    - `rich` (via Textual)
+    - `colorama`, `click`, `platformdirs`, `shellingham`, `pygments`, `PyWavelets`, `markdown-it-py`, `mdit-py-plugins`, `mdurl`, `linkify-it-py`, `uc-micro-py`, `typing_extensions`
+    - See `[requirements.txt](mdc:requirements.txt)` for the full list.
+*   **Static Assets:**
+    - Main JS: `[clip_actions.js](mdc:src/loopsleuth/web/static/clip_actions.js)` (handles all grid/detail UI logic)
+    - Main CSS: `[style.css](mdc:src/loopsleuth/web/static/style.css)`
+    - Favicons: PNG/ICO in `src/loopsleuth/web/static/`
+    - Clusterize.js (CDN in grid.html)
+
+**Templates:**
+*   Main grid: `[grid.html](mdc:src/loopsleuth/web/templates/grid.html)`
+*   Detail view: `[clip_detail.html](mdc:src/loopsleuth/web/templates/clip_detail.html)`
+*   Duplicates, error, and base templates in the same directory
 
 **Project Management:**
-*   Tasks are tracked in `[TODO.md](mdc:TODO.md)`.
-*   Session status is sometimes summarized in `[STARTUP_MESSAGE.md](mdc:STARTUP_MESSAGE.md)`.
+*   Tasks and next steps are tracked in `[TODO.md](mdc:TODO.md)`.
+*   Onboarding, troubleshooting, and handoff notes are in `[README.md](mdc:README.md)` and `[STARTUP_MESSAGE.md](mdc:STARTUP_MESSAGE.md)`.
+
+**Cross-Platform:**
+*   All features are tested and supported on macOS, Windows, and Linux. Only system dependencies (ffmpeg/ffprobe) must be installed separately.
 

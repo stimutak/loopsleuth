@@ -1,5 +1,5 @@
 <!--
-LoopSleuth Web: Clip Detail Page (DaVinci-inspired)
+LoopSleuth Web: Clip Detail Page (Notch/Cursor-inspired Redesign)
 -->
 <!DOCTYPE html>
 <html lang="en">
@@ -7,7 +7,19 @@ LoopSleuth Web: Clip Detail Page (DaVinci-inspired)
     <meta charset="UTF-8">
     <title>{{ clip.filename }} - LoopSleuth</title>
     <link rel="stylesheet" href="/static/style.css">
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="180x180" href="/static/favicon-180x180.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="/static/favicon-192x192.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/static/favicon-180x180.png">
     <style>
+        body {
+            background: linear-gradient(120deg, #10131a 0%, #181a1b 100%);
+            color: #f0f4fa;
+            font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+            margin: 0;
+            min-height: 100vh;
+        }
         .detail-flex {
             display: flex;
             flex-direction: row;
@@ -15,100 +27,241 @@ LoopSleuth Web: Clip Detail Page (DaVinci-inspired)
             margin: 2.5em 2em 2em 2em;
             min-height: 60vh;
         }
-        .detail-main {
-            flex: 2 1 0%;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: flex-start;
-        }
         .detail-sidebar {
             flex: 1 1 0%;
-            background: #181a1b;
-            border-radius: 12px;
-            box-shadow: 0 2px 12px #000a;
-            padding: 2em 1.5em 1.5em 1.5em;
+            background: rgba(24,26,27,0.92);
+            border-radius: 18px;
+            box-shadow: 0 8px 32px #000b, 0 1.5px 0 #23232a, 0 0 0 1.5px #3fa7ff;
+            border-left: 4px solid #3fa7ff;
+            backdrop-filter: blur(12px);
+            padding: 2.2em 1.7em 1.7em 1.7em;
             min-width: 260px;
             max-width: 340px;
             color: #f0f4fa;
             display: flex;
             flex-direction: column;
-            gap: 1.2em;
+            gap: 1.5em;
+        }
+        .sidebar-section {
+            margin-bottom: 1.3em;
+        }
+        .sidebar-section:last-child { margin-bottom: 0; }
+        .sidebar-actions {
+            display: flex;
+            gap: 0.7em;
+            flex-wrap: wrap;
+        }
+        .sidebar-btn {
+            border-radius: 999px;
+            background: #23232a;
+            color: #3fa7ff;
+            font-weight: 600;
+            font-size: 1em;
+            padding: 0.5em 1.2em;
+            display: flex;
+            align-items: center;
+            gap: 0.5em;
+            box-shadow: 0 2px 8px #0002;
+            border: 1.5px solid #3fa7ff;
+            transition: background 0.15s, color 0.15s;
+            cursor: pointer;
+        }
+        .sidebar-btn:hover, .sidebar-btn:focus {
+            background: #3fa7ff;
+            color: #181a1b;
+        }
+        .sidebar-filename {
+            font-size: 1.25em;
+            font-weight: 700;
+            letter-spacing: 0.01em;
+            color: #fff;
+            margin-bottom: 0.2em;
+        }
+        .star {
+            cursor: pointer;
+            font-size: 2.2em;
+            margin-top: 0.2em;
+            color: #3fa7ff;
+            text-shadow: 0 2px 8px #3fa7ff44;
+            transition: color 0.18s, text-shadow 0.18s;
+        }
+        .star:hover, .star:focus {
+            color: #fff;
+            text-shadow: 0 0 8px #3fa7ffcc;
+        }
+        .meta-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.5em 1.2em;
+            font-size: 1em;
+            color: #bfc7d5;
+        }
+        .meta-label { color: #3fa7ff; font-size: 0.97em; font-weight: 500; }
+        .meta-value { color: #f0f4fa; font-weight: 400; }
+        .tags-text, .tags-edit {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.4em;
+            margin-bottom: 0.3em;
+        }
+        .tag-chip, .playlist-badge {
+            display: inline-block;
+            background: #1a2633;
+            color: #3fa7ff;
+            border-radius: 999px;
+            padding: 0.13em 0.9em;
+            font-size: 0.93em;
+            font-weight: 600;
+            border: 1.5px solid #3fa7ff;
+            margin-right: 0.15em;
+            margin-bottom: 0.15em;
+            letter-spacing: 0.01em;
+            box-shadow: 0 2px 8px #3fa7ff22;
+            transition: background 0.15s, color 0.15s;
+        }
+        .tag-chip.tag-empty, .playlist-badge.playlist-empty {
+            background: #181a1b;
+            color: #888;
+            border: 1.5px solid #23232a;
+            font-style: italic;
+        }
+        .tag-chip.tag-edit {
+            background: #3fa7ff;
+            color: #181a1b;
+            border: 2px solid #3fa7ff;
+            font-weight: 700;
+        }
+        .playlist-badge.playlist-member {
+            background: #3fa7ff;
+            color: #181a1b;
+            border: 2px solid #3fa7ff;
+            font-weight: 700;
+        }
+        .playlist-badge.playlist-nonmember {
+            background: #23232a;
+            color: #888;
+            border: 1.5px solid #23232a;
+            opacity: 0.7;
+        }
+        .playlist-badge.selected {
+            background: #1a6fff !important;
+            color: #fff !important;
+            font-weight: 800;
+            box-shadow: 0 0 0 2px #3fa7ff44;
         }
         .video-player-container {
             width: 100%;
-            max-width: 900px;
-            background: #111;
-            border-radius: 12px;
-            box-shadow: 0 2px 12px #000a;
+            max-width: 1100px;
+            background: #111a22;
+            border-radius: 18px;
+            box-shadow: 0 8px 32px #000b, 0 1.5px 0 #23232a;
             display: flex;
             flex-direction: column;
             align-items: center;
-            padding: 1.5em 1em 1.2em 1em;
+            padding: 2.2em 1.5em 1.7em 1.5em;
+            margin-bottom: 1.5em;
         }
         .video-player-container video {
             width: 100%;
-            max-width: 880px;
+            max-width: 1000px;
             aspect-ratio: 16/9;
             background: #111;
-            border-radius: 8px;
+            border-radius: 12px;
+            box-shadow: 0 2px 16px #000a;
         }
         .playback-bar {
             width: 100%;
             display: flex;
             align-items: center;
             gap: 1em;
-            margin-top: 0.7em;
+            margin-top: 1.2em;
             color: #f0f4fa;
+            background: rgba(24,26,27,0.85);
+            border-radius: 8px;
+            padding: 0.7em 1.2em;
+            box-shadow: 0 2px 8px #0004;
         }
-        .meta-label { color: #aaa; font-size: 0.97em; margin-right: 0.5em; }
-        .meta-value { color: #f0f4fa; font-weight: 500; }
-        .sidebar-section { margin-bottom: 1.2em; }
-        .sidebar-section:last-child { margin-bottom: 0; }
-        .sidebar-actions button { margin-right: 0.7em; }
+        .playback-bar button {
+            background: #23232a;
+            color: #3fa7ff;
+            border: none;
+            border-radius: 999px;
+            padding: 0.3em 1em;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.15s, color 0.15s;
+        }
+        .playback-bar button:hover, .playback-bar button:focus {
+            background: #3fa7ff;
+            color: #181a1b;
+        }
+        .playback-bar input[type="range"] {
+            accent-color: #3fa7ff;
+        }
+        .back-link {
+            color: #3fa7ff;
+            text-decoration: none;
+            font-size: 1.1em;
+            margin-left: 2.2em;
+            margin-top: 1.2em;
+            display: inline-block;
+            margin-bottom: -1.2em;
+        }
         @media (max-width: 900px) {
             .detail-flex { flex-direction: column; gap: 1.5em; margin: 1.2em 0.5em; }
-            .detail-sidebar { max-width: 100vw; min-width: 0; padding: 1.2em 0.7em; }
+            .detail-sidebar { max-width: 100vw; min-width: 0; padding: 1.2em 0.7em; border-left: none; border-top: 4px solid #3fa7ff; border-radius: 0 0 18px 18px; }
             .video-player-container { max-width: 100vw; padding: 0.7em 0.2em; }
+        }
+        #back-to-grid-btn:hover, #back-to-grid-btn:focus {
+            background: #3fa7ff;
+            color: #181a1b;
+            outline: none;
         }
     </style>
 </head>
 <body>
-    <a class="back-link" href="/">← Back to grid</a>
+    <button class="back-link" id="back-to-grid-btn" type="button" aria-label="Back to grid" tabindex="0" style="position:fixed;top:1.2em;left:1.2em;z-index:4000;padding:0.6em 1.3em;font-size:1.1em;background:#181a1b;border:2px solid #3fa7ff;border-radius:999px;color:#3fa7ff;box-shadow:0 2px 12px #000a;cursor:pointer;transition:background 0.15s,color 0.15s;">← Back to grid</button>
     <div class="detail-flex">
+        <!-- Sidebar: Glassmorphic, blue-accented, modern -->
         <div class="detail-sidebar">
             <div class="sidebar-section">
-                <div style="font-size:1.15em; font-weight:600;">{{ clip.filename }}</div>
-                <div class="star" style="cursor:pointer; font-size:2em; margin-top:0.2em;" data-clip-id="{{ clip.id }}" onclick="toggleStar(event)" title="Toggle star">{% if clip.starred %}★{% else %}☆{% endif %}</div>
+                <div class="sidebar-filename">{{ clip.filename }}</div>
+                <div class="star" data-clip-id="{{ clip.id }}" onclick="toggleStar(event)" title="Toggle star">{% if clip.starred %}★{% else %}☆{% endif %}</div>
             </div>
             <div class="sidebar-section">
-                <div><span class="meta-label">Duration:</span> <span class="meta-value">
-                    {# Robust duration formatting using .get() #}
-                    {% set duration = clip.get('duration') %}
-                    {% if duration is not none %}
-                        {{ (duration // 60)|int }}:{{ '%02d' % (duration % 60) }} min
-                    {% else %}
-                        ??:?? min
-                    {% endif %}
-                </span></div>
-                <div><span class="meta-label">Resolution:</span> <span class="meta-value">
-                    {% set width = clip.get('width') %}
-                    {% set height = clip.get('height') %}
-                    {% if width is not none and height is not none %}
-                        {{ width }}×{{ height }}
-                    {% else %}
-                        ?×?
-                    {% endif %}
-                </span></div>
-                <div><span class="meta-label">Size:</span> <span class="meta-value">
-                    {% set size = clip.get('size') %}
-                    {% if size is not none %}
-                        {{ size|filesizeformat }}
-                    {% else %}
-                        ?
-                    {% endif %}
-                </span></div>
-                <div><span class="meta-label">Format:</span> <span class="meta-value">{{ clip.get('codec_name', 'Unknown')|default('Unknown') }}</span></div>
+                <div class="meta-grid">
+                    <div class="meta-label">Duration:</div>
+                    <div class="meta-value">
+                        {% set duration = clip.get('duration') %}
+                        {% if duration is not none %}
+                            {{ (duration // 60)|int }}:{{ '%02d' % (duration % 60) }} min
+                        {% else %}
+                            ??:?? min
+                        {% endif %}
+                    </div>
+                    <div class="meta-label">Resolution:</div>
+                    <div class="meta-value">
+                        {% set width = clip.get('width') %}
+                        {% set height = clip.get('height') %}
+                        {% if width is not none and height is not none %}
+                            {{ width }}×{{ height }}
+                        {% else %}
+                            ?×?
+                        {% endif %}
+                    </div>
+                    <div class="meta-label">Size:</div>
+                    <div class="meta-value">
+                        {% set size = clip.get('size') %}
+                        {% if size is not none %}
+                            {{ size|filesizeformat }}
+                        {% else %}
+                            ?
+                        {% endif %}
+                    </div>
+                    <div class="meta-label">Format:</div>
+                    <div class="meta-value">{{ clip.get('codec_name', 'Unknown')|default('Unknown') }}</div>
+                </div>
             </div>
             <div class="sidebar-section">
                 <div style="margin-bottom:0.4em; color:#aaa;">Tags:</div>
@@ -119,11 +272,11 @@ LoopSleuth Web: Clip Detail Page (DaVinci-inspired)
                         <span class="tag-chip tag-empty">No tags</span>
                     {% endfor %}
                 </span>
-                <button type="button" class="edit-tag-btn" data-clip-id="{{ clip.id }}" onclick="editTags(event)" style="margin-left:0.5em; font-size:0.9em;">✎</button>
+                <button type="button" class="edit-tag-btn sidebar-btn" data-clip-id="{{ clip.id }}" onclick="editTags(event)" style="margin-left:0.5em; font-size:0.9em; padding:0.2em 1em;">✎ Edit</button>
                 <span class="tags-edit" id="tags-edit-{{ clip.id }}" style="display:none;"></span>
                 <input type="text" class="tag-input-new" id="tag-input-new-{{ clip.id }}" style="display:none; width:90%; margin-top:0.3em;" data-clip-id="{{ clip.id }}" placeholder="Add tag..." autocomplete="off" />
-                <button type="button" class="save-tag-btn" id="save-tag-btn-{{ clip.id }}" style="display:none; margin-left:0.3em; font-size:0.9em;" data-clip-id="{{ clip.id }}" onclick="saveTags(event)">💾</button>
-                <button type="button" class="cancel-tag-btn" id="cancel-tag-btn-{{ clip.id }}" style="display:none; margin-left:0.3em; font-size:0.9em;" data-clip-id="{{ clip.id }}" onclick="cancelEditTags(event)">✖</button>
+                <button type="button" class="save-tag-btn sidebar-btn" id="save-tag-btn-{{ clip.id }}" style="display:none; margin-left:0.3em; font-size:0.9em; padding:0.2em 1em;" data-clip-id="{{ clip.id }}" onclick="saveTags(event)">💾 Save</button>
+                <button type="button" class="cancel-tag-btn sidebar-btn" id="cancel-tag-btn-{{ clip.id }}" style="display:none; margin-left:0.3em; font-size:0.9em; padding:0.2em 1em;" data-clip-id="{{ clip.id }}" onclick="cancelEditTags(event)">✖ Cancel</button>
             </div>
             <div class="sidebar-section">
                 <div style="margin-bottom:0.4em; color:#aaa;">Playlists:</div>
@@ -141,17 +294,19 @@ LoopSleuth Web: Clip Detail Page (DaVinci-inspired)
                         <span class="playlist-badge playlist-empty">No playlists</span>
                     {% endif %}
                 </div>
-                <button class="sidebar-btn" style="margin-top:0.7em;">Add to Playlist</button>
+                <button class="sidebar-btn" style="margin-top:0.7em;">+ Add to Playlist</button>
             </div>
             <div class="sidebar-section sidebar-actions">
-                <button class="sidebar-btn" onclick="window.open('/media/{{ clip.path | urlencode }}', '_blank')">Download</button>
+                <button class="sidebar-btn" onclick="window.open('/media/{{ clip.path | urlencode }}', '_blank')"><span style="font-size:1.1em;">⬇️</span> Download</button>
                 <form method="post" action="/open_in_system/{{ clip.id }}" style="display:inline;" target="_blank">
-                    <button class="sidebar-btn" type="submit">Open in System</button>
+                    <button class="sidebar-btn" type="submit"><span style="font-size:1.1em;">🗁</span> Open in System</button>
                 </form>
             </div>
         </div>
+        <!-- Main: Large video, modern controls, filename/quick actions -->
         <div class="detail-main">
             <div class="video-player-container">
+                <div class="sidebar-filename" style="margin-bottom:0.7em;">{{ clip.filename }}</div>
                 <video id="clip-video" controls preload="auto">
                     <source src="/media/{{ clip.path | urlencode }}" type="{{ video_mime }}">
                     <div style="color:#ffb347; background:#222; padding:1em; border-radius:6px; margin-top:1em;">
@@ -161,7 +316,6 @@ LoopSleuth Web: Clip Detail Page (DaVinci-inspired)
                     </div>
                 </video>
                 <div class="playback-bar">
-                    <!-- Placeholder: Custom controls can be added here (play/pause, seek, timecode, frame step, volume, speed) -->
                     <span id="current-time">00:00</span> / <span id="duration">00:00</span>
                     <input type="range" id="seek-bar" min="0" max="100" value="0" style="flex:1; margin:0 1em;">
                     <button id="play-pause-btn">⏯</button>
@@ -199,6 +353,86 @@ LoopSleuth Web: Clip Detail Page (DaVinci-inspired)
             alert('Playlist: ' + playlistName);
         }
     };
+
+    // --- Custom video controls wiring ---
+    (function() {
+        const video = document.getElementById('clip-video');
+        const playPauseBtn = document.getElementById('play-pause-btn');
+        const seekBar = document.getElementById('seek-bar');
+        const currentTimeLabel = document.getElementById('current-time');
+        const durationLabel = document.getElementById('duration');
+        const frameBackBtn = document.getElementById('frame-back-btn');
+        const frameFwdBtn = document.getElementById('frame-fwd-btn');
+        const volumeBar = document.getElementById('volume-bar');
+        let seeking = false;
+
+        function formatTime(sec) {
+            if (isNaN(sec)) return '00:00';
+            const m = Math.floor(sec / 60);
+            const s = Math.floor(sec % 60);
+            return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        }
+
+        // Update duration when metadata is loaded
+        video.addEventListener('loadedmetadata', function() {
+            seekBar.max = video.duration || 0;
+            durationLabel.textContent = formatTime(video.duration);
+        });
+
+        // Sync seek bar and time display
+        video.addEventListener('timeupdate', function() {
+            if (!seeking) seekBar.value = video.currentTime;
+            currentTimeLabel.textContent = formatTime(video.currentTime);
+        });
+
+        // Play/pause button
+        playPauseBtn.addEventListener('click', function() {
+            if (video.paused) {
+                video.play();
+                playPauseBtn.textContent = '⏸';
+            } else {
+                video.pause();
+                playPauseBtn.textContent = '⏯';
+            }
+        });
+        video.addEventListener('play', () => { playPauseBtn.textContent = '⏸'; });
+        video.addEventListener('pause', () => { playPauseBtn.textContent = '⏯'; });
+
+        // Seek bar interaction
+        seekBar.addEventListener('input', function() {
+            seeking = true;
+            video.currentTime = seekBar.value;
+        });
+        seekBar.addEventListener('change', function() {
+            seeking = false;
+        });
+
+        // Frame step
+        frameBackBtn.addEventListener('click', function() {
+            video.currentTime = Math.max(0, video.currentTime - 1/30);
+        });
+        frameFwdBtn.addEventListener('click', function() {
+            video.currentTime = Math.min(video.duration, video.currentTime + 1/30);
+        });
+
+        // Volume
+        volumeBar.addEventListener('input', function() {
+            video.volume = volumeBar.value;
+        });
+    })();
+
+    // Use history.back() for scroll restoration, fallback to reload
+    const backBtn = document.getElementById('back-to-grid-btn');
+    if (backBtn) {
+        backBtn.onclick = function(e) {
+            e.preventDefault();
+            if (window.history.length > 1) {
+                window.history.back();
+            } else {
+                window.location.href = '/';
+            }
+        };
+    }
     </script>
 </body>
 </html> 

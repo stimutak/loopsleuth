@@ -5,15 +5,37 @@ alwaysApply: false
 ---
 # LoopSleuth Core Components
 
-Key Python modules and their roles:
+Key components and their roles:
 
-*   **TUI:** `[src/loopsleuth/tui.py](mdc:src/loopsleuth/tui.py)` - Implements the main Textual user interface for browsing and interacting with clips.
-*   **Database:** `[src/loopsleuth/db.py](mdc:src/loopsleuth/db.py)` - Defines the SQLite database schema and provides functions for adding, querying, updating, and deleting clip metadata. The main database is typically named `loopsleuth.db` (or similar) in the root, with `[temp_thumb_test.db](mdc:temp_thumb_test.db)` used for testing.
-*   **Thumbnailer:** `[src/loopsleuth/thumbnailer.py](mdc:src/loopsleuth/thumbnailer.py)` - Uses `ffmpeg` to extract a frame from a video file and saves it as a JPEG thumbnail.
-*   **Hasher:** `[src/loopsleuth/hasher.py](mdc:src/loopsleuth/hasher.py)` - Calculates the perceptual hash (pHash) of thumbnail images using `imagehash`.
-*   **Exporter:** `[src/loopsleuth/exporter.py](mdc:src/loopsleuth/exporter.py)` - Handles exporting data, currently focused on writing starred clip paths to a text file (`[keepers.txt](mdc:keepers.txt)`).
+*   **Web UI:** `[src/loopsleuth/web/app.py](mdc:src/loopsleuth/web/app.py)` - FastAPI app serving the production web frontend (grid, detail, batch, playlist, tagging, export, duplicate review). Uses Jinja2 templates and static assets for a responsive, creative workflow UI. Features:
+    - Virtualized, infinite-scroll grid (Clusterize.js)
+    - Persistent selection and batch bars
+    - Playlist sidebar (add/remove, filter, reorder)
+    - Robust scroll restoration between grid and detail views
+    - Batch selection, tagging, playlist management, and duplicate review/merge
+    - API endpoints for all core workflows
+*   **Static Assets:**
+    - Main JS: `[clip_actions.js](mdc:src/loopsleuth/web/static/clip_actions.js)` (all grid/detail UI logic)
+    - Main CSS: `[style.css](mdc:src/loopsleuth/web/static/style.css)`
+    - Favicons: PNG/ICO in `src/loopsleuth/web/static/`
+    - Clusterize.js (CDN in grid.html)
+*   **Experimental React+Vite frontend:** `[src/loopsleuth/web/react](mdc:src/loopsleuth/web/react)` (not used in production, for future/experimental UI work)
+*   **TUI (legacy/optional):** `[src/loopsleuth/tui.py](mdc:src/loopsleuth/tui.py)` - Textual-based terminal UI for power users (not actively maintained)
+*   **Database:** `[src/loopsleuth/db.py](mdc:src/loopsleuth/db.py)` - Defines the SQLite schema and provides all DB access. Schema includes clips, tags, playlists, and join tables for many-to-many relationships (clip_tags, playlist_clips).
+*   **Thumbnailer:** `[src/loopsleuth/thumbnailer.py](mdc:src/loopsleuth/thumbnailer.py)` - Uses ffmpeg to extract video frames as JPEG thumbnails for fast grid browsing.
+*   **Hasher:** `[src/loopsleuth/hasher.py](mdc:src/loopsleuth/hasher.py)` - Computes perceptual hashes (pHash) for thumbnails to enable duplicate detection and visual similarity search.
+*   **Exporter:** `[src/loopsleuth/exporter.py](mdc:src/loopsleuth/exporter.py)` - Handles exporting keepers.txt, playlist exports, and (future) zip/tox bundles for creative tools.
+*   **Metadata:** `[src/loopsleuth/metadata.py](mdc:src/loopsleuth/metadata.py)` - Extracts and normalizes video metadata (duration, size, codec, etc).
+*   **Scanner:** `[src/loopsleuth/scanner.py](mdc:src/loopsleuth/scanner.py)` - Walks folders, probes videos, and populates the database.
 
 **Data Storage:**
-*   Thumbnails are stored in `[.loopsleuth_data/thumbnails/](mdc:.loopsleuth_data/thumbnails)`.
-*   Metadata is stored in an SQLite database file.
+*   Thumbnails: `[.loopsleuth_data/thumbnails/](mdc:.loopsleuth_data/thumbnails)`
+*   Main DB: `loopsleuth.db` (root, or user-selected)
+*   All metadata, tags, playlists, and relationships are stored in normalized tables for robust querying and batch operations.
+
+**Features:**
+*   Modern web UI (FastAPI + Jinja2 + JS/CSS, Clusterize.js)
+*   Virtualized grid, batch selection, tagging, playlist management, duplicate detection/review
+*   Export: keepers.txt, playlist .txt, copy-to-folder, (future: .zip, .tox)
+*   Robust error handling and automated test coverage
 

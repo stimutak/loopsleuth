@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}LoopSleuth{% endblock %}</title>
+    <link rel="stylesheet" href="/static/style.css">
+    {% block head %}{% endblock %}
+</head>
+<body style="background:#181a1b; color:#f0f4fa; font-family: 'Inter', 'Segoe UI', Arial, sans-serif; margin:0;">
+    <div id="main-content" style="min-height:100vh;">
+        {% block content %}{% endblock %}
+    </div>
+    {% block scripts %}{% endblock %}
+</body>
+</html> 

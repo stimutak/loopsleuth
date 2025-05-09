@@ -1,0 +1,98 @@
+{% extends 'base.html' %}
+{% block title %}Duplicate Review | LoopSleuth{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Batch Duplicate Review</h1>
+  <p>Review and resolve flagged duplicate clips. For each group, choose which to keep, delete, or merge. Actions are immediate and cannot be undone.</p>
+</div>
+<div id="duplicate-review-container">
+  <!-- Duplicate groups will be rendered here by JS -->
+</div>
+<div id="toast" class="toast" style="display:none;"></div>
+<script src="/static/clip_actions.js"></script>
+<script>
+  // On page load, fetch and render duplicate groups
+  document.addEventListener('DOMContentLoaded', function() {
+    if (window.renderDuplicateReviewUI) {
+      window.renderDuplicateReviewUI();
+    } else {
+      // fallback: show error
+      document.getElementById('duplicate-review-container').innerHTML = '<div class="error">Duplicate review UI failed to load.</div>';
+    }
+  });
+</script>
+<style>
+#duplicate-review-container {
+  margin: 2em auto;
+  max-width: 1200px;
+}
+.duplicate-group {
+  display: flex;
+  gap: 2em;
+  margin-bottom: 2em;
+  padding: 1.5em;
+  background: #181a20;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+}
+.canonical-clip, .duplicate-clips {
+  flex: 1;
+}
+.canonical-clip {
+  border-right: 1px solid #333;
+  padding-right: 2em;
+}
+.duplicate-clips {
+  display: flex;
+  flex-direction: column;
+  gap: 1.2em;
+}
+.duplicate-card {
+  display: flex;
+  align-items: center;
+  gap: 1em;
+  background: #23242a;
+  border-radius: 6px;
+  padding: 0.8em 1em;
+}
+.duplicate-card img, .canonical-clip img {
+  width: 96px;
+  height: 54px;
+  object-fit: cover;
+  border-radius: 4px;
+  background: #222;
+}
+.duplicate-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 0.5em;
+}
+.duplicate-actions button {
+  background: #222;
+  color: #3fa7ff;
+  border: 1px solid #3fa7ff;
+  border-radius: 4px;
+  padding: 0.3em 0.8em;
+  cursor: pointer;
+  font-size: 1em;
+  transition: background 0.2s, color 0.2s;
+}
+.duplicate-actions button:hover {
+  background: #3fa7ff;
+  color: #fff;
+}
+.toast {
+  position: fixed;
+  bottom: 2em;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #23242a;
+  color: #fff;
+  padding: 1em 2em;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+  z-index: 2000;
+  font-size: 1.1em;
+}
+</style>
+{% endblock %} 

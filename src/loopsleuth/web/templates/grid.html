@@ -9,83 +9,988 @@ LoopSleuth Web: Grid View Template
     <meta charset="UTF-8">
     <title>LoopSleuth - Clip Grid</title>
     <link rel="stylesheet" href="/static/style.css">
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="180x180" href="/static/favicon-180x180.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="/static/favicon-192x192.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/static/favicon-180x180.png">
+    <style>
+        .batch-tag-group {
+            display: flex;
+            gap: 0.5em;
+            align-items: center;
+        }
+        .batch-bar-section {
+            display: flex;
+            gap: 1em;
+            align-items: center;
+        }
+        .batch-bar-input {
+            min-width: 180px;
+        }
+        .batch-bar-btn {
+            white-space: nowrap;
+        }
+        .batch-bar-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        .tag-suggestions-dropdown {
+            position: absolute;
+            background: #23232a;
+            border: 1px solid #333;
+            border-radius: 6px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            max-height: 200px;
+            overflow-y: auto;
+            z-index: 3500;
+            display: none;
+        }
+        
+        .tag-suggestion-item {
+            padding: 0.3em 0.8em;
+            cursor: pointer;
+            color: #f0f4fa;
+            font-size: 0.89em;
+        }
+        
+        .tag-suggestion-item:hover,
+        .tag-suggestion-item[aria-selected="true"] {
+            background: #2a3a3a;
+            color: #fff;
+        }
+        
+        /* Batch Action Bar Styles */
+        #batch-action-bar {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: #23232a;
+            padding: 1em;
+            z-index: 2000;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 -2px 12px rgba(0,0,0,0.2);
+        }
+        
+        .batch-bar-section {
+            display: flex;
+            gap: 1em;
+            align-items: center;
+        }
+        
+        .batch-tag-group {
+            display: flex;
+            gap: 0.5em;
+            align-items: center;
+        }
+        
+        .batch-bar-input {
+            background: #2a2a32;
+            border: 1px solid #333;
+            color: #fff;
+            padding: 0.5em;
+            border-radius: 4px;
+            min-width: 180px;
+        }
+        
+        .batch-bar-input:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .batch-bar-btn {
+            background: #2a2a32;
+            border: 1px solid #333;
+            color: #fff;
+            padding: 0.5em 1em;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        .batch-bar-btn:hover:not(:disabled) {
+            background: #333;
+        }
+        
+        .batch-bar-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .batch-bar-label {
+            font-weight: bold;
+            color: #fff;
+        }
+        
+        .batch-bar-help {
+            color: #666;
+            cursor: help;
+            font-size: 1.2em;
+        }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        .spinner { vertical-align: middle; }
+        .container { padding-bottom: 10em !important; }
+    </style>
+    <script src="/static/clip_actions.js"></script>
 </head>
 <body>
     <!-- Playlist Sidebar -->
     <div id="playlist-sidebar">
-        <div class="sidebar-header">Playlists</div>
-        <div id="playlist-list"></div>
+        <div class="sidebar-header" style="display:flex;align-items:center;justify-content:space-between;">
+            <span>Playlists</span>
+            <button id="clear-playlist-filter-btn" style="display:none; margin-left:0.7em; font-size:0.93em; background:#23232a; color:#3fa7ff; border:1px solid #3fa7ff; border-radius:999px; padding:0.18em 0.9em; cursor:pointer;" tabindex="0">Clear Filter</button>
+        </div>
+        <div id="playlist-list">
+            <!-- Playlist items will be rendered by JS. Each item will have:
+                 - A checkbox for target selection (add/remove clips)
+                 - Playlist name (text)
+                 - A filter icon/button to filter the grid by this playlist
+                 Decoupling filtering from target selection for better UX. -->
+        </div>
         <button id="playlist-create-btn" class="sidebar-btn">+ New Playlist</button>
         <div id="playlist-details"></div>
     </div>
     <div class="container">
         <h1>LoopSleuth - Clip Grid (Web UI)</h1>
-        <form method="post" action="/scan_folder" style="margin-bottom:2em;">
-            <label for="folder_path">Scan folder for videos:</label>
-            <input type="text" id="folder_path" name="folder_path" placeholder="E:/downloads" size="40" required style="margin:0 1em;" />
+        <div class="sort-bar" style="margin-bottom:1.2em; display:flex; align-items:center; gap:0.7em;">
+            <label for="sort-field" class="notch-label" style="margin:0;">Sort by:</label>
+            <select id="sort-field" style="font-size:0.97em;">
+                <option value="filename" {% if sort == 'filename' %}selected{% endif %}>Name</option>
+                <option value="modified_at" {% if sort == 'modified_at' %}selected{% endif %}>Date Modified</option>
+                <option value="size" {% if sort == 'size' %}selected{% endif %}>Size</option>
+                <option value="duration" {% if sort == 'duration' %}selected{% endif %}>Length</option>
+                <option value="starred" {% if sort == 'starred' %}selected{% endif %}>Starred</option>
+            </select>
+            <select id="sort-order" style="font-size:0.97em;">
+                <option value="asc" {% if order == 'asc' %}selected{% endif %}>Ascending</option>
+                <option value="desc" {% if order == 'desc' %}selected{% endif %}>Descending</option>
+            </select>
+            <label for="starred-first" class="notch-label" style="margin-left:1em;">Show starred first</label>
+            <input type="checkbox" id="starred-first" {% if starred_first %}checked{% endif %} style="vertical-align:middle;">
+        </div>
+        <div class="thumb-size-slider" style="margin-bottom:1.2em; display:flex; align-items:center; gap:0.7em;">
+            <label for="thumb-size-range" class="notch-label" style="margin:0;">Thumbnail Size:</label>
+            <input type="range" id="thumb-size-range" min="60" max="220" value="120" step="2" style="width:180px;">
+            <span id="thumb-size-value" style="font-size:0.93em; color:#888; min-width:2.5em;">120px</span>
+        </div>
+        <form method="post" action="/scan_folder" id="scan-form" style="margin-bottom:2em; display:flex; align-items:center; gap:1em;">
+            <!-- Database combo: custom select for recents + manual entry -->
+            <label for="db-combo-select" style="margin-right:0.5em;">Database:</label>
+            <select id="db-combo-select" style="min-width:180px; background:#181a1b; color:#f0f4fa; border:1px solid #333; border-radius:6px; padding:0.4em 1.2em 0.4em 0.7em; font-size:1em;">
+                <option value="__custom__">Custom...</option>
+            </select>
+            <input type="text" id="db-combo-input" name="db_path" placeholder="Enter DB name (e.g. MyVideos.db)" style="display:none; min-width:180px; background:#181a1b; color:#f0f4fa; border:1px solid #333; border-radius:6px; padding:0.4em 1.2em 0.4em 0.7em; font-size:1em; margin-right:1em;" autocomplete="off" />
+            <!-- Scan folder combo: custom select for recents + manual entry -->
+            <label for="recent-folders-select" style="margin-right:0.5em;">Scan folder for videos:</label>
+            <select id="recent-folders-select" style="min-width:220px; background:#181a1b; color:#f0f4fa; border:1px solid #333; border-radius:6px; padding:0.4em 1.2em 0.4em 0.7em; font-size:1em;">
+                <option value="__custom__">Custom...</option>
+            </select>
+            <input type="text" id="custom-folder-input" name="folder_path" placeholder="Enter folder path (e.g. E:/downloads)" style="display:none; min-width:220px; background:#181a1b; color:#f0f4fa; border:1px solid #333; border-radius:6px; padding:0.4em 1.2em 0.4em 0.7em; font-size:1em; margin-right:1em;" autocomplete="off" />
             <button type="submit">Scan</button>
         </form>
-        {% if clips %}
-            <div class="grid">
-                {% for clip in clips %}
-                    <div class="card" data-clip-id="{{ clip.id }}">
-                        <label class="custom-checkbox-label">
-                            <input type="checkbox" class="select-clip-checkbox" aria-label="Select clip {{ clip.filename }}" />
-                            <span class="custom-checkbox"></span>
-                        </label>
-                        {% if clip.thumbnail_path %}
-                            <a class="card-link" href="/clip/{{ clip.id }}">
-                                <img class="thumb" src="/thumbs/{{ clip.thumb_filename }}" alt="Thumbnail for {{ clip.filename }}" />
-                            </a>
-                        {% else %}
-                            <div class="thumb placeholder">No Thumbnail</div>
-                        {% endif %}
-                        <div class="meta">
-                            <a class="card-link" href="/clip/{{ clip.id }}">
-                                <div class="filename">{{ clip.filename }}</div>
-                            </a>
-                            {% if clip.duration %}
-                                <div class="duration">{{ (clip.duration // 60)|int }}:{{ '%02d' % (clip.duration % 60) }} min</div>
-                            {% endif %}
-                            <div class="star" style="cursor:pointer;" data-clip-id="{{ clip.id }}" onclick="toggleStar(event)" title="Toggle star">{% if clip.starred %}★{% else %}☆{% endif %}</div>
-                            <div class="tags">
-                                <!-- Tags are always visible as static chips -->
-                                <span class="tags-text" id="tags-text-{{ clip.id }}">
-                                    {% for tag in clip.tags %}
-                                        <span class="tag-chip">{{ tag }}</span>
-                                    {% else %}
-                                        <span class="tag-chip tag-empty">No tags</span>
-                                    {% endfor %}
-                                </span>
-                                <a href="/clip/{{ clip.id }}" class="edit-tag-btn-link" style="margin-left:0.5em; font-size:0.9em; text-decoration:none;" title="Edit tags in detail view">✎</a>
-                            </div>
-                        </div>
-                    </div>
-                {% endfor %}
-            </div>
-            <!-- Floating batch action bar -->
-            <div id="batch-action-bar" style="display:none;"></div>
-        {% else %}
-            <p>No clips found. (This is a placeholder page.)</p>
+        <script>
+        // --- Database combo: custom select for recents + manual entry ---
+        (function() {
+            const dbKey = 'loopsleuthDatabases';
+            const select = document.getElementById('db-combo-select');
+            const input = document.getElementById('db-combo-input');
+            let dbs = JSON.parse(localStorage.getItem(dbKey) || '["loopsleuth.db"]');
+            function updateSelect() {
+                select.innerHTML = '<option value="__custom__">Custom...</option>';
+                dbs.forEach(path => {
+                    const opt = document.createElement('option');
+                    opt.value = path;
+                    opt.textContent = path;
+                    select.appendChild(opt);
+                });
+            }
+            updateSelect();
+            // On select change: if custom, show input; else, hide input
+            select.addEventListener('change', function() {
+                if (select.value === '__custom__') {
+                    input.style.display = '';
+                    input.value = '';
+                    input.focus();
+                } else {
+                    input.style.display = 'none';
+                    input.value = select.value;
+                }
+            });
+            // On page load, default to most recent or custom
+            if (dbs.length > 0) {
+                select.value = dbs[0];
+                input.style.display = 'none';
+                input.value = dbs[0];
+            } else {
+                select.value = '__custom__';
+                input.style.display = '';
+                input.value = '';
+            }
+            // On scan, add to recents if not present
+            const scanForm = document.getElementById('scan-form');
+            scanForm.addEventListener('submit', function(e) {
+                let db = select.value === '__custom__' ? input.value.trim() : select.value;
+                if (db && !dbs.includes(db)) {
+                    dbs.unshift(db);
+                    if (dbs.length > 8) dbs = dbs.slice(0, 8);
+                    localStorage.setItem(dbKey, JSON.stringify(dbs));
+                    updateSelect();
+                }
+                // Always set the input's name for form submission
+                input.name = 'db_path';
+                if (select.value !== '__custom__') {
+                    input.value = select.value;
+                }
+            });
+        })();
+        // --- Scan folder combo: custom select for recents + manual entry ---
+        (function() {
+            const recentsKey = 'recentScanFolders';
+            const select = document.getElementById('recent-folders-select');
+            const customInput = document.getElementById('custom-folder-input');
+            let recents = JSON.parse(localStorage.getItem(recentsKey) || '[]');
+            function updateSelect() {
+                // Remove all except Custom...
+                select.innerHTML = '<option value="__custom__">Custom...</option>';
+                recents.forEach(path => {
+                    const opt = document.createElement('option');
+                    opt.value = path;
+                    opt.textContent = path;
+                    select.appendChild(opt);
+                });
+            }
+            updateSelect();
+            // On select change: if custom, show input; else, hide input
+            select.addEventListener('change', function() {
+                if (select.value === '__custom__') {
+                    customInput.style.display = '';
+                    customInput.value = '';
+                    customInput.focus();
+                } else {
+                    customInput.style.display = 'none';
+                    customInput.value = select.value;
+                }
+            });
+            // On page load, default to most recent or custom
+            if (recents.length > 0) {
+                select.value = recents[0];
+                customInput.style.display = 'none';
+                customInput.value = recents[0];
+            } else {
+                select.value = '__custom__';
+                customInput.style.display = '';
+                customInput.value = '';
+            }
+            // On scan, add to recents if not present
+            const scanForm = document.getElementById('scan-form');
+            scanForm.addEventListener('submit', function(e) {
+                let folder = select.value === '__custom__' ? customInput.value.trim() : select.value;
+                if (folder && !recents.includes(folder)) {
+                    recents.unshift(folder);
+                    if (recents.length > 8) recents = recents.slice(0, 8);
+                    localStorage.setItem(recentsKey, JSON.stringify(recents));
+                    updateSelect();
+                }
+                // Always set the input's name for form submission
+                customInput.name = 'folder_path';
+                if (select.value !== '__custom__') {
+                    customInput.value = select.value;
+                }
+            });
+        })();
+        // --- Client-side validation for DB and folder ---
+        (function() {
+            const scanForm = document.getElementById('scan-form');
+            const dbInput = document.getElementById('db-combo-input');
+            const select = document.getElementById('recent-folders-select');
+            const customInput = document.getElementById('custom-folder-input');
+            function showToast(msg, duration=3500) {
+                const toast = document.getElementById('toast');
+                if (!toast) return;
+                toast.textContent = msg;
+                toast.style.display = 'block';
+                toast.style.opacity = '0.97';
+                setTimeout(() => {
+                    toast.style.opacity = '0';
+                    setTimeout(() => { toast.style.display = 'none'; }, 400);
+                }, duration);
+            }
+            scanForm.addEventListener('submit', function(e) {
+                let folder = select.value === '__custom__' ? customInput.value.trim() : select.value;
+                if (!folder) {
+                    showToast('Please enter a scan folder path.');
+                    e.preventDefault();
+                    return false;
+                }
+                let dbName = dbInput.value.trim();
+                if (!dbName) dbName = select.value;
+                if (!dbName) {
+                    showToast('Please select or enter a database name.');
+                    e.preventDefault();
+                    return false;
+                }
+                const forbidden = /[<>:"/\\|?*]/;
+                if (forbidden.test(dbName)) {
+                    showToast('Database name contains forbidden characters.');
+                    e.preventDefault();
+                    return false;
+                }
+                if (!dbName.toLowerCase().endsWith('.db')) {
+                    showToast('Database name must end with .db');
+                    e.preventDefault();
+                    return false;
+                }
+                const reserved = ["CON","PRN","AUX","NUL","COM1","COM2","COM3","COM4","COM5","COM6","COM7","COM8","COM9","LPT1","LPT2","LPT3","LPT4","LPT5","LPT6","LPT7","LPT8","LPT9"];
+                if (reserved.includes(dbName.split('.')[0].toUpperCase())) {
+                    showToast('Database name is a reserved system name.');
+                    e.preventDefault();
+                    return false;
+                }
+            });
+        })();
+        // --- Show backend errors as toast ---
+        (function() {
+            const scanForm = document.getElementById('scan-form');
+            scanForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const formData = new FormData(scanForm);
+                fetch(scanForm.action, {
+                    method: 'POST',
+                    body: formData
+                }).then(async resp => {
+                    if (resp.redirected) {
+                        window.location.href = resp.url;
+                        return;
+                    }
+                    let data;
+                    try { data = await resp.json(); } catch { data = {}; }
+                    if (data && data.error) {
+                        showToast(data.error, 5000);
+                    }
+                }).catch(err => {
+                    showToast('Scan failed: ' + err, 5000);
+                });
+            });
+        })();
+        </script>
+        {% if has_duplicates %}
+          <div class="duplicate-banner" style="background:#23242a;color:#fff;padding:1em 2em;margin-bottom:1.5em;border-left:6px solid #3fa7ff;font-size:1.1em;display:flex;align-items:center;justify-content:space-between;z-index:2100;position:relative;">
+            <span>⚠️ <b>Duplicates flagged for review.</b> <a href="/duplicates" style="color:#3fa7ff;text-decoration:underline;font-weight:bold;">Review now</a></span>
+          </div>
         {% endif %}
+        <div id="clip-scroll-area" style="height:80vh;overflow:auto; padding-bottom:10em;">
+            <div id="clip-content-area"></div>
+            <div id="grid-loading-spinner" style="display:none; text-align:center; padding:2em 0;">
+              <span class="spinner" style="display:inline-block;width:2.5em;height:2.5em;border:0.4em solid #3fa7ff;border-top:0.4em solid #23232a;border-radius:50%;animation:spin 1s linear infinite;"></span>
+            </div>
+        </div>
+        <div id="batch-action-bar" style="position:fixed; left:0; right:0; bottom:0; background:#23232a; padding:1em; z-index:2000; display:flex; align-items:center; justify-content:space-between; box-shadow:0 -2px 12px rgba(0,0,0,0.2);">
+            <span class="batch-bar-label">Batch Actions</span>
+            <div class="batch-bar-section">
+                <div class="batch-tag-group">
+                    <input type="text" class="batch-bar-input" id="batch-add-tags" placeholder="Add tags..." />
+                    <button class="batch-bar-btn" id="batch-add-tags-btn" disabled>Add Tags</button>
+                </div>
+                <div class="batch-tag-group">
+                    <input type="text" class="batch-bar-input" id="batch-remove-tags" placeholder="Remove tags..." />
+                    <button class="batch-bar-btn" id="batch-remove-tags-btn" disabled>Remove Tags</button>
+                </div>
+                <button class="batch-bar-btn" id="batch-clear-tags" disabled>Clear Tags</button>
+            </div>
+            <span class="batch-bar-help" title="Use the checkboxes to select multiple clips. Shift+Click selects a range. Modifier keys (Cmd, Option, Ctrl) are not supported for multi-select on macOS browsers.">?</span>
+        </div>
+        <div id="selected-clips-bar" style="position:fixed; left:0; right:0; bottom:4em; background:#23232a; padding:1em; z-index:2000; display:flex; align-items:center; gap:1em; box-shadow:0 -2px 12px rgba(0,0,0,0.2);"></div>
     </div>
-    <div id="selected-clips-bar"><!-- Persistent selection bar (populated by JS) --></div>
+    <!-- Scan Progress Modal -->
+    <div id="scan-progress-modal" style="display:none; position:fixed; z-index:5000; left:0; top:0; width:100vw; height:100vh; background:rgba(10,10,20,0.85); color:#fff; align-items:center; justify-content:center; flex-direction:column;">
+        <div style="background:#222; padding:2em 3em; border-radius:1em; box-shadow:0 2px 16px #000a; min-width:320px; text-align:center;">
+            <h2 style="margin-bottom:1em;">Scanning Clips...</h2>
+            <div id="scan-progress-bar" style="width:100%; background:#444; border-radius:0.5em; overflow:hidden; height:1.5em; margin-bottom:1em;">
+                <div id="scan-progress-bar-inner" style="height:100%; width:0%; background:#3fa7ff; transition:width 0.3s;"></div>
+            </div>
+            <div id="scan-progress-status" style="font-size:1.1em;">Starting scan...</div>
+        </div>
+    </div>
+    <!-- Toast notification -->
+    <div id="toast" style="display:none; position:fixed; left:50%; bottom:2.5em; transform:translateX(-50%); background:#23232a; color:#fff; padding:1em 2em; border-radius:1em; box-shadow:0 2px 16px #000a; z-index:4000; font-size:1.1em; pointer-events:none; opacity:0.97; transition:opacity 0.3s;"></div>
+    <!-- Add Clusterize.js for virtualized grid -->
+    <script src="https://unpkg.com/clusterize.js/clusterize.min.js"></script>
 </body>
-<script src="/static/clip_actions.js"></script>
+<!-- SortableJS for drag-and-drop playlist reordering -->
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 <script>
 // Restore scroll position if returning from detail view
 window.addEventListener('DOMContentLoaded', function() {
-    const scrollY = sessionStorage.getItem('gridScrollY');
-    if (scrollY !== null) {
-        window.scrollTo(0, parseInt(scrollY, 10));
-        sessionStorage.removeItem('gridScrollY');
-    }
+    // --- PATCH: Robust scroll restoration for grid scroll area ---
+    // Do not use window.scrollTo; use #clip-scroll-area.scrollTop
+    // Restoration is now handled in afterGridUpdate after Clusterize.js renders
 });
+
 // Reload the grid if restored from bfcache (e.g., browser back button)
 window.addEventListener('pageshow', function(event) {
     if (event.persisted) {
         window.location.reload();
     }
+});
+
+// --- Thumbnail size slider logic ---
+(function() {
+    const root = document.documentElement;
+    const slider = document.getElementById('thumb-size-range');
+    const valueLabel = document.getElementById('thumb-size-value');
+    // Load from localStorage or default
+    const saved = localStorage.getItem('thumbSizePx');
+    const defaultSize = 120;
+    const size = saved ? parseInt(saved, 10) : defaultSize;
+    slider.value = size;
+    valueLabel.textContent = size + 'px';
+    root.style.setProperty('--thumb-size', size + 'px');
+    slider.addEventListener('input', function() {
+        const v = parseInt(this.value, 10);
+        valueLabel.textContent = v + 'px';
+        root.style.setProperty('--thumb-size', v + 'px');
+        localStorage.setItem('thumbSizePx', v);
+    });
+})();
+
+// --- Sorting dropdown logic ---
+document.addEventListener('DOMContentLoaded', function() {
+    const sortField = document.getElementById('sort-field');
+    const sortOrder = document.getElementById('sort-order');
+    const starredFirst = document.getElementById('starred-first');
+    if (sortField && sortOrder && starredFirst) {
+        function updateSort() {
+            const params = new URLSearchParams(window.location.search);
+            params.set('sort', sortField.value);
+            params.set('order', sortOrder.value);
+            if (starredFirst.checked) {
+                params.set('starred_first', '1');
+            } else {
+                params.delete('starred_first');
+            }
+            window.location.search = params.toString();
+        }
+        sortField.addEventListener('change', updateSort);
+        sortOrder.addEventListener('change', updateSort);
+        starredFirst.addEventListener('change', updateSort);
+    }
+});
+
+// --- PiP button logic ---
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.pip-btn').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const clipId = btn.getAttribute('data-clip-id');
+            const card = btn.closest('.card');
+            const video = document.getElementById('pip-video-' + clipId);
+            if (video && card) {
+                // --- PiP video path handling ---
+                // Use the raw (unencoded) path in data-path, and encode it here for the video URL.
+                // This avoids double-encoding issues (e.g., %2520 instead of %20) that break video loading.
+                const videoUrl = '/media/' + encodeURIComponent(card.getAttribute('data-path'));
+                video.src = videoUrl;
+                video.currentTime = 0;
+                video.load();
+                video.muted = true;
+                // --- PiP error diagnostics ---
+                // Add a one-time error handler to log and display the specific video error and path.
+                video.onerror = null;
+                video.addEventListener('error', function onVideoError() {
+                    let errMsg = 'Unknown error';
+                    if (video.error) {
+                        switch (video.error.code) {
+                            case 1: errMsg = 'MEDIA_ERR_ABORTED'; break;
+                            case 2: errMsg = 'MEDIA_ERR_NETWORK'; break;
+                            case 3: errMsg = 'MEDIA_ERR_DECODE'; break;
+                            case 4: errMsg = 'MEDIA_ERR_SRC_NOT_SUPPORTED'; break;
+                        }
+                    }
+                    console.error('Video element error:', video.error, 'src:', video.src);
+                    showToast('Video error: ' + errMsg + ' (' + video.src + ')', 6000);
+                }, { once: true });
+                let canplayTimeout = setTimeout(() => {
+                    showToast('Could not load video for PiP: ' + videoUrl, 6000);
+                    video.removeEventListener('canplay', onCanPlay);
+                }, 10000); // 10 seconds
+                function onCanPlay() {
+                    clearTimeout(canplayTimeout);
+                    video.removeEventListener('canplay', onCanPlay);
+                    video.play().then(() => {
+                        if (document.pictureInPictureElement) {
+                            document.exitPictureInPicture();
+                        }
+                        // Prefer Safari's API if available
+                        if (video.webkitSupportsPresentationMode && typeof video.webkitSetPresentationMode === 'function') {
+                            try {
+                                video.webkitSetPresentationMode('picture-in-picture');
+                            } catch (err) {
+                                console.error('Safari PiP error:', err);
+                                showToast('Picture-in-Picture not supported in this browser.');
+                            }
+                        } else if (video.requestPictureInPicture) {
+                            video.requestPictureInPicture().catch(err => {
+                                console.error('PiP error:', err);
+                                showToast('Picture-in-Picture not supported or failed.');
+                            });
+                        } else {
+                            showToast('Picture-in-Picture not supported in this browser.');
+                        }
+                    }).catch(err => {
+                        console.error('Video play error:', err);
+                        showToast('Could not play video for PiP.');
+                    });
+                }
+                video.addEventListener('canplay', onCanPlay);
+            }
+        });
+    });
+});
+
+// --- Preview Grid logic ---
+function openPreviewGrid(selectedClipIds) {
+    if (!selectedClipIds || selectedClipIds.length === 0) return;
+    let overlay = document.getElementById('preview-grid-overlay');
+    if (overlay) overlay.remove();
+    overlay = document.createElement('div');
+    overlay.id = 'preview-grid-overlay';
+    overlay.style.position = 'fixed';
+    overlay.style.top = '0';
+    overlay.style.left = '0';
+    overlay.style.width = '100vw';
+    overlay.style.height = '100vh';
+    overlay.style.background = 'rgba(18,20,24,0.97)';
+    overlay.style.zIndex = '3000';
+    overlay.style.display = 'flex';
+    overlay.style.flexDirection = 'column';
+    overlay.innerHTML = `<button id=\"close-preview-grid\" style=\"align-self:flex-end;margin:1em 2em 0 0;font-size:1.5em;\">✖</button>`;
+    const grid = document.createElement('div');
+    const n = selectedClipIds.length;
+    const gridSize = Math.ceil(Math.sqrt(n));
+    grid.style.display = 'grid';
+    grid.style.gridTemplateColumns = `repeat(${gridSize}, 1fr)`;
+    grid.style.gridTemplateRows = `repeat(${Math.ceil(n/gridSize)}, 1fr)`;
+    grid.style.gap = '1.2em';
+    grid.style.width = '90vw';
+    grid.style.height = '80vh';
+    grid.style.margin = '2em auto';
+    selectedClipIds.forEach(clipId => {
+        const card = document.querySelector(`.card[data-clip-id='${clipId}']`);
+        if (!card) return;
+        const filename = card.querySelector('.filename').textContent;
+        const videoUrl = '/media/' + encodeURIComponent(card.getAttribute('data-path'));
+        const cell = document.createElement('div');
+        cell.style.background = '#181a1b';
+        cell.style.borderRadius = '10px';
+        cell.style.display = 'flex';
+        cell.style.flexDirection = 'column';
+        cell.style.alignItems = 'center';
+        cell.style.justifyContent = 'center';
+        cell.style.padding = '0.7em';
+        cell.innerHTML = `<div style='font-size:0.93em;color:#bbb;margin-bottom:0.3em;'>${filename}</div>`;
+        const video = document.createElement('video');
+        video.src = videoUrl;
+        video.controls = true;
+        video.muted = true;
+        video.style.width = '100%';
+        video.style.maxHeight = '18vh';
+        video.style.borderRadius = '6px';
+        video.style.background = '#111';
+        cell.appendChild(video);
+        const controls = document.createElement('div');
+        controls.style.display = 'flex';
+        controls.style.gap = '0.7em';
+        controls.style.marginTop = '0.3em';
+        const playBtn = document.createElement('button');
+        playBtn.textContent = '▶';
+        playBtn.title = 'Play/Pause';
+        playBtn.onclick = () => { video.paused ? video.play() : video.pause(); };
+        const muteBtn = document.createElement('button');
+        muteBtn.textContent = '🔇';
+        muteBtn.title = 'Mute/Unmute';
+        muteBtn.onclick = () => { video.muted = !video.muted; muteBtn.textContent = video.muted ? '🔇' : '🔊'; };
+        const closeBtn = document.createElement('button');
+        closeBtn.textContent = '✖';
+        closeBtn.title = 'Close';
+        closeBtn.onclick = () => { cell.remove(); };
+        controls.appendChild(playBtn);
+        controls.appendChild(muteBtn);
+        controls.appendChild(closeBtn);
+        cell.appendChild(controls);
+        grid.appendChild(cell);
+    });
+    overlay.appendChild(grid);
+    document.body.appendChild(overlay);
+    document.getElementById('close-preview-grid').onclick = () => overlay.remove();
+}
+
+// Add Preview Grid button to selection bar
+function patchSelectedClipsBarForPreviewGrid() {
+    const bar = document.getElementById('selected-clips-bar');
+    if (!bar) return;
+    if (!document.getElementById('selected-preview-grid-btn')) {
+        const btn = document.createElement('button');
+        btn.id = 'selected-preview-grid-btn';
+        btn.className = 'selected-bar-btn';
+        btn.innerHTML = '<span class="selected-bar-icon">🎬</span> Preview Grid';
+        btn.title = 'Preview selected clips in a floating grid';
+        btn.disabled = true;
+        btn.onclick = function() {
+            const selected = Array.from(document.querySelectorAll('.card.selected')).map(card => card.getAttribute('data-clip-id'));
+            openPreviewGrid(selected);
+        };
+        bar.appendChild(btn);
+    }
+    // Enable/disable based on selection
+    const btn = document.getElementById('selected-preview-grid-btn');
+    const updateBtn = () => {
+        const selected = document.querySelectorAll('.card.selected');
+        btn.disabled = selected.length === 0;
+    };
+    document.addEventListener('selectionchange', updateBtn);
+    document.addEventListener('click', updateBtn);
+    updateBtn();
+}
+
+document.addEventListener('DOMContentLoaded', patchSelectedClipsBarForPreviewGrid);
+
+// --- Scan Progress Modal Logic ---
+let scanProgressInterval = null;
+let scanProgressRetryTimeout = null;
+let scanProgressStartTime = null;
+
+function showScanProgressModal(msg) {
+    const modal = document.getElementById('scan-progress-modal');
+    modal.style.display = 'flex';
+    if (msg) {
+        document.getElementById('scan-progress-status').textContent = msg;
+    }
+}
+
+function hideScanProgressModal() {
+    document.getElementById('scan-progress-modal').style.display = 'none';
+}
+
+function updateScanProgressBar(done, total) {
+    const percent = total > 0 ? Math.round((done / total) * 100) : 0;
+    document.getElementById('scan-progress-bar-inner').style.width = percent + '%';
+    document.getElementById('scan-progress-status').textContent =
+        `Scanned ${done} of ${total} files (${percent}%)`;
+}
+
+function showToast(msg, duration=2500) {
+    const toast = document.getElementById('toast');
+    if (!toast) return;
+    toast.textContent = msg;
+    toast.style.display = 'block';
+    toast.style.opacity = '0.97';
+    setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => { toast.style.display = 'none'; }, 400);
+    }, duration);
+}
+
+function pollScanProgress() {
+    fetch('/scan_progress')
+        .then(r => r.json())
+        .then(data => {
+            if (data.status === 'scanning') {
+                showScanProgressModal();
+                updateScanProgressBar(data.done, data.total);
+                scanProgressStartTime = null; // reset wait timer
+                // Show a message in the grid area if empty
+                const grid = document.querySelector('.grid');
+                if (grid && grid.children.length === 0) {
+                    grid.innerHTML = '<div style="width:100%;text-align:center;color:#3fa7ff;font-size:1.2em;padding:2em 0;">Scanning in progress... Please wait.</div>';
+                }
+            } else if (data.status === 'done') {
+                updateScanProgressBar(data.done, data.total);
+                setTimeout(hideScanProgressModal, 1000);
+                showToast('Scan complete!');
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1200);
+                clearInterval(scanProgressInterval);
+                clearTimeout(scanProgressRetryTimeout);
+                scanProgressStartTime = null;
+            } else if (data.status === 'error') {
+                document.getElementById('scan-progress-status').textContent =
+                    'Error: ' + (data.error || 'Unknown error');
+                setTimeout(hideScanProgressModal, 3000);
+                showToast('Scan failed: ' + (data.error || 'Unknown error'), 4000);
+                clearInterval(scanProgressInterval);
+                clearTimeout(scanProgressRetryTimeout);
+                scanProgressStartTime = null;
+            } else {
+                // idle or unknown: retry for up to 10 seconds before showing failure
+                if (!scanProgressStartTime) {
+                    scanProgressStartTime = Date.now();
+                }
+                const elapsed = Date.now() - scanProgressStartTime;
+                if (elapsed < 10000) { // 10 seconds
+                    showScanProgressModal('Waiting for scan to start...');
+                    // Schedule another poll in 1s if not already scheduled
+                    if (!scanProgressRetryTimeout) {
+                        scanProgressRetryTimeout = setTimeout(() => {
+                            scanProgressRetryTimeout = null;
+                            pollScanProgress();
+                        }, 1000);
+                    }
+                } else {
+                    hideScanProgressModal();
+                    showToast('Scan failed to start. Please try again.', 4000);
+                    clearInterval(scanProgressInterval);
+                    clearTimeout(scanProgressRetryTimeout);
+                    scanProgressStartTime = null;
+                }
+            }
+        })
+        .catch(() => {
+            // On fetch error, treat as idle and retry for up to 10 seconds
+            if (!scanProgressStartTime) {
+                scanProgressStartTime = Date.now();
+            }
+            const elapsed = Date.now() - scanProgressStartTime;
+            if (elapsed < 10000) {
+                showScanProgressModal('Waiting for scan to start...');
+                if (!scanProgressRetryTimeout) {
+                    scanProgressRetryTimeout = setTimeout(() => {
+                        scanProgressRetryTimeout = null;
+                        pollScanProgress();
+                    }, 1000);
+                }
+            } else {
+                hideScanProgressModal();
+                showToast('Scan failed to start (network error).', 4000);
+                clearInterval(scanProgressInterval);
+                clearTimeout(scanProgressRetryTimeout);
+                scanProgressStartTime = null;
+            }
+        });
+}
+
+function startScanProgressPolling() {
+    showScanProgressModal();
+    scanProgressStartTime = null;
+    pollScanProgress(); // immediate
+    scanProgressInterval = setInterval(pollScanProgress, 1000);
+}
+
+// Hook up scan form to start polling
+const scanForm = document.getElementById('scan-form');
+if (scanForm) {
+    scanForm.addEventListener('submit', function() {
+        const grid = document.querySelector('.grid');
+        if (grid) grid.innerHTML = '';
+        startScanProgressPolling();
+    });
+}
+
+// Auto-start polling if a scan is in progress on page load
+window.addEventListener('DOMContentLoaded', () => {
+    fetch('/scan_progress')
+        .then(r => r.json())
+        .then(data => {
+            if (data.status === 'scanning') {
+                startScanProgressPolling();
+            }
+        });
+});
+
+// --- Persist scan folder location logic ---
+document.addEventListener('DOMContentLoaded', function() {
+    const folderInput = document.getElementById('folder_path');
+    if (folderInput) {
+        // Restore last used folder from localStorage
+        const lastFolder = localStorage.getItem('lastScanFolder');
+        if (lastFolder) {
+            folderInput.value = lastFolder;
+        }
+        // Save on form submit
+        const scanForm = document.getElementById('scan-form');
+        if (scanForm) {
+            scanForm.addEventListener('submit', function() {
+                localStorage.setItem('lastScanFolder', folderInput.value);
+            });
+        }
+    }
+});
+
+// --- Virtualized Infinite Grid Logic (Multi-Column Flex Rows) ---
+let offset = 0;
+const limit = 100;
+let loading = false;
+let allLoaded = false;
+const cardsPerRow = 5; // Set your preferred number of columns here
+const clusterize = new Clusterize({
+    rows: [],
+    scrollId: 'clip-scroll-area',
+    contentId: 'clip-content-area',
+    callbacks: {
+        clusterChanged: function() {
+            console.log('[Clusterize] Cluster changed, updating UI');
+            afterGridUpdate();
+        }
+    }
+});
+
+// --- PATCH: Robust scroll restoration with retry until correct ---
+window._pendingGridScrollY = null;
+
+function afterGridUpdate() {
+    // Attach selection handlers to all cards and checkboxes
+    if (window.attachCardEventHandlers) {
+        window.attachCardEventHandlers();
+    }
+    // Update selection bar and batch bar
+    if (window.updateCardSelectionUI) {
+        window.updateCardSelectionUI();
+    }
+    // --- Robust scroll restoration: try until scrollTop matches desired value ---
+    const scrollArea = document.getElementById('clip-scroll-area');
+    if (scrollArea && window.sessionStorage) {
+        // On first load, move sessionStorage value to global
+        if (window._pendingGridScrollY === null) {
+            const y = sessionStorage.getItem('gridScrollY');
+            if (y !== null) {
+                window._pendingGridScrollY = parseInt(y, 10);
+                sessionStorage.removeItem('gridScrollY');
+                console.log('[Grid] Will restore scrollY to', window._pendingGridScrollY);
+            }
+        }
+        if (window._pendingGridScrollY !== null) {
+            if (Math.abs(scrollArea.scrollTop - window._pendingGridScrollY) > 2) {
+                scrollArea.scrollTop = window._pendingGridScrollY;
+                console.log('[Grid] Attempted scroll restore to', window._pendingGridScrollY, 'current:', scrollArea.scrollTop);
+            } else {
+                console.log('[Grid] ScrollY restored and confirmed at', scrollArea.scrollTop);
+                window._pendingGridScrollY = null;
+            }
+        }
+    }
+}
+
+// --- Load more clips and always call afterGridUpdate ---
+async function loadMoreClips() {
+    if (loading || allLoaded) return;
+    loading = true;
+    // Build params from URL
+    const params = new URLSearchParams(window.location.search);
+    params.set('offset', offset);
+    params.set('limit', limit);
+    const resp = await fetch(`/api/clips?${params.toString()}`);
+    const data = await resp.json();
+    // Debug: Log the clips data received from the API
+    console.log('[loadMoreClips] Fetched clips:', data.clips);
+    if (data.clips.length === 0) {
+        allLoaded = true;
+        return;
+    }
+    const newRows = window.renderClipRows(data.clips, cardsPerRow);
+    // Debug: Log the rows being rendered
+    console.log('[loadMoreClips] Rendering rows:', newRows);
+    clusterize.append(newRows);
+    afterGridUpdate(); // <-- Always re-attach handlers and update bar
+    offset += data.clips.length;
+    loading = false;
+}
+
+// Initial load with explicit afterGridUpdate
+loadMoreClips().then(() => {
+    console.log('[Initial Load] Complete, updating UI');
+    afterGridUpdate();
+});
+
+// --- Throttle utility ---
+function throttle(func, wait) {
+  let last = 0, timeout = null;
+  return function(...args) {
+    const now = Date.now();
+    if (now - last >= wait) {
+      last = now;
+      func.apply(this, args);
+    } else if (!timeout) {
+      timeout = setTimeout(() => {
+        last = Date.now();
+        timeout = null;
+        func.apply(this, args);
+      }, wait - (now - last));
+    }
+  };
+}
+
+// Patch scroll handler to throttle and show spinner
+const scrollArea = document.getElementById('clip-scroll-area');
+const spinner = document.getElementById('grid-loading-spinner');
+const throttledLoad = throttle(() => {
+  if (window.loadMoreClipsDebounced) {
+    spinner.style.display = 'block';
+    window.loadMoreClipsDebounced().finally(() => { spinner.style.display = 'none'; });
+  } else {
+    spinner.style.display = 'block';
+    loadMoreClips().finally(() => { spinner.style.display = 'none'; });
+  }
+}, 400);
+scrollArea.addEventListener('scroll', function() {
+  if (scrollArea.scrollTop + scrollArea.clientHeight >= scrollArea.scrollHeight - 800) {
+    throttledLoad();
+  }
+});
+
+// --- Recent scan folders logic ---
+(function() {
+    const folderInput = document.getElementById('folder_path');
+    const recentSelect = document.getElementById('recent-folders');
+    if (!folderInput || !recentSelect) return;
+    // Load from localStorage
+    let recents = JSON.parse(localStorage.getItem('recentScanFolders') || '[]');
+    function updateDropdown() {
+        recentSelect.innerHTML = '';
+        if (recents.length === 0) {
+            recentSelect.innerHTML = '<option value="">(none)</option>';
+        } else {
+            recents.forEach(path => {
+                const opt = document.createElement('option');
+                opt.value = path;
+                opt.textContent = path;
+                recentSelect.appendChild(opt);
+            });
+        }
+    }
+    updateDropdown();
+    // On select, update input
+    recentSelect.addEventListener('change', function() {
+        if (recentSelect.value) folderInput.value = recentSelect.value;
+    });
+    // On scan, add to recents
+    const scanForm = document.getElementById('scan-form');
+    scanForm.addEventListener('submit', function() {
+        const val = folderInput.value.trim();
+        if (val && !recents.includes(val)) {
+            recents.unshift(val);
+            if (recents.length > 8) recents = recents.slice(0, 8);
+            localStorage.setItem('recentScanFolders', JSON.stringify(recents));
+        }
+    });
+})();
+
+// --- Playlist pill badge interactivity: click to filter grid by playlist ---
+document.addEventListener('DOMContentLoaded', function() {
+    // Delegate click event for playlist pills (works for dynamically loaded cards)
+    document.body.addEventListener('click', function(e) {
+        const pill = e.target.closest('.playlist-pill');
+        if (pill && pill.dataset.playlistId) {
+            // Update URL with ?playlist_id=... and reload
+            const playlistId = pill.dataset.playlistId;
+            const params = new URLSearchParams(window.location.search);
+            params.set('playlist_id', playlistId);
+            // Remove offset for infinite scroll
+            params.delete('offset');
+            window.location.search = params.toString();
+        }
+    });
 });
 </script>
 </html> 

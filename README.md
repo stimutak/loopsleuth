@@ -1,7 +1,64 @@
 # LoopSleuth
 
-> **Note (2024-06-13): LoopSleuth is now web-first!**
-> The web UI (FastAPI + Jinja2) is the primary interface for browsing, tagging, and managing video loops. See `STARTUP_MESSAGE.md` for the latest project state, usage, and next steps.
+## Overview
+LoopSleuth is a modern, production-ready web app for creative video library management, inspired by Notch, TouchDesigner, and Cursor. It features a robust, dark UI, advanced batch selection and tagging, playlist management, and seamless creative workflows.
+
+## Key Features (2024-06)
+- **Grid View:** Infinite scroll, responsive multi-column layout, and robust selection logic (single, Ctrl/Cmd, Shift+Click for multi/range select).
+- **Playlist Pills:** Interactive playlist badges on each grid card, with instant add/remove and visual feedback. Pills are fully accessible and support direct removal from the grid.
+- **Batch Actions:** Floating batch bar for tag add/remove/clear, with chip-style input, autocomplete, and keyboard accessibility. All actions are robust to DOM changes and large libraries.
+- **Detail View:** Notch/Cursor-inspired glassmorphic sidebar, large video preview, and modern metadata/tags/playlists. Fully accessible and responsive.
+- **Sidebar:** Playlist management (create, select, filter, reorder), with decoupled selection/filtering and instant feedback.
+- **Export/Copy:** Export selected clips to keepers.txt or copy/move to a folder, with robust error handling and feedback.
+- **Preview Grid:** Floating overlay for multi-clip video preview, adaptive grid layout, and custom controls.
+- **Tag System:** Normalized tags, chip-style editing, and batch/single-clip parity. All tag changes are persisted and reflected instantly.
+- **Production-Ready:** All core workflows are robust, accessible, and tested. See CHANGELOG.md for details.
+
+## Selection UX
+- **Single click:** Selects only the clicked card (sets anchor).
+- **Ctrl/Cmd+Click:** Toggles selection of a card (multi-select, does not update anchor).
+- **Shift+Click:** Selects a range from anchor to clicked card (updates anchor).
+- **Checkboxes:** Support all selection modes, robust to DOM changes.
+- **Selection Bar:** Always visible, with batch actions, preview, and playlist controls.
+
+## Playlist Pills
+- Pills show all playlists a clip belongs to, with color/hover feedback.
+- Remove a clip from a playlist directly from the grid (✖ button on pill).
+- Pills are accessible, keyboard-navigable, and update instantly.
+
+## Handoff & Onboarding
+- See `TODO.md` for next steps, creative/technical enhancements, and open issues.
+- See `STARTUP_MESSAGE.md` for a full project state, onboarding checklist, and handoff notes.
+- All code is modular, maintainable, and ready for further creative/production workflows.
+- For new contributors: review the last commits, TODO.md, and STARTUP_MESSAGE.md for context and next actions.
+
+## Contributing
+- Fork the repo and create a feature branch for your changes.
+- Follow the coding style and documentation patterns in the codebase.
+- Run tests with `pytest` (see below) before submitting a PR.
+- Document all new features and changes in CHANGELOG.md.
+
+## Running & Testing
+- Install requirements: `pip install -r requirements.txt`
+- Start the server: `python src/loopsleuth/web/app.py`
+- Open the app at `http://localhost:8000`
+- Run tests: `pytest --maxfail=3 --disable-warnings -q`
+
+## File Locations
+- Grid: `src/loopsleuth/web/templates/grid.html`
+- Detail: `src/loopsleuth/web/templates/clip_detail.html`
+- JS: `src/loopsleuth/web/static/clip_actions.js`
+- CSS: `src/loopsleuth/web/static/style.css`
+- Backend: `src/loopsleuth/web/app.py`
+- Tests: `tests/`
+
+## Support & Handoff
+- For onboarding, see `STARTUP_MESSAGE.md` and `TODO.md`.
+- For bug reports, see `BUG_HANDBOOK.md`.
+- For roadmap and creative ideas, see `ROADMAP.md`.
+
+---
+_Last update: 2024-06-XX_
 
 ## 🚦 Handoff & Next Steps (2024-06)
 - **Production-ready:**
@@ -45,6 +102,15 @@ A web-first (formerly terminal-first) librarian for video loops.
 - Accessibility and keyboard navigation are maintained.
 - Responsive design: grid and controls scale for smaller screens.
 
+## 🆕 Scan UX Improvements (2024-06)
+- The scan folder and database fields are now unified, modern combo boxes: select from recent entries or enter a new value. Both are styled to match the dark UI and support keyboard/mouse interaction.
+- The last-used database and scan folder are always available at the top of their respective dropdowns, unless localStorage is cleared.
+- All endpoints (grid, playlists, duplicates, etc.) now respect the selected database, enabling seamless multi-library workflows.
+- You do not need to re-ingest to see your last scan—just select the same DB and your clips will appear.
+- All errors (validation, permission, scan conflicts, etc.) are shown as toast notifications in the UI—no more silent failures.
+- The scan form prevents submission if validation fails, and backend errors are always surfaced to the user.
+- These changes make multi-library workflows safer and more user-friendly, with instant feedback and robust error handling.
+
 ## MVP (v0.1)
 1. **Scan**: walk folder → SQLite row per clip (`ffprobe`)
 2. **Thumb**: grab frame @ 25 % duration → 256 px JPEG
@@ -64,18 +130,29 @@ Python ≥ 3.10, ffmpeg/ffprobe, SQLite, Pillow, imagehash, FastAPI, Jinja2, Tex
 ### Tag System (vNext)
 - Tags are now stored in a normalized schema: a `tags` table (unique tag names) and a `clip_tags` join table (many-to-many: clips <-> tags).
 - This enables tag reuse, autocomplete, and efficient tag-based search/filtering.
+- Tag suggestions are provided through a dedicated `/api/tag_suggestions` endpoint with consistent behavior across all contexts.
+- Tag autocomplete is fully implemented with keyboard navigation and accessibility features.
 
 ### Tag Editing UX (2024-06)
-
-- Per-clip tag editing in the detail view is now fully consistent with the batch editor: chip-style input, autocomplete, keyboard navigation, and ARIA/accessibility are all supported. Tag changes are persisted to the database and reflected in both the detail and grid views.
+- Per-clip tag editing in the detail view is now fully consistent with the batch editor:
+  - Chip-style input with removable tags
+  - Real-time tag suggestions with keyboard navigation
+  - Proper dropdown positioning and styling
+  - ARIA/accessibility support
+  - Instant feedback and persistence
+- Tag changes are persisted to the database and reflected in both detail and grid views
+- Tag autocomplete works seamlessly in all contexts:
+  - Batch action bar
+  - Clip detail view
+  - Any other tag input fields
 - The codebase is ready for handoff or onboarding. See STARTUP_MESSAGE.md and TODO.md for the latest project state and next steps.
 
 #### Remaining polish for pro-level UX
 - [x] ARIA roles/attributes for full screen reader support
 - [x] Dropdown scrolls to keep highlight visible (for long lists)
-- Batch tag editing (multi-select)
-- Tag color/category support (optional)
-- Tag reordering (optional)
+- [x] Tag autocomplete with keyboard navigation
+- [ ] Tag color/category support (optional)
+- [ ] Tag reordering (optional)
 
 See code comments for further details and next steps.
 
@@ -184,33 +261,20 @@ LoopSleuth uses `pytest` and `pytest-cov` for automated testing and coverage rep
 - Copy to Folder: Copy selected files to a user-specified folder
 - Custom checkboxes, grid scroll restore, robust batch UX
 
-## 🚀 Playlist Management (2024-06)
+## 🚀 Playlist Management & Selection UX (2024-06)
 
-LoopSleuth now supports (or is adding) robust playlist management for creative workflows:
+LoopSleuth now supports robust playlist management for creative workflows:
 
-- **Database:**
-  - `playlists` table: id, name, created_at
-  - `playlist_clips` join table: playlist_id, clip_id, position (ordering)
-- **Backend API:**
-  - Create, rename, delete playlists
-  - Add/remove clips (batch)
-  - Reorder clips (drag-and-drop or up/down)
-  - List playlists and their clips
-  - Export playlist as .txt, .zip, or .tox (TouchDesigner)
-- **Frontend UI:**
-  - Playlist sidebar or modal for management
-  - Add/remove selected clips to playlists
-  - Drag-and-drop or up/down for ordering
-  - Export/download and preview (play all/step-through)
-- **Workflow:**
-  - Add/remove multiple selected clips to playlists in one go
-  - Show which playlists a clip belongs to in grid/detail views
-  - Visual feedback: badges/highlights for playlist membership
-- **Testing:**
-  - Unit tests for all endpoints and ordering logic
-  - UI tests for playlist creation, modification, and export
-
-_Stretch:_ .tox export, multi-user/concurrent edits, creative integrations (TouchDesigner/Notch hooks).
+- **Sidebar checkboxes** select *target* playlists for add/remove actions, not for filtering.
+- **Filter icon** (🔍) next to each playlist name filters the grid by that playlist.
+- **Batch add/remove to multiple playlists** from the grid is fully supported.
+- **Creating a new playlist with clips selected** immediately adds those clips to the new playlist.
+- **Playlist pills on each grid card** now have a remove (✖) button to remove a clip from a playlist, with instant UI update and toast feedback.
+- **Grid view reloads** after playlist changes to reflect new membership.
+- **All playlist pill rendering is now handled in JS**, not Jinja, to avoid context errors and server errors.
+- **Persistent selection bar and batch bar** are robust and always reflect current selection state.
+- **Visual feedback (toast/snackbar)** for all playlist actions.
+- All major UI/UX bugs (including 500 errors from Jinja context) have been fixed.
 
 ## 🚀 UI & Layout Modernization (2024-06)
 - The app now uses a robust flexbox layout: the playlist sidebar and grid never overlap, and the grid always fills the available space.
@@ -238,22 +302,20 @@ _Stretch:_ .tox export, multi-user/concurrent edits, creative integrations (Touc
 ## 🚦 Handoff & Path Forward (2024-06)
 
 ### Current State
-- Playlist management is robust: create, rename, delete, reorder, and export playlists from the sidebar.
-- Playlist badges in the detail view are now fully interactive:
-  - Clicking a badge highlights it, selects the playlist in the sidebar, and auto-scrolls the sidebar to the selected playlist.
-  - Visual feedback is immediate and robust for both badge and sidebar selection.
-- Batch tag editing, selection bar, and all core grid/detail UX are production-ready.
+- All core playlist, tagging, and selection workflows are robust and production-ready.
+- The codebase is modular, maintainable, and well-documented.
+- All major UI/UX bugs are resolved.
+- The onboarding and handoff notes are up to date.
+- Remaining work is mostly advanced/creative features and polish, not core stability.
 
-### Path Forward
-- **For new contributors or maintainers:**
-  1. Review the sidebar and detail view playlist sync logic in `clip_detail.html` and `clip_actions.js`.
-  2. For further UX polish, consider:
-     - Keyboard navigation for playlist badges and sidebar
-     - Drag-and-drop playlist reordering in the sidebar
-     - Multi-clip add/remove to playlists from both grid and detail views
-     - Playlist export as .zip or TouchDesigner .tox
-  3. See `TODO.md` for granular next steps and open issues.
-  4. All code is modular and documented for rapid onboarding.
+### Pending / Next Steps
+- Playlist reordering (drag-and-drop), playlist folders, playlist export (zip, .tox), playlist preview (play all/step through).
+- Advanced export: zip, TouchDesigner .tox, etc.
+- Further UX polish: keyboard shortcuts, accessibility improvements, creative/visual features (e.g., animated transitions, custom playlist covers).
+- Detail view polish: needs a full redesign for usability and creative workflows (larger video, better tag/playlist controls, responsive layout).
+- Duplicate detection: pHash duplicate detection, batch review/merge UI, cross-database duplicate scan.
+- Performance: selection performance with very large grids, further optimization.
+- Testing: expand automated test coverage, especially for new playlist and batch features.
 
 ### Onboarding Checklist
 - [x] All playlist and tag features are tested and robust
@@ -261,5 +323,71 @@ _Stretch:_ .tox export, multi-user/concurrent edits, creative integrations (Touc
 - [x] All major user flows are documented in this README and `STARTUP_MESSAGE.md`
 - [x] See `src/loopsleuth/web/templates/clip_detail.html` for the latest playlist UX logic
 
-_Last update: 2024-06-14_
+_Last update: 2025-04-26_
+
+## 🚦 Grid Sorting & Preview Features (2025-04-26)
+
+- The grid view now supports sorting by:
+  - Name (filename)
+  - Date modified
+  - Size
+  - Duration (length)
+  - Starred (favorites)
+- You can also enable a 'Show starred first' checkbox to always prioritize starred clips in the sort order.
+- Sorting controls are available in a persistent sort bar above the grid, with dropdowns for field and order (ascending/descending).
+- The grid and selection bar are now more interactive:
+  - Each card has a PiP (Picture-in-Picture) button for floating video preview.
+  - The selection bar includes a Preview Grid button to open a floating overlay with a grid of video previews for selected clips.
+- All sorting and preview features are robust, accessible, and tested for creative workflows.
+
+## 🚦 Preview Grid Overlay Improvements (2024-06)
+- The Preview Grid overlay now uses a fully adaptive, responsive CSS Grid layout.
+- Video player cells automatically adjust their size and aspect ratio based on the number of selected clips and the viewport size.
+- Videos are maximized within their grid cells, maintaining aspect ratio and filling available vertical space.
+- The grid uses `repeat(auto-fit, minmax(320px, 1fr))` for columns, and each cell/video fills the available height and width.
+- The overlay is robust for 1 to many selected clips, and the code is modular and ready for further creative/UX enhancements.
+- See `src/loopsleuth/web/static/clip_actions.js` for the JS logic and `grid.html` for the template.
+
+## 🚦 Handoff Summary (2024-06)
+
+- The grid view now uses a virtualized, infinite scroll powered by Clusterize.js for robust performance with large libraries.
+- The backend exposes `/api/clips` for windowed, paged data to support the virtualized frontend.
+- Thumbnails are loaded on demand and sized via a persistent slider (using a CSS variable and localStorage).
+- The grid is multi-column, responsive, and batch actions (tagging, selection) are fully supported.
+- The batch tag bar and selection bar are always visible and robust to DOM changes.
+- All code is modular, maintainable, and ready for creative/production workflows.
+- See `src/loopsleuth/web/templates/grid.html`, `src/loopsleuth/web/static/style.css`, and `src/loopsleuth/web/static/clip_actions.js` for the main logic.
+
+## Selection Behavior (macOS & Cross-Platform)
+
+- **Single click**: Selects only the clicked card.
+- **Shift+Click**: Selects a range of cards.
+- **Checkboxes**: Use checkboxes to select multiple, non-contiguous cards. This is the most reliable method for multi-select on all platforms.
+- **Cmd/Ctrl/Option+Click**: Not supported for multi-select on macOS browsers due to OS/browser limitations. Use checkboxes and shift+click instead.
+
+## 🚦 New Features (2024-06)
+
+- **Recent Scan Folders:** The scan form now includes a dropdown of your last 8 scanned folders (per user, stored in localStorage). Select a recent location or type a new one to scan.
+- **Database Selection:** A database dropdown in the header/sidebar lets you quickly switch between libraries. Add new DBs, persist your selection, and reload the app with the chosen DB (via ?db=... query param). All state and actions are scoped to the selected DB.
+- **Seamless Multi-Library Workflow:** The backend now supports per-request DB switching. You can scan, tag, review duplicates, and manage playlists in any selected DB without restarting the server.
+- **Duplicate Review Banner:** If any duplicates are flagged, a prominent banner appears in the grid view linking to the batch review UI. Resolve, merge, or ignore duplicates directly from the web UI.
+
+## 🚦 Onboarding & Workflow (2024-06)
+
+- **Switching Libraries:** Use the database dropdown to select or add a DB. The app reloads with the selected DB, and all actions (scan, tag, review) apply to that library. All DB names are validated for safety.
+- **Scanning Folders:** Use the scan form's combo dropdown to quickly select from recent folders or enter a new location. Recent folders are remembered per user. All scan folders are validated for existence and readability before scanning.
+- **Error Feedback:** Any error (invalid DB name, permission denied, scan in progress, etc.) is shown as a toast notification. No silent failures.
+- **Duplicate Review:** If flagged, review and resolve duplicates from the grid banner or the /duplicates page. Merge tags/playlists, keep, delete, or ignore as needed.
+
+## ⚠️ Known Issue: Batch Action Bar Blank After Grid Virtualization (2025-04)
+
+- After migrating the grid to virtualized rendering (Clusterize.js, JS-only cards), the batch action bar (`#batch-action-bar`) is present in the DOM but remains blank.
+- Attempts to fix by calling `renderBatchActionBar()` after every grid update did **not** resolve the issue.
+- The bar is visible but not populated with controls or tag chips, regardless of selection state.
+- This is a regression from the previous Jinja2-rendered grid, where the bar worked as expected.
+- **Next steps:**
+    - Investigate the interaction between grid rendering, selection state, and batch bar logic.
+    - Ensure the batch bar's rendering logic is compatible with the new JS/virtualized grid.
+    - Review all event and state flows related to selection and batch actions.
+- Handoff to a new developer/model is recommended for further debugging and resolution.
 

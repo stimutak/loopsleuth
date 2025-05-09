@@ -22,8 +22,9 @@ def get_db_connection(db_path: Path = None) -> sqlite3.Connection:
     if db_path is None:
         db_path = get_default_db_path()
     conn = sqlite3.connect(db_path)
-    # Use Row factory for dict-like access to columns
+    # Defensive: Always set Row factory for dict-like access to columns
     conn.row_factory = sqlite3.Row
+    print(f"[get_db_connection] row_factory set to: {conn.row_factory}")
     create_table(conn)
     migrate_clips_table(conn)
     return conn
@@ -42,7 +43,9 @@ def create_table(conn: sqlite3.Connection):
             starred BOOLEAN DEFAULT FALSE,
             tags TEXT,              -- Comma-separated string or JSON? Start with simple string.
             scanned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            modified_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP -- Track file modification
+            modified_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, -- Track file modification
+            duplicate_of INTEGER,   -- If duplicate, points to canonical clip.id
+            needs_review BOOLEAN DEFAULT 0 -- Flag for batch duplicate review
             -- Consider adding width, height, codec later if needed
         )
     """)
@@ -69,14 +72,20 @@ def create_table(conn: sqlite3.Connection):
     """)
 
     # --- Playlist tables ---
-    # playlists: stores playlist metadata (name, created_at)
+    # playlists: stores playlist metadata (name, created_at, order)
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS playlists (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            "order" INTEGER
         )
     """)
+    # Add 'order' column if missing (for playlist sidebar reordering)
+    try:
+        cursor.execute("ALTER TABLE playlists ADD COLUMN \"order\" INTEGER")
+    except Exception:
+        pass  # Already exists
     # playlist_clips: join table for ordered clips in playlists
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS playlist_clips (
@@ -89,10 +98,24 @@ def create_table(conn: sqlite3.Connection):
         )
     """)
 
+    # --- Scan tracking table ---
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS scans (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            folder_path TEXT NOT NULL,
+            scanned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    # Add scan_id to clips if not present
+    try:
+        cursor.execute("ALTER TABLE clips ADD COLUMN scan_id INTEGER")
+    except Exception:
+        pass  # Already exists
+
     conn.commit()
 
 def migrate_clips_table(conn):
-    """Add width, height, size, and codec_name columns to the clips table if missing."""
+    """Add width, height, size, codec_name, duplicate_of, and needs_review columns to the clips table if missing."""
     cursor = conn.cursor()
     # Check and add columns if they do not exist
     columns = [row[1] for row in cursor.execute("PRAGMA table_info(clips)")]
@@ -105,6 +128,10 @@ def migrate_clips_table(conn):
         alter_stmts.append("ALTER TABLE clips ADD COLUMN size INTEGER")
     if 'codec_name' not in columns:
         alter_stmts.append("ALTER TABLE clips ADD COLUMN codec_name TEXT")
+    if 'duplicate_of' not in columns:
+        alter_stmts.append("ALTER TABLE clips ADD COLUMN duplicate_of INTEGER")
+    if 'needs_review' not in columns:
+        alter_stmts.append("ALTER TABLE clips ADD COLUMN needs_review BOOLEAN DEFAULT 0")
     for stmt in alter_stmts:
         cursor.execute(stmt)
     if alter_stmts:

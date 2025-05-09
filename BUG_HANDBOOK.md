@@ -1,5 +1,15 @@
 # LoopSleuth Persistent UI Bugs: Handoff & Debug Handbook
 
+**[2025-04-22 to 2025-04-26] NOTE:** Major UI/UX improvements and new features were implemented over this period:
+- Favicons are now present on all pages (grid, detail, error, 404) for consistent branding.
+- A thumbnail size slider is available above the grid view, allowing users to adjust thumbnail size in real time (value is persisted per browser).
+- The detail view now features fully functional custom video controls (play/pause, seek, frame step, volume) in addition to the native controls.
+- All text and icon colors are now a subtle grey for a more elegant look.
+- The "Open in System" feature now selects the file in Explorer (Windows) or reveals it in Finder (macOS), and opens the folder on Linux.
+- All form elements and buttons use a modern, thin, Notch-inspired typographic style.
+
+---
+
 ## 1. Sidebar Still Pinned (Grid View)
 
 ### Symptoms
@@ -50,6 +60,9 @@
 - Consider using a library for autocomplete or a more robust event delegation pattern.
 - Test with a minimal HTML/JS page to isolate the issue outside of the main app.
 
+### Status
+- [2024-06-16] Batch action bar and autocomplete are working as of commit ef8fdea. If issues recur, compare against this baseline.
+
 ---
 
 ## 3. Excessive `/tags` Requests
@@ -73,7 +86,12 @@
 
 ---
 
-## Handoff Checklist
+## Handoff Checklist (2025-04-26)
+- All major UI/UX improvements are in place and committed.
+- Favicons are present on all pages.
+- Thumbnail size slider is implemented and persistent.
+- Custom video controls are functional in the detail view.
+- All form elements and buttons use the new typographic style.
 - Reference this document in your new chat or issue tracker.
 - Attach or link to the current `style.css`, `clip_actions.js`, and `grid.html` for context.
 - Use the "Next Steps for Debug" sections above as a checklist for the next developer.
@@ -81,4 +99,4 @@
 
 ---
 
-_Last updated: 2024-06-15_ 
+_Last updated: 2025-04-26_ 
