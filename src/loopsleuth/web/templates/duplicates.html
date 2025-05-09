@@ -20,18 +20,6 @@
       document.getElementById('duplicate-review-container').innerHTML = '<div class="error">Duplicate review UI failed to load.</div>';
     }
   });
-
-  card.addEventListener('click', function(e) {
-    console.log('Card click:', {
-      ctrl: e.ctrlKey,
-      meta: e.metaKey,
-      shift: e.shiftKey,
-      target: e.target,
-      closest: e.target.closest('a,button,input,.pip-btn,.custom-checkbox,.select-clip-checkbox'),
-      platform: navigator.platform
-    });
-    // ...rest of handler...
-  });
 </script>
 <style>
 #duplicate-review-container {

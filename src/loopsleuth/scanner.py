@@ -22,7 +22,7 @@ if str(SRC_DIR) not in sys.path:
 
 from loopsleuth.db import get_db_connection, get_default_db_path
 from loopsleuth.metadata import get_video_duration, FFprobeError, get_video_metadata
-from loopsleuth.thumbnailer import generate_thumbnail, ThumbnailError
+from loopsleuth.thumbnailer import generate_thumbnail, ThumbnailError, generate_animated_preview
 from loopsleuth.hasher import calculate_phash, HasherError
 
 # Common video file extensions
@@ -173,26 +173,47 @@ def ingest_directory(
                 if duration and duration > 0:
                     try:
                         from loopsleuth.thumbnailer import _get_thumbnail_dir
-                        thumb_path = generate_thumbnail(
+                        thumb_output_dir = _get_thumbnail_dir()
+
+                        # 1. Generate Static Thumbnail
+                        static_thumb_path = generate_thumbnail(
                             video_path=video_path,
                             duration=duration,
                             clip_id=clip_id,
-                            output_dir=_get_thumbnail_dir()
+                            output_dir=thumb_output_dir
                         )
-                        if thumb_path:
+                        if static_thumb_path:
                             try:
-                                abs_thumb_path = thumb_path.resolve()
+                                abs_thumb_path = static_thumb_path.resolve()
                                 abs_project_root = Path.cwd().resolve()
                                 relative_thumb_path = str(abs_thumb_path.relative_to(abs_project_root))
                             except ValueError:
-                                relative_thumb_path = str(thumb_path.name)
+                                relative_thumb_path = str(static_thumb_path.name)
                             cursor.execute(
                                 "UPDATE clips SET thumbnail_path = ? WHERE id = ?",
                                 (relative_thumb_path, clip_id)
                             )
-                            # --- Calculate pHash and check for duplicates ---
+                            print(f"    Static thumbnail generated: {relative_thumb_path}")
+
+                            # 2. Generate Animated Preview (if static was successful)
                             try:
-                                phash_str = calculate_phash(thumb_path)
+                                print(f"    Attempting animated preview for: {filename}")
+                                anim_preview_path = generate_animated_preview(
+                                    video_path=video_path,
+                                    duration=duration,
+                                    clip_id=clip_id,
+                                    output_dir=thumb_output_dir
+                                )
+                                if anim_preview_path:
+                                    print(f"      Animated preview generated: {anim_preview_path.name}")
+                                else:
+                                    print(f"      Failed to generate animated preview for {filename} (returned None).")
+                            except (ThumbnailError, Exception) as e_anim:
+                                print(f"      Error generating animated preview for {filename}: {e_anim}", file=sys.stderr)
+                            
+                            # 3. Calculate pHash (uses static thumbnail path)
+                            try:
+                                phash_str = calculate_phash(static_thumb_path)
                                 if phash_str:
                                     # Check for duplicates (exact or near)
                                     cursor.execute("SELECT id, path, filename, phash FROM clips WHERE phash IS NOT NULL AND id != ?", (clip_id,))
@@ -267,9 +288,23 @@ def ingest_directory(
         print(f"  Skipped (already exist): {skipped_count}")
         print(f"  Errors: {error_count}")
 
-        # Set status to done
+        # Write final status
         with progress_path.open("w") as f:
-            json.dump({"total": total_files, "done": total_files, "status": "done"}, f)
+            json.dump({"total": total_files, "done": total_files, "status": "complete"}, f)
+        
+        # Final call to process_thumbnails
+        if force_rescan:
+            print(f"Calling process_thumbnails for DB: {db_path} (force_regenerate=True, due to ingest_directory force_rescan=True)")
+            from loopsleuth.thumbnailer import process_thumbnails # Import here if not already at top
+            process_thumbnails(db_path=db_path, force_regenerate=True)
+        else:
+            # If not force_rescan, the main loop should have handled new items.
+            # A call with force_regenerate=False could find items from very old, incomplete scans
+            # where thumbnail_path is NULL, but might be largely redundant now.
+            # For now, let's make it explicit that we might call it to catch genuinely missing ones.
+            print(f"Optionally calling process_thumbnails for DB: {db_path} (force_regenerate=False) to catch any old missing items.")
+            from loopsleuth.thumbnailer import process_thumbnails # Import here if not already at top
+            process_thumbnails(db_path=db_path, force_regenerate=False)
 
     except sqlite3.Error as e:
         print(f"Database error during scan: {e}", file=sys.stderr)

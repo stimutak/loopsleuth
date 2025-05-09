@@ -165,6 +165,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Date
 - 2024-06-15
 
+## [Unreleased] - YYYY-MM-DD
+### Added
+- Implemented animated GIF previews on thumbnail hover in the grid view. GIFs are generated during scan and displayed dynamically on mouseover.
+
 ---
 
 Older changes and project history can be found in the README and ROADMAP. 

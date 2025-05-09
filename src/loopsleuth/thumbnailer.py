@@ -26,6 +26,15 @@ THUMBNAIL_SIZE = (256, 256) # Target size (width, height) - keeping aspect ratio
 THUMBNAIL_FORMAT = "JPEG"
 THUMBNAIL_QUALITY = 85 # JPEG quality
 
+# Animated GIF Preview Constants
+ANIM_PREVIEW_SUFFIX = "_anim" # To differentiate from potential static GIFs
+ANIM_PREVIEW_FORMAT = "gif"
+ANIM_DURATION_S = 2.0  # Duration of the animated preview in seconds
+ANIM_FPS = 10  # Frames per second for the animated preview
+ANIM_WIDTH_PX = 256  # Width of the animated preview
+ANIM_LOOP_COUNT = 0  # 0 for infinite loop
+ANIM_TIME_PERCENT = 0.25 # Start at 25% of video duration, same as static thumb
+
 class ThumbnailError(Exception):
     """Custom exception for errors during thumbnail generation."""
     pass
@@ -45,6 +54,16 @@ def _get_thumbnail_filename(video_path_str: str, clip_id: Optional[int] = None) 
         # Fallback to hash of path if ID is not provided
         path_hash = hashlib.sha1(video_path_str.encode('utf-8')).hexdigest()
         return f"path_{path_hash}.jpg"
+
+def _get_animated_preview_filename(video_path_str: str, clip_id: Optional[int] = None) -> str:
+    """Generates a unique filename for the animated GIF preview."""
+    base_name = ""
+    if clip_id:
+        base_name = f"clip_{clip_id}"
+    else:
+        path_hash = hashlib.sha1(video_path_str.encode('utf-8')).hexdigest()
+        base_name = f"path_{path_hash}"
+    return f"{base_name}{ANIM_PREVIEW_SUFFIX}.{ANIM_PREVIEW_FORMAT}"
 
 def generate_thumbnail(
     video_path: Path,
@@ -181,6 +200,112 @@ def generate_thumbnail(
              except OSError:
                  pass
 
+def generate_animated_preview(
+    video_path: Path,
+    duration: Optional[float] = None,
+    clip_id: Optional[int] = None,
+    output_dir: Optional[Path] = None,
+) -> Optional[Path]:
+    """
+    Generates an animated GIF preview for a video file.
+
+    Args:
+        video_path: Path to the input video file.
+        duration: Duration of the video in seconds (required to calculate time).
+        clip_id: The primary key ID of the clip in the database (optional, for filename).
+        output_dir: The directory to save previews (defaults to THUMBNAIL_DIR_NAME).
+
+    Returns:
+        The Path to the generated animated preview file, or None if generation failed.
+
+    Raises:
+        ThumbnailError: If ffmpeg fails.
+        FileNotFoundError: If ffmpeg executable or video_path is not found.
+        ValueError: If duration is None or invalid.
+    """
+    if not video_path.is_file():
+        raise FileNotFoundError(f"Video file not found: {video_path}")
+    if duration is None or duration <= 0:
+        raise ValueError(f"Invalid or missing duration ({duration}) for {video_path}. Cannot calculate timestamp for animated preview.")
+
+    if output_dir is None:
+        output_dir = _get_thumbnail_dir()
+    else:
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+    start_time_s = max(0.01, duration * ANIM_TIME_PERCENT)
+    anim_filename = _get_animated_preview_filename(str(video_path), clip_id)
+    output_path = output_dir / anim_filename
+
+    # Two-pass ffmpeg command for optimized GIF
+    # Pass 1: Generate palette
+    # Pass 2: Use palette to generate GIF
+    # Simpler one-pass with split for palettegen/paletteuse in one command
+    vf_string = (
+        f"fps={ANIM_FPS},scale={ANIM_WIDTH_PX}:-1:flags=lanczos,"
+        f"split[s0][s1];[s0]palettegen=stats_mode=diff[p];[s1][p]paletteuse"
+    )
+
+    ffmpeg_gif_command = [
+        FFMPEG_COMMAND,
+        "-ss", f"{start_time_s:.4f}",
+        "-t", f"{ANIM_DURATION_S:.4f}",
+        "-i", str(video_path),
+        "-vf", vf_string,
+        "-loop", str(ANIM_LOOP_COUNT),
+        "-an",  # No audio
+        "-gifflags", "+transdiff", # Optimize transparency changes
+        "-y", # Overwrite output file if it exists
+        "-loglevel", "error",
+        str(output_path)
+    ]
+    
+    # print(f"Attempting to generate animated GIF: {' '.join(ffmpeg_gif_command)}")
+
+    try:
+        process = subprocess.run(
+            ffmpeg_gif_command,
+            capture_output=True, # Get stdout/stderr
+            text=True, # Decode output as text
+            check=False # Don't raise exception for non-zero exit, handle manually
+        )
+        if process.returncode != 0:
+            error_msg = process.stderr.strip() if process.stderr else "Unknown ffmpeg error during GIF generation."
+            # Clean up potentially incomplete file
+            if output_path.exists():
+                try: output_path.unlink()
+                except OSError: pass
+            raise ThumbnailError(
+                f"ffmpeg failed to generate animated preview for {video_path} at {start_time_s:.4f}s. "
+                f"Return code: {process.returncode}. Error: {error_msg}"
+            )
+        
+        if not output_path.exists() or output_path.stat().st_size == 0:
+            # Clean up empty file
+            if output_path.exists():
+                try: output_path.unlink()
+                except OSError: pass
+            raise ThumbnailError(f"ffmpeg produced no output or an empty file for animated preview of {video_path}.")
+
+        # print(f"Generated animated preview: {output_path}")
+        return output_path
+
+    except FileNotFoundError: # Specifically for FFMPEG_COMMAND not found
+        raise FileNotFoundError(
+            f"'{FFMPEG_COMMAND}' command not found. "
+            f"Ensure FFmpeg is installed and '{FFMPEG_COMMAND}' is in your PATH."
+        )
+    except Exception as e:
+        # Clean up potentially incomplete file
+        if output_path.exists():
+            try: output_path.unlink()
+            except OSError: pass
+
+        if isinstance(e, ThumbnailError) or isinstance(e, FileNotFoundError): # Re-raise specific caught errors
+            raise
+        else: # Wrap other exceptions
+            raise ThumbnailError(f"An unexpected error occurred generating animated preview for {video_path}: {e}") from e
+
 def process_thumbnails(
     db_path: Path = get_default_db_path(),
     limit: Optional[int] = None,
@@ -237,42 +362,110 @@ def process_thumbnails(
                 continue
 
             try:
-                thumb_path = generate_thumbnail(
-                    video_path=video_path,
-                    duration=duration,
-                    clip_id=clip_id,
-                    db_path=db_path,
-                    output_dir=base_output_dir
-                )
+                # Check for existing static thumbnail
+                static_thumb_name = _get_thumbnail_filename(str(video_path), clip_id)
+                static_thumb_path = base_output_dir / static_thumb_name
+                # Ensure we use the most up-to-date existence check after potential generation
+                # static_thumb_exists_initially = static_thumb_path.exists() and static_thumb_path.stat().st_size > 0
 
-                if thumb_path:
-                    # Store path relative to the main project/db directory
-                    relative_thumb_path = str(thumb_path.relative_to(db_path.parent))
+                # Check for existing animated preview
+                anim_preview_name = _get_animated_preview_filename(str(video_path), clip_id)
+                anim_preview_path = base_output_dir / anim_preview_name
+                # anim_preview_exists_initially = anim_preview_path.exists() and anim_preview_path.stat().st_size > 0
+                
+                current_duration: Optional[float] = None
+                try:
+                    current_duration = get_video_duration(video_path)
+                    if current_duration is None or current_duration <= 0:
+                        current_duration = None # Ensure it's None if invalid
+                        print(f"  Warning: Could not get valid duration for {video_path.name} (ID: {clip_id}). Animated preview will be skipped.")
+                except (FFprobeError, ValueError) as e:
+                    print(f"  Error getting duration for {video_path.name} (ID: {clip_id}): {e}. Animated preview will be skipped.")
+                    current_duration = None
+
+                # --- Generation Logic ---
+                static_thumbnail_processed_ok = False
+                animated_preview_processed_ok = False
+
+                # Determine if we need to generate (or regenerate)
+                needs_static_generation = force_regenerate or not (static_thumb_path.exists() and static_thumb_path.stat().st_size > 0)
+                needs_anim_generation = current_duration and (force_regenerate or not (anim_preview_path.exists() and anim_preview_path.stat().st_size > 0))
+
+                # 1. Process Static Thumbnail
+                if needs_static_generation:
+                    print(f"  Generating static thumbnail for: {video_path.name} (ID: {clip_id})")
                     try:
-                        # Use explicit transaction for update
-                        update_cursor.execute("BEGIN")
-                        update_cursor.execute(
-                            "UPDATE clips SET thumbnail_path = ? WHERE id = ?",
-                            (relative_thumb_path, clip_id)
+                        # Use an actual duration if available, otherwise a sensible default for static frame extraction
+                        duration_for_static = current_duration if current_duration and current_duration > 0 else 1.0 
+                        generated_static_path = generate_thumbnail(
+                            video_path,
+                            duration=duration_for_static,
+                            clip_id=clip_id,
+                            output_dir=base_output_dir
                         )
-                        update_cursor.execute("COMMIT")
-                        success_count += 1
-                        # print(f"  Success: {relative_thumb_path}")
-                    except sqlite3.Error as db_err:
-                         print(f"  Error updating database for clip ID {clip_id}: {db_err}", file=sys.stderr)
-                         update_cursor.execute("ROLLBACK")
-                         error_count += 1
-                         # Optionally delete the generated thumb if DB update failed?
-                         # if thumb_path.exists(): thumb_path.unlink()
+                        if generated_static_path and generated_static_path.exists() and generated_static_path.stat().st_size > 0:
+                            update_cursor.execute("BEGIN")
+                            update_cursor.execute(
+                                "UPDATE clips SET thumbnail_path = ? WHERE id = ?",
+                                (str(generated_static_path.relative_to(Path.cwd())), clip_id)
+                            )
+                            update_cursor.execute("COMMIT")
+                            static_thumbnail_processed_ok = True
+                            print(f"    Static thumbnail generated: {generated_static_path.name}")
+                        else:
+                            print(f"    Failed to generate static thumbnail for {video_path.name} (generation returned None or empty file).")
+                            static_thumbnail_processed_ok = False
+                    except (ThumbnailError, FileNotFoundError, ValueError, sqlite3.Error) as e:
+                        print(f"    Error during static thumbnail generation/DB update for {video_path.name}: {e}")
+                        if conn: conn.rollback()
+                        static_thumbnail_processed_ok = False
                 else:
-                    print(f"  Warning: Thumbnail generation failed for clip ID {clip_id}.", file=sys.stderr)
-                    error_count += 1
+                    # print(f"  Static thumbnail already exists for {video_path.name} (ID: {clip_id}).")
+                    static_thumbnail_processed_ok = True # Exists and not forcing regeneration
 
-            except (ThumbnailError, FileNotFoundError, ValueError) as e:
-                print(f"  Error generating thumbnail for clip ID {clip_id}: {e}", file=sys.stderr)
-                error_count += 1
-            except Exception as e:
-                 print(f"  Unexpected error for clip ID {clip_id}: {e}", file=sys.stderr)
+                # 2. Process Animated Preview (only if static is OK and duration is valid)
+                if current_duration:
+                    if needs_anim_generation:
+                        if static_thumbnail_processed_ok: # Only proceed if static part is fine
+                            print(f"  Generating animated preview for: {video_path.name} (ID: {clip_id})")
+                            try:
+                                generated_anim_path = generate_animated_preview(
+                                    video_path,
+                                    duration=current_duration,
+                                    clip_id=clip_id,
+                                    output_dir=base_output_dir
+                                )
+                                if generated_anim_path and generated_anim_path.exists() and generated_anim_path.stat().st_size > 0:
+                                    animated_preview_processed_ok = True
+                                    print(f"    Animated preview generated: {generated_anim_path.name}")
+                                else:
+                                    print(f"    Failed to generate animated preview for {video_path.name} (generation returned None or empty file).")
+                                    animated_preview_processed_ok = False
+                            except (ThumbnailError, FileNotFoundError, ValueError) as e:
+                                print(f"    Error during animated preview generation for {video_path.name}: {e}")
+                                animated_preview_processed_ok = False
+                        else:
+                            print(f"  Skipping animated preview for {video_path.name} as static thumbnail processing failed or was skipped.")
+                            animated_preview_processed_ok = False # Cannot generate if static failed
+                    else:
+                        # print(f"  Animated preview already exists for {video_path.name} (ID: {clip_id}).")
+                        animated_preview_processed_ok = True # Exists and not forcing regeneration
+                else:
+                    # No valid duration, so animated preview is not applicable.
+                    # Consider it "processed_ok" for the sake of overall clip success if static is fine.
+                    # print(f"  Skipping animated preview for {video_path.name} due to invalid/missing duration.")
+                    animated_preview_processed_ok = True 
+
+                # --- Final Accounting for the clip ---
+                if static_thumbnail_processed_ok and animated_preview_processed_ok:
+                    success_count += 1
+                    # print(f"  Successfully processed clip ID {clip_id}")
+                else:
+                    error_count += 1
+                    print(f"  Error processing clip ID {clip_id}: Static OK={static_thumbnail_processed_ok}, Anim OK={animated_preview_processed_ok} (Duration valid: {bool(current_duration)})")
+
+            except Exception as e: # Catch-all for unexpected errors for this specific clip
+                 print(f"  Major unexpected error processing clip ID {clip_id} ({video_path.name}): {e}", file=sys.stderr)
                  error_count += 1
 
             # Fetch next row before potentially long processing

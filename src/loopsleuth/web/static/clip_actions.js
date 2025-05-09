@@ -1254,8 +1254,12 @@ function attachCardEventHandlers() {
             if (e.target.closest('.tag-chip') || e.target.closest('.playlist-pill') || e.target.closest('.pip-btn') || e.target.closest('.star')) {
                 return;
             }
-            // --- PATCH: Save scroll position before navigating to detail view ---
-            sessionStorage.setItem('gridScrollY', window.scrollY);
+            // --- PATCH: Save #clip-scroll-area.scrollTop before navigating to detail view ---
+            const scrollArea = document.getElementById('clip-scroll-area');
+            if (scrollArea && window.sessionStorage) {
+                sessionStorage.setItem('gridScrollY', scrollArea.scrollTop);
+                console.log('[Grid->Detail] Saved scrollY:', scrollArea.scrollTop);
+            }
             const isShift = e.shiftKey;
             const isCtrl = e.ctrlKey || e.metaKey;
             if (isShift && window.lastSelectedClipId) {
@@ -1354,10 +1358,27 @@ function attachCardEventHandlers() {
 function afterGridUpdate() {
     console.log('[afterGridUpdate] Updating UI');
     attachCardEventHandlers();
-    updateCardSelectionUI();
-    if (!window.batchBarInitialized) {
-        initializeBatchActionBar();
-        window.batchBarInitialized = true;
+    attachPlaylistPillRemoveHandlers(); // For removing clips from playlists via pills
+    updateCardSelectionUI(); // Reflect current selection state on cards
+    renderSelectedClipsBar(); // Update the floating selection bar
+    initializeBatchActionBar(); // Ensure batch bar is correctly set up if needed
+
+    // Restore scroll position *after* new content is rendered and heights are calculated
+    // Use a small timeout to allow the browser to paint and Clusterize to settle
+    setTimeout(restoreScrollPosition, 50); 
+
+    // Attach delegated event listeners for GIF previews if not already attached
+    // These are attached to document.body and will work for dynamically added thumbnails
+    if (!document.body.hasAnimatedPreviewListeners) {
+        // console.log("[GridUpdate] Attaching mouseover/mouseout for GIF previews to document.body for img.thumb");
+        document.body.addEventListener('mouseover', handleThumbnailMouseOver);
+        document.body.addEventListener('mouseout', handleThumbnailMouseOut);
+        document.body.hasAnimatedPreviewListeners = true; // Flag to prevent multiple attachments
+    }
+
+    const loadingIndicator = document.getElementById('loading-indicator');
+    if (loadingIndicator) {
+        loadingIndicator.style.display = 'none';
     }
 }
 document.addEventListener('DOMContentLoaded', afterGridUpdate);
@@ -1536,10 +1557,38 @@ function attachPlaylistPillRemoveHandlers() {
 } 
 
 function renderClipCard(clip) {
-    // Debug: Log playlists for each clip
-    console.log('[renderClipCard] clip.id:', clip.id, 'playlists:', clip.playlists);
-    const activePlaylistIds = getActivePlaylistIds();
-    // Render playlist pills
+    // This function should return an HTML STRING for Clusterize.js
+
+    // Derive base filename for constructing /thumbs/... URLs
+    // Assumes `clip.thumb_filename` (e.g., 'clip_123.jpg') is passed from backend if available,
+    // or falls back to deriving from `clip.thumb_url` (e.g., '.loopsleuth_data/thumbnails/clip_123.jpg')
+    let baseFilenameForUrls = '';
+    if (clip.thumb_filename && typeof clip.thumb_filename === 'string' && clip.thumb_filename.trim() !== '') {
+        baseFilenameForUrls = clip.thumb_filename;
+    } else if (clip.thumb_url && typeof clip.thumb_url === 'string') { // thumb_url might be the full path
+        // Extract filename if thumb_url is a path like '.../thumbnails/file.jpg'
+        const pathParts = clip.thumb_url.replace(/\\/g, '/').split('/');
+        const potentialFilename = pathParts.pop(); 
+        if (potentialFilename && potentialFilename.includes('.')) { // Basic check for a filename with extension
+            baseFilenameForUrls = potentialFilename;
+        }
+    } else if (clip.thumbnail_path && typeof clip.thumbnail_path === 'string') { // Another possible field name for full path
+        const pathParts = clip.thumbnail_path.replace(/\\/g, '/').split('/');
+        const potentialFilename = pathParts.pop();
+        if (potentialFilename && potentialFilename.includes('.')) {
+            baseFilenameForUrls = potentialFilename;
+        }
+    }
+
+    const staticSrcUrl = baseFilenameForUrls ? `/thumbs/${baseFilenameForUrls}` : '/static/placeholder.png';
+    
+    let animatedSrcUrl = '/static/placeholder_anim.gif';
+    if (baseFilenameForUrls) {
+        const filenameBase = baseFilenameForUrls.substring(0, baseFilenameForUrls.lastIndexOf('.'));
+        animatedSrcUrl = `/thumbs/${filenameBase}_anim.gif`;
+    }
+
+    // Prepare playlist pills HTML string
     let playlistPills = '';
     if (clip.playlists && Array.isArray(clip.playlists) && clip.playlists.length > 0) {
         playlistPills = clip.playlists.map(pl => `
@@ -1551,6 +1600,9 @@ function renderClipCard(clip) {
     } else {
         playlistPills = '<span class="playlist-pill playlist-empty">No playlists</span>';
     }
+
+    // Construct the HTML string for the card
+    // Event handlers for PiP button, star, selection, etc., are attached by attachCardEventHandlers
     return `
         <div class="card" data-clip-id="${clip.id}" data-path="${encodeURIComponent(clip.path)}">
             <label class="custom-checkbox-label">
@@ -1558,7 +1610,7 @@ function renderClipCard(clip) {
                 <span class="custom-checkbox"></span>
             </label>
             <a class="card-link" href="/clip/${clip.id}">
-                <img class="thumb" src="${clip.thumb_url || '/static/placeholder.png'}" alt="Thumbnail for ${clip.filename}" loading="lazy" />
+                <img class="thumb" src="${staticSrcUrl}" data-static-src="${staticSrcUrl}" data-animated-src="${animatedSrcUrl}" alt="Thumbnail for ${clip.filename}" loading="lazy" />
             </a>
             <div class="meta">
                 <a class="card-link" href="/clip/${clip.id}">
@@ -1578,14 +1630,14 @@ function renderClipCard(clip) {
                     </span>
                     <a href="/clip/${clip.id}" class="edit-tag-btn-link" style="margin-left:0.5em; font-size:0.9em; text-decoration:none;" title="Edit tags in detail view">✎</a>
                 </div>
-                <!-- Playlist pill badges: highlight all active pills for selected playlists -->
+                <!-- Playlist pill badges -->
                 <div class="playlists">
                     ${playlistPills}
                 </div>
             </div>
         </div>
     `;
-} 
+}
 
 // --- Debounce loadMoreClips to prevent stacking ---
 let loadMoreClipsTimeout = null;
@@ -1630,3 +1682,68 @@ function renderClipRows(clips, cardsPerRow = 5) {
 
 window.renderClipCard = renderClipCard;
 window.renderClipRows = renderClipRows;
+
+document.querySelectorAll('.card-link').forEach(link => {
+    link.addEventListener('click', function(e) {
+        const scrollArea = document.getElementById('clip-scroll-area');
+        if (scrollArea && window.sessionStorage) {
+            sessionStorage.setItem('gridScrollY', scrollArea.scrollTop);
+            console.log('[Grid->Detail:link] Saved scrollY:', scrollArea.scrollTop);
+        }
+    });
+});
+
+// --- Global Variables and State ---
+let CLIPS_DATA = []; // Holds all clip data fetched from the server
+let CLUSTERIZE_INSTANCE = null;
+const ITEMS_PER_PAGE = 50; // Number of items to fetch per page
+let CURRENT_PAGE = 0;
+let IS_LOADING_MORE = false;
+let HAS_MORE_CLIPS = true;
+let CURRENT_SORT_FIELD = 'id'; // Default sort field
+let CURRENT_SORT_ORDER = 'asc'; // Default sort order
+let SHOW_STARRED_FIRST = false;
+
+// Store the current scroll position to restore it after updates
+let lastScrollPosition = 0;
+
+// Debounced version of loadMoreClips
+const debouncedLoadMore = debounce(loadMoreClips, 200);
+
+// Function to save scroll position
+function saveScrollPosition() {
+    const scrollArea = document.getElementById('scrollArea');
+    if (scrollArea) {
+        lastScrollPosition = scrollArea.scrollTop;
+    }
+}
+
+// Function to restore scroll position
+function restoreScrollPosition() {
+    const scrollArea = document.getElementById('scrollArea');
+    if (scrollArea) {
+        scrollArea.scrollTop = lastScrollPosition;
+    }
+}
+
+// Function to handle thumbnail mouseover for GIF preview
+function handleThumbnailMouseOver(event) {
+    const targetImg = event.target.closest('img.thumb'); // Target images with class 'thumb'
+    if (targetImg) {
+        const animatedSrc = targetImg.getAttribute('data-animated-src');
+        if (animatedSrc && targetImg.src !== animatedSrc) {
+            targetImg.src = animatedSrc;
+        }
+    }
+}
+
+// Function to handle thumbnail mouseout for GIF preview
+function handleThumbnailMouseOut(event) {
+    const targetImg = event.target.closest('img.thumb'); // Target images with class 'thumb'
+    if (targetImg) {
+        const staticSrc = targetImg.getAttribute('data-static-src');
+        if (staticSrc && targetImg.src !== staticSrc) {
+            targetImg.src = staticSrc;
+        }
+    }
+}
