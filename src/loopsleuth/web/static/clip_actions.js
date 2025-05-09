@@ -1245,8 +1245,13 @@ function attachCardEventHandlers() {
                 updateCardSelectionUI();
             };
         }
+        // --- PATCH: Attach star click handler ---
+        const star = card.querySelector('.star');
+        if (star) {
+            star.onclick = toggleStar;
+        }
         card.onclick = function(e) {
-            if (e.target.closest('.tag-chip') || e.target.closest('.playlist-pill') || e.target.closest('.pip-btn')) {
+            if (e.target.closest('.tag-chip') || e.target.closest('.playlist-pill') || e.target.closest('.pip-btn') || e.target.closest('.star')) {
                 return;
             }
             const isShift = e.shiftKey;

@@ -29,6 +29,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **Fixed** Tag suggestions response format is now consistent across all endpoints
 - **Fixed** Tag autocomplete dropdowns are properly positioned and styled in all contexts
 - **Fixed** Prevented phantom/unselectable duplicate cards in the grid by ensuring all grid DOM updates are handled exclusively by Clusterize.js, removing all manual DOM appends from renderClipRows. This resolves selection and batch action issues caused by duplicate DOM nodes.
+- **Fixed** Star (favorite) toggling now works in both grid and detail views. The root cause was a missing `request` parameter in the `/star/{clip_id}` backend endpoint, which caused a 500 error and prevented the UI from updating. Now, clicking the star icon instantly toggles favorite status and persists it in the database.
+- **Fixed** Grid sort dropdown now works as expected: sorting by name, date, size, duration, or starred status updates the grid order. The `/api/clips` endpoint now respects `sort`, `order`, and `starred_first` query parameters, matching the main grid route.
 
 ## [1.2.0] - 2025-04-26
 
@@ -158,6 +160,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 ### Fixed
 - Prevented accidental creation of invalid or unsafe database files.
 - Prevented scans from running on non-existent or unreadable folders.
+
+### Date
+- 2024-06-15
 
 ---
 

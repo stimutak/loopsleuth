@@ -77,12 +77,6 @@ def grid(request: Request):
     default_scan_folder = "E:/Downloads"
     sort = request.query_params.get("sort", "filename")
     order = request.query_params.get("order", "asc")
-    valid_sorts = {"filename", "modified_at", "size", "duration", "starred"}
-    valid_orders = {"asc", "desc"}
-    if sort not in valid_sorts:
-        sort = "filename"
-    if order not in valid_orders:
-        order = "asc"
     starred_first = request.query_params.get("starred_first", "0") == "1"
     playlist_id = request.query_params.get("playlist_id")
     try:
@@ -371,7 +365,7 @@ def scan_folder(request: Request, folder_path: str = Form(...), force_rescan: bo
         return JSONResponse({"error": f"Scan failed: {e}"}, status_code=500)
 
 @app.post("/star/{clip_id}")
-def toggle_star(clip_id: int):
+def toggle_star(request: Request, clip_id: int):
     """Toggle the 'starred' flag for a clip and return the new state as JSON."""
     db_path = get_db_path_from_request(request)
     conn = None
@@ -925,13 +919,28 @@ def api_clips(request: Request, offset: int = Query(0, ge=0), limit: int = Query
     Returns a window of clips for virtualized/infinite scrolling.
     Uses the selected DB from the request for multi-library support.
     Supports filtering by playlist_id (if provided as a query param).
+    Now supports sorting by sort/order/starred_first params (matches main grid route).
     """
     db_path = get_db_path_from_request(request)
     playlist_id = request.query_params.get("playlist_id")
+    # --- Sorting params ---
+    sort = request.query_params.get("sort", "filename")
+    order = request.query_params.get("order", "asc")
+    starred_first = request.query_params.get("starred_first", "0") == "1"
+    valid_sorts = {"filename", "modified_at", "size", "duration", "starred"}
+    valid_orders = {"asc", "desc"}
+    if sort not in valid_sorts:
+        sort = "filename"
+    if order not in valid_orders:
+        order = "asc"
+    if starred_first:
+        order_by = f"starred DESC, {sort} {order.upper()}"
+    else:
+        order_by = f"{sort} {order.upper()}"
     conn = get_db_connection(db_path)
     cursor = conn.cursor()
     if playlist_id:
-        # Filter by playlist membership
+        # Filter by playlist membership, keep playlist order
         cursor.execute("""
             SELECT COUNT(*) FROM playlist_clips pc
             JOIN clips c ON pc.clip_id = c.id
@@ -949,10 +958,10 @@ def api_clips(request: Request, offset: int = Query(0, ge=0), limit: int = Query
     else:
         cursor.execute("SELECT COUNT(*) FROM clips")
         total = cursor.fetchone()[0]
-        cursor.execute("""
+        cursor.execute(f"""
             SELECT id, filename, path, thumbnail_path, duration, size, starred, modified_at
             FROM clips
-            ORDER BY id ASC
+            ORDER BY {order_by}
             LIMIT ? OFFSET ?
         """, (limit, offset))
     clips = []
@@ -1008,27 +1017,31 @@ def api_duplicates(request: Request):
         # Group by duplicate_of (canonical id)
         groups = {}
         for row in dup_rows:
-            canonical_id = row['duplicate_of']
+            canonical_id = row['duplicate_of'] if isinstance(row, dict) or hasattr(row, '__getitem__') else None
             if canonical_id is None:
+                print(f"[api_duplicates] Warning: needs_review=1 but duplicate_of is NULL for clip id {row['id'] if 'id' in row.keys() else '?'}")
                 continue  # Defensive: should always be set if needs_review=1
             if canonical_id not in groups:
-                # Fetch canonical clip
-                cursor.execute("SELECT * FROM clips WHERE id = ?", (canonical_id,))
-                canonical = cursor.fetchone()
-                if not canonical:
-                    continue  # Defensive: skip if canonical missing
+                try:
+                    canonical_size = row['size']
+                except (KeyError, IndexError):
+                    canonical_size = None
                 groups[canonical_id] = {
                     'canonical': {
-                        'id': canonical['id'],
-                        'filename': canonical['filename'],
-                        'path': canonical['path'],
-                        'phash': canonical['phash'],
-                        'thumbnail_path': canonical['thumbnail_path'],
-                        'duration': canonical['duration'],
-                        'size': canonical.get('size'),
+                        'id': row['id'],
+                        'filename': row['filename'],
+                        'path': row['path'],
+                        'phash': row['phash'],
+                        'thumbnail_path': row['thumbnail_path'],
+                        'duration': row['duration'],
+                        'size': canonical_size,
                     },
                     'duplicates': []
                 }
+            try:
+                row_size = row['size']
+            except (KeyError, IndexError):
+                row_size = None
             groups[canonical_id]['duplicates'].append({
                 'id': row['id'],
                 'filename': row['filename'],
@@ -1036,7 +1049,7 @@ def api_duplicates(request: Request):
                 'phash': row['phash'],
                 'thumbnail_path': row['thumbnail_path'],
                 'duration': row['duration'],
-                'size': row.get('size'),
+                'size': row_size,
             })
         # Return as list of groups
         result = list(groups.values())
@@ -1056,25 +1069,15 @@ def duplicates_review(request: Request):
     return templates.TemplateResponse("duplicates.html", {"request": request})
 
 @app.post("/api/duplicate_action")
-def duplicate_action(request: Request):
+async def duplicate_action(request: Request):
     """
     Handle actions for duplicate review: keep, delete, ignore.
     Expects JSON: {"dup_id": int, "action": "keep"|"delete"|"ignore", "canonical_id": int}
     """
-    data = request.json() if hasattr(request, 'json') else None
-    if not data:
-        try:
-            data = request._json
-        except Exception:
-            data = None
-    if not data:
-        try:
-            data = request.body()
-            if data:
-                import json as _json
-                data = _json.loads(data)
-        except Exception:
-            data = None
+    try:
+        data = await request.json()
+    except Exception:
+        data = None
     if not data:
         return JSONResponse({"error": "Missing or invalid JSON."}, status_code=400)
     dup_id = data.get("dup_id")
