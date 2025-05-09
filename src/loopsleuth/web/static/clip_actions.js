@@ -1254,6 +1254,8 @@ function attachCardEventHandlers() {
             if (e.target.closest('.tag-chip') || e.target.closest('.playlist-pill') || e.target.closest('.pip-btn') || e.target.closest('.star')) {
                 return;
             }
+            // --- PATCH: Save scroll position before navigating to detail view ---
+            sessionStorage.setItem('gridScrollY', window.scrollY);
             const isShift = e.shiftKey;
             const isCtrl = e.ctrlKey || e.metaKey;
             if (isShift && window.lastSelectedClipId) {

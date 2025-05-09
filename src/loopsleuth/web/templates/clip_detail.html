@@ -216,7 +216,7 @@ LoopSleuth Web: Clip Detail Page (Notch/Cursor-inspired Redesign)
     </style>
 </head>
 <body>
-    <a class="back-link" href="/">← Back to grid</a>
+    <button class="back-link" id="back-to-grid-btn" type="button">← Back to grid</button>
     <div class="detail-flex">
         <!-- Sidebar: Glassmorphic, blue-accented, modern -->
         <div class="detail-sidebar">
@@ -415,6 +415,13 @@ LoopSleuth Web: Clip Detail Page (Notch/Cursor-inspired Redesign)
             video.volume = volumeBar.value;
         });
     })();
+
+    document.getElementById('back-to-grid-btn').onclick = function(e) {
+        // Save scroll position (if any) from sessionStorage or default to 0
+        const scrollY = window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
+        sessionStorage.setItem('gridScrollY', scrollY);
+        window.location.href = '/';
+    };
     </script>
 </body>
 </html> 
