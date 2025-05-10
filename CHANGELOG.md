@@ -32,6 +32,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **Fixed** Star (favorite) toggling now works in both grid and detail views. The root cause was a missing `request` parameter in the `/star/{clip_id}` backend endpoint, which caused a 500 error and prevented the UI from updating. Now, clicking the star icon instantly toggles favorite status and persists it in the database.
 - **Fixed** Grid sort dropdown now works as expected: sorting by name, date, size, duration, or starred status updates the grid order. The `/api/clips` endpoint now respects `sort`, `order`, and `starred_first` query parameters, matching the main grid route.
 - **Fixed** Robust grid scroll restoration: The grid view now reliably restores your previous scroll position when returning from the detail view, both via the browser back button and the "Back to grid" button. The fix uses `window.history.back()` for the button and a retry-until-correct scroll restoration logic to handle Clusterize.js virtualized rendering. This ensures seamless navigation and workflow, even with large libraries and infinite scroll.
+- **Enhanced Preview Grid Functionality:**
+  - Added "Escape" key shortcut to close the preview grid overlay.
+  - Each video cell in the preview grid now has an "Open in Detail View" button (🔗 icon).
+  - Added global "Play All / Pause All" button to control playback of all videos in the preview grid.
+  - Added global "Mute All / Unmute All" button that also updates the individual mute buttons within each video cell.
 
 ## [1.2.0] - 2025-04-26
 

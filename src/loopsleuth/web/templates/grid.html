@@ -567,6 +567,50 @@ function openPreviewGrid(selectedClipIds) {
     overlay.style.flexDirection = 'column';
     overlay.style.overflowY = 'auto';
     overlay.innerHTML = `<button id="close-preview-grid" style="align-self:flex-end;margin:1em 2em 0 0;font-size:1.5em;">✖</button>`;
+
+    const globalControlsBar = document.createElement('div');
+    globalControlsBar.style.display = 'flex';
+    globalControlsBar.style.justifyContent = 'center';
+    globalControlsBar.style.gap = '1em';
+    globalControlsBar.style.padding = '0.5em 0 1em 0';
+
+    const playAllBtn = document.createElement('button');
+    playAllBtn.textContent = 'Play All ▶';
+    playAllBtn.title = 'Play/Pause All Videos';
+    playAllBtn.onclick = () => {
+        const videos = grid.querySelectorAll('video');
+        const somePaused = Array.from(videos).some(v => v.paused);
+        if (somePaused) {
+            videos.forEach(v => v.play());
+            playAllBtn.textContent = 'Pause All ⏸';
+        } else {
+            videos.forEach(v => v.pause());
+            playAllBtn.textContent = 'Play All ▶';
+        }
+    };
+
+    const muteAllBtn = document.createElement('button');
+    muteAllBtn.textContent = 'Mute All 🔇';
+    muteAllBtn.title = 'Mute/Unmute All Videos';
+    muteAllBtn.onclick = () => {
+        const videos = grid.querySelectorAll('video');
+        const individualMuteBtns = grid.querySelectorAll('.preview-cell-mute-btn');
+        const someUnmuted = Array.from(videos).some(v => !v.muted);
+        if (someUnmuted) {
+            videos.forEach(v => v.muted = true);
+            muteAllBtn.textContent = 'Unmute All 🔊';
+            individualMuteBtns.forEach(btn => btn.textContent = '🔇');
+        } else {
+            videos.forEach(v => v.muted = false);
+            muteAllBtn.textContent = 'Mute All 🔇';
+            individualMuteBtns.forEach(btn => btn.textContent = '🔊');
+        }
+    };
+
+    globalControlsBar.appendChild(playAllBtn);
+    globalControlsBar.appendChild(muteAllBtn);
+    overlay.appendChild(globalControlsBar);
+
     const grid = document.createElement('div');
     const n = selectedClipIds.length;
     const gridSize = Math.ceil(Math.sqrt(n));
@@ -611,22 +655,45 @@ function openPreviewGrid(selectedClipIds) {
         playBtn.title = 'Play/Pause';
         playBtn.onclick = () => { video.paused ? video.play() : video.pause(); };
         const muteBtn = document.createElement('button');
+        muteBtn.className = 'preview-cell-mute-btn';
         muteBtn.textContent = '🔇';
         muteBtn.title = 'Mute/Unmute';
         muteBtn.onclick = () => { video.muted = !video.muted; muteBtn.textContent = video.muted ? '🔇' : '🔊'; };
-        const closeBtn = document.createElement('button');
-        closeBtn.textContent = '✖';
-        closeBtn.title = 'Close';
-        closeBtn.onclick = () => { cell.remove(); };
+        const closeCellBtn = document.createElement('button');
+        closeCellBtn.textContent = '✖';
+        closeCellBtn.title = 'Close this video';
+        closeCellBtn.onclick = () => { cell.remove(); };
+
+        const detailBtn = document.createElement('button');
+        detailBtn.textContent = '🔗';
+        detailBtn.title = 'Open detail view';
+        detailBtn.onclick = () => { window.location.href = `/clip/${clipId}`; };
+
         controls.appendChild(playBtn);
         controls.appendChild(muteBtn);
-        controls.appendChild(closeBtn);
+        controls.appendChild(detailBtn);
+        controls.appendChild(closeCellBtn);
         cell.appendChild(controls);
         grid.appendChild(cell);
     });
     overlay.appendChild(grid);
     document.body.appendChild(overlay);
-    document.getElementById('close-preview-grid').onclick = () => overlay.remove();
+
+    const closeOverlayBtn = document.getElementById('close-preview-grid');
+
+    function closePreviewGrid() {
+        overlay.remove();
+        document.removeEventListener('keydown', handleEscKey);
+    }
+
+    function handleEscKey(event) {
+        if (event.key === 'Escape') {
+            closePreviewGrid();
+        }
+    }
+
+    closeOverlayBtn.onclick = closePreviewGrid;
+    document.addEventListener('keydown', handleEscKey);
 }
 
 // Add Preview Grid button to selection bar
