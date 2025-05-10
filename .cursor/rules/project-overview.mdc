@@ -1,24 +1,18 @@
 ---
-description: 
-globs: 
+description:
+globs:
 alwaysApply: false
 ---
 # LoopSleuth Project Overview
 
-LoopSleuth is a cross-platform video loop librarian and creative asset manager for artists, VJs, and motion designers. It provides:
+This project, LoopSleuth, is a terminal-first librarian for managing video loop collections.
 
-- A modern, production-ready web UI (FastAPI + Jinja2 + custom JS/CSS) with:
-    - Virtualized, infinite-scroll grid (Clusterize.js) for large libraries
-    - Responsive multi-column layout, persistent selection and batch bars
-    - Playlist sidebar for creation, batch add/remove, filtering, and instant feedback
-    - Detail view with glassmorphic sidebar, large video, and modern tag/playlist controls
-    - Robust scroll restoration between grid and detail views
-    - Batch selection, tagging, and playlist management with normalized schemas for efficient search/filtering
-    - Duplicate detection (pHash), batch review, and merge tools
-    - Export features: keepers.txt, playlist .txt, copy-to-folder, and (future) .zip/.tox for TouchDesigner
-- An experimental React+Vite frontend (src/loopsleuth/web/react) exists for future/experimental UI work (not used in production).
-- The legacy Terminal UI (Textual) is available for power users (src/loopsleuth/tui.py), but is not actively maintained.
-- SQLite database for all metadata, tags, playlists, and relationships.
-- Uses ffmpeg for thumbnail extraction and imagehash for duplicate detection.
+**Main Goal:** Provide a TUI and CLI interface to scan video files, generate thumbnails and perceptual hashes, store metadata in an SQLite database, allow users to browse, star, tag, and delete clips, and export lists of selected clips.
 
-LoopSleuth is designed for creative professionals who need to manage, preview, and export large video loop collections with speed and flexibility. All features are cross-platform (macOS, Windows, Linux) and production-ready for creative/production workflows.
+**Key Technologies:**
+*   Python
+*   [Textual](https://textual.textualize.io/) for the TUI ([src/loopsleuth/tui.py](mdc:src/loopsleuth/tui.py))
+*   SQLite for the database ([src/loopsleuth/db.py](mdc:src/loopsleuth/db.py))
+*   `ffmpeg`/`ffprobe` (external dependency) for video processing ([src/loopsleuth/thumbnailer.py](mdc:src/loopsleuth/thumbnailer.py))
+*   Pillow and ImageHash for thumbnails and perceptual hashing ([src/loopsleuth/hasher.py](mdc:src/loopsleuth/hasher.py))
+*   Typer (planned) for the CLI

@@ -565,7 +565,8 @@ function openPreviewGrid(selectedClipIds) {
     overlay.style.zIndex = '3000';
     overlay.style.display = 'flex';
     overlay.style.flexDirection = 'column';
-    overlay.innerHTML = `<button id=\"close-preview-grid\" style=\"align-self:flex-end;margin:1em 2em 0 0;font-size:1.5em;\">✖</button>`;
+    overlay.style.overflowY = 'auto';
+    overlay.innerHTML = `<button id="close-preview-grid" style="align-self:flex-end;margin:1em 2em 0 0;font-size:1.5em;">✖</button>`;
     const grid = document.createElement('div');
     const n = selectedClipIds.length;
     const gridSize = Math.ceil(Math.sqrt(n));
@@ -574,7 +575,7 @@ function openPreviewGrid(selectedClipIds) {
     grid.style.gridTemplateRows = `repeat(${Math.ceil(n/gridSize)}, 1fr)`;
     grid.style.gap = '1.2em';
     grid.style.width = '90vw';
-    grid.style.height = '80vh';
+    grid.style.minHeight = '80vh';
     grid.style.margin = '2em auto';
     selectedClipIds.forEach(clipId => {
         const card = document.querySelector(`.card[data-clip-id='${clipId}']`);
@@ -595,7 +596,9 @@ function openPreviewGrid(selectedClipIds) {
         video.controls = true;
         video.muted = true;
         video.style.width = '100%';
-        video.style.maxHeight = '18vh';
+        video.style.flexGrow = '1';
+        video.style.objectFit = 'contain';
+        video.style.minHeight = '0';
         video.style.borderRadius = '6px';
         video.style.background = '#111';
         cell.appendChild(video);
