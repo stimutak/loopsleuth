@@ -19,31 +19,30 @@ LoopSleuth Web: Clip Detail Page (Notch/Cursor-inspired Redesign)
             font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
             margin: 0;
             min-height: 100vh;
+            display: block;
         }
         .detail-flex {
             display: flex;
             flex-direction: row;
-            gap: 2.5em;
-            margin: 2.5em 2em 2em 2em;
+            gap: 1.5em;
+            margin: 0.5em 1em 2em 1em;
             min-height: 60vh;
         }
         .detail-sidebar {
-            flex: 1 1 0%;
+            flex: 0 0 200px;
             background: rgba(24,26,27,0.92);
             border-radius: 18px;
             box-shadow: 0 8px 32px #000b, 0 1.5px 0 #23232a, 0 0 0 1.5px #3fa7ff;
             border-left: 4px solid #3fa7ff;
             backdrop-filter: blur(12px);
-            padding: 2.2em 1.7em 1.7em 1.7em;
-            min-width: 260px;
-            max-width: 340px;
+            padding: 1.2em 1em;
             color: #f0f4fa;
             display: flex;
             flex-direction: column;
-            gap: 1.5em;
+            gap: 0.8em;
         }
         .sidebar-section {
-            margin-bottom: 1.3em;
+            margin-bottom: 1em;
         }
         .sidebar-section:last-child { margin-bottom: 0; }
         .sidebar-actions {
@@ -56,8 +55,8 @@ LoopSleuth Web: Clip Detail Page (Notch/Cursor-inspired Redesign)
             background: #23232a;
             color: #3fa7ff;
             font-weight: 600;
-            font-size: 1em;
-            padding: 0.5em 1.2em;
+            font-size: 0.9em;
+            padding: 0.4em 1em;
             display: flex;
             align-items: center;
             gap: 0.5em;
@@ -71,7 +70,7 @@ LoopSleuth Web: Clip Detail Page (Notch/Cursor-inspired Redesign)
             color: #181a1b;
         }
         .sidebar-filename {
-            font-size: 1.25em;
+            font-size: 1.1em;
             font-weight: 700;
             letter-spacing: 0.01em;
             color: #fff;
@@ -79,8 +78,8 @@ LoopSleuth Web: Clip Detail Page (Notch/Cursor-inspired Redesign)
         }
         .star {
             cursor: pointer;
-            font-size: 2.2em;
-            margin-top: 0.2em;
+            font-size: 1.8em;
+            margin-top: 0.1em;
             color: #3fa7ff;
             text-shadow: 0 2px 8px #3fa7ff44;
             transition: color 0.18s, text-shadow 0.18s;
@@ -91,12 +90,12 @@ LoopSleuth Web: Clip Detail Page (Notch/Cursor-inspired Redesign)
         }
         .meta-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 0.5em 1.2em;
-            font-size: 1em;
+            grid-template-columns: auto 1fr;
+            gap: 0.4em 0.8em;
+            font-size: 0.9em;
             color: #bfc7d5;
         }
-        .meta-label { color: #3fa7ff; font-size: 0.97em; font-weight: 500; }
+        .meta-label { color: #3fa7ff; font-size: 0.9em; font-weight: 500; }
         .meta-value { color: #f0f4fa; font-weight: 400; }
         .tags-text, .tags-edit {
             display: flex;
@@ -109,8 +108,8 @@ LoopSleuth Web: Clip Detail Page (Notch/Cursor-inspired Redesign)
             background: #1a2633;
             color: #3fa7ff;
             border-radius: 999px;
-            padding: 0.13em 0.9em;
-            font-size: 0.93em;
+            padding: 0.1em 0.7em;
+            font-size: 0.85em;
             font-weight: 600;
             border: 1.5px solid #3fa7ff;
             margin-right: 0.15em;
@@ -151,7 +150,8 @@ LoopSleuth Web: Clip Detail Page (Notch/Cursor-inspired Redesign)
         }
         .video-player-container {
             width: 100%;
-            max-width: 1100px;
+            flex-grow: 1;
+            max-width: none;
             background: #111a22;
             border-radius: 18px;
             box-shadow: 0 8px 32px #000b, 0 1.5px 0 #23232a;
@@ -200,13 +200,7 @@ LoopSleuth Web: Clip Detail Page (Notch/Cursor-inspired Redesign)
             accent-color: #3fa7ff;
         }
         .back-link {
-            color: #3fa7ff;
             text-decoration: none;
-            font-size: 1.1em;
-            margin-left: 2.2em;
-            margin-top: 1.2em;
-            display: inline-block;
-            margin-bottom: -1.2em;
         }
         @media (max-width: 900px) {
             .detail-flex { flex-direction: column; gap: 1.5em; margin: 1.2em 0.5em; }
@@ -218,10 +212,18 @@ LoopSleuth Web: Clip Detail Page (Notch/Cursor-inspired Redesign)
             color: #181a1b;
             outline: none;
         }
+        .sidebar-section > div[style*="margin-bottom:0.4em"] {
+            font-size: 0.9em;
+            color: #999;
+        }
     </style>
 </head>
 <body>
-    <button class="back-link" id="back-to-grid-btn" type="button" aria-label="Back to grid" tabindex="0" style="position:fixed;top:1.2em;left:1.2em;z-index:4000;padding:0.6em 1.3em;font-size:1.1em;background:#181a1b;border:2px solid #3fa7ff;border-radius:999px;color:#3fa7ff;box-shadow:0 2px 12px #000a;cursor:pointer;transition:background 0.15s,color 0.15s;">← Back to grid</button>
+    <div id="all-playlists-data-container" style="display:none;" data-playlists="{{ all_playlists|tojson|e }}"></div>
+
+    <div style="display: block; width: 100%; box-sizing: border-box; padding: 0 1em 0 1em;">
+      <button class="back-link" id="back-to-grid-btn" type="button" aria-label="Back to grid" tabindex="0" style="margin: 0.5em 0 0.5em 0; padding:0.3em 0.8em; font-size:0.85em; background:#181a1b; border:2px solid #3fa7ff; border-radius:999px; color:#3fa7ff; box-shadow:0 2px 12px #000a; cursor:pointer; transition:background 0.15s,color 0.15s;">← Back to grid</button>
+    </div>
     <div class="detail-flex">
         <!-- Sidebar: Glassmorphic, blue-accented, modern -->
         <div class="detail-sidebar">
@@ -294,7 +296,16 @@ LoopSleuth Web: Clip Detail Page (Notch/Cursor-inspired Redesign)
                         <span class="playlist-badge playlist-empty">No playlists</span>
                     {% endif %}
                 </div>
-                <button class="sidebar-btn" style="margin-top:0.7em;">+ Add to Playlist</button>
+                <button class="sidebar-btn" id="manage-playlists-btn" onclick="openPlaylistManager()" style="margin-top:0.7em;">+ Manage Playlists</button>
+                <div id="playlist-management" style="display:none; margin-top:0.7em;">
+                    <div id="playlist-checkbox-list" style="max-height: 150px; overflow-y: auto; margin-bottom: 0.7em; border: 1px solid #333; padding: 0.5em; border-radius: 6px;">
+                        <!-- Checkboxes will be populated by JS -->
+                    </div>
+                    <div class="playlist-mgmt-actions" style="display: flex; gap: 0.5em; align-items: center;">
+                        <button class="sidebar-btn" id="save-playlist-changes-btn" onclick="savePlaylistChangesInternal()">💾 Save Changes</button>
+                        <button class="sidebar-btn" id="cancel-playlist-management-btn" onclick="cancelPlaylistManagementInternal()" style="background-color: #444; margin-left: 0em;">✖ Cancel</button>
+                    </div>
+                </div>
             </div>
             <div class="sidebar-section sidebar-actions">
                 <button class="sidebar-btn" onclick="window.open('/media/{{ clip.path | urlencode }}', '_blank')"><span style="font-size:1.1em;">⬇️</span> Download</button>
@@ -353,6 +364,79 @@ LoopSleuth Web: Clip Detail Page (Notch/Cursor-inspired Redesign)
             alert('Playlist: ' + playlistName);
         }
     };
+
+    // Data for playlist management
+    const clipIdForPlaylistMgmt = '{{ clip.id }}';
+    const allPlaylistsData = {{ all_playlists|tojson }};
+
+    function openPlaylistManager() {
+        document.getElementById('manage-playlists-btn').style.display = 'none';
+        const playlistMgmtDiv = document.getElementById('playlist-management');
+        playlistMgmtDiv.style.display = 'block';
+        const checkboxListDiv = document.getElementById('playlist-checkbox-list');
+        checkboxListDiv.innerHTML = ''; // Clear previous items
+
+        if (allPlaylistsData && allPlaylistsData.length > 0) {
+            allPlaylistsData.forEach(pl => {
+                const label = document.createElement('label');
+                label.style.display = 'block';
+                label.style.marginBottom = '0.3em';
+                label.style.fontSize = '0.9em';
+
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.id = 'pl-check-' + pl.id + '-' + clipIdForPlaylistMgmt;
+                checkbox.value = pl.id;
+                checkbox.checked = pl.is_member;
+                checkbox.dataset.initialMember = pl.is_member;
+                checkbox.dataset.playlistName = pl.name;
+                checkbox.style.marginRight = '0.5em';
+
+                label.appendChild(checkbox);
+                label.appendChild(document.createTextNode(pl.name));
+                checkboxListDiv.appendChild(label);
+            });
+        } else {
+            checkboxListDiv.innerHTML = '<span style="font-style: italic; color: #888;">No playlists available.</span>';
+        }
+    }
+
+    function savePlaylistChanges() {
+        const checkboxListDiv = document.getElementById('playlist-checkbox-list');
+        const checkboxes = checkboxListDiv.querySelectorAll('input[type="checkbox"]');
+        let changesMade = false;
+
+        checkboxes.forEach(checkbox => {
+            const playlistId = checkbox.value;
+            const isChecked = checkbox.checked;
+            const wasMember = checkbox.dataset.initialMember === 'true' || checkbox.dataset.initialMember === true;
+
+            if (isChecked !== wasMember) {
+                if (window.toggleClipPlaylistMembership) {
+                    // Pass false for the third param if toggleClipPlaylistMembership expects it to suppress reload
+                    // Or remove the third param if it's not meant to be there for the global version.
+                    // For now, assuming the global one might reload by default.
+                    window.toggleClipPlaylistMembership(clipIdForPlaylistMgmt, playlistId);
+                    changesMade = true;
+                }
+            }
+        });
+
+        if (changesMade) {
+            if(window.showToast) window.showToast('Playlist memberships updated. Reloading...', 1500);
+            setTimeout(() => {
+                window.location.reload();
+            }, 1600);
+        } else {
+            if(window.showToast) window.showToast('No changes to playlist membership.', 2000);
+        }
+        cancelPlaylistManagement(); // Close the manager UI
+    }
+
+    function cancelPlaylistManagement() {
+        document.getElementById('playlist-management').style.display = 'none';
+        document.getElementById('manage-playlists-btn').style.display = 'inline-flex';
+    }
 
     // --- Custom video controls wiring ---
     (function() {
@@ -433,6 +517,130 @@ LoopSleuth Web: Clip Detail Page (Notch/Cursor-inspired Redesign)
             }
         };
     }
+
+    // Focus the video player on page load for spacebar play/pause
+    document.addEventListener('DOMContentLoaded', function() {
+        const videoPlayer = document.getElementById('clip-video');
+        if (videoPlayer) {
+            videoPlayer.focus();
+        }
+    });
+
+    document.addEventListener('DOMContentLoaded', function() {
+        // Data for playlist management
+        const clipId = '{{ clip.id }}';
+        let allPlaylists = [];
+        const playlistsDataEl = document.getElementById('all-playlists-data-container');
+        if (playlistsDataEl && playlistsDataEl.dataset.playlists) {
+            try {
+                // It might be an empty string if all_playlists was None or empty, JSON.parse('') fails.
+                if (playlistsDataEl.dataset.playlists.trim() !== '') {
+                    allPlaylists = JSON.parse(playlistsDataEl.dataset.playlists);
+                } else {
+                    allPlaylists = []; // Default to empty array
+                }
+            } catch (e) {
+                console.error("Error parsing all_playlists from data attribute:", e, "Attribute was:", playlistsDataEl.dataset.playlists);
+                allPlaylists = []; // Default to empty array on error
+            }
+        } else {
+             console.warn('Playlist data container or data attribute not found.');
+        }
+
+        const manageBtn = document.getElementById('manage-playlists-btn');
+        const playlistMgmtDiv = document.getElementById('playlist-management');
+        const checkboxListDiv = document.getElementById('playlist-checkbox-list');
+        const saveBtn = document.getElementById('save-playlist-changes-btn');
+        const cancelBtn = document.getElementById('cancel-playlist-management-btn');
+
+        function openPlaylistManagerInternal() {
+            if (!manageBtn || !playlistMgmtDiv || !checkboxListDiv) return;
+            manageBtn.style.display = 'none';
+            playlistMgmtDiv.style.display = 'block';
+            checkboxListDiv.innerHTML = ''; // Clear previous items
+
+            if (allPlaylists && allPlaylists.length > 0) {
+                allPlaylists.forEach(pl => {
+                    const label = document.createElement('label');
+                    label.style.display = 'block';
+                    label.style.marginBottom = '0.3em';
+                    label.style.fontSize = '0.9em';
+
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.id = 'pl-check-' + pl.id + '-' + clipId;
+                    checkbox.value = pl.id;
+                    checkbox.checked = pl.is_member;
+                    checkbox.dataset.initialMember = pl.is_member;
+                    checkbox.dataset.playlistName = pl.name;
+                    checkbox.style.marginRight = '0.5em';
+
+                    label.appendChild(checkbox);
+                    label.appendChild(document.createTextNode(pl.name));
+                    checkboxListDiv.appendChild(label);
+                });
+            } else {
+                checkboxListDiv.innerHTML = '<span style="font-style: italic; color: #888;">No playlists available.</span>';
+            }
+        }
+
+        function savePlaylistChangesInternal() {
+            if (!checkboxListDiv) return;
+            const checkboxes = checkboxListDiv.querySelectorAll('input[type="checkbox"]');
+            let changesMade = false;
+            let promises = [];
+
+            checkboxes.forEach(checkbox => {
+                const playlistId = checkbox.value;
+                const isChecked = checkbox.checked;
+                const wasMember = checkbox.dataset.initialMember === 'true' || checkbox.dataset.initialMember === true;
+
+                if (isChecked !== wasMember) {
+                    if (window.toggleClipPlaylistMembership) {
+                        // Assuming toggleClipPlaylistMembership returns a promise or can be adapted
+                        const promise = window.toggleClipPlaylistMembership(clipId, playlistId, true);
+                        if (promise && typeof promise.then === 'function') {
+                            promises.push(promise);
+                        }
+                        changesMade = true;
+                    }
+                }
+            });
+
+            Promise.all(promises).then(() => {
+                if (changesMade) {
+                    if(window.showToast) window.showToast('Playlist memberships updated. Reloading...', 1500);
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1600);
+                } else {
+                    if(window.showToast) window.showToast('No changes to playlist membership.', 2000);
+                }
+                cancelPlaylistManagementInternal(); // Close the manager UI
+            }).catch(error => {
+                console.error("Error updating playlist memberships:", error);
+                if(window.showToast) window.showToast('Error updating playlists. Check console.', 3000);
+                cancelPlaylistManagementInternal();
+            });
+        }
+
+        function cancelPlaylistManagementInternal() {
+            if (!playlistMgmtDiv || !manageBtn) return;
+            playlistMgmtDiv.style.display = 'none';
+            manageBtn.style.display = 'inline-flex';
+        }
+        
+        // Attach event listeners
+        if (manageBtn) manageBtn.onclick = openPlaylistManagerInternal;
+        if (saveBtn) saveBtn.onclick = savePlaylistChangesInternal;
+        if (cancelBtn) cancelBtn.onclick = cancelPlaylistManagementInternal;
+        
+        // Focus the video player on page load for spacebar play/pause
+        const videoPlayer = document.getElementById('clip-video');
+        if (videoPlayer) {
+            videoPlayer.focus();
+        }
+    });
     </script>
 </body>
 </html> 
