@@ -150,4 +150,9 @@ temp_thumb_test/
 
 # Ignore other system files
 .DS_Store
-Thumbs.db 
+Thumbs.db
+
+# Node.js / React specific
+node_modules/
+package-lock.json
+# Add other React build output folders here if necessary, e.g., build/ or dist/ 

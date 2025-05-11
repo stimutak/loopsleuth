@@ -19,14 +19,15 @@ LoopSleuth Web: Clip Detail Page (Notch/Cursor-inspired Redesign)
             font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
             margin: 0;
             min-height: 100vh;
-            display: block;
+            display: flex;
+            flex-direction: column;
         }
         .detail-flex {
             display: flex;
             flex-direction: row;
             gap: 1.5em;
-            margin: 0.5em 1em 2em 1em;
-            min-height: 60vh;
+            margin: 0.5em 2.0em 2em 1em;
+            flex-grow: 1;
         }
         .detail-sidebar {
             flex: 0 0 200px;
@@ -148,6 +149,12 @@ LoopSleuth Web: Clip Detail Page (Notch/Cursor-inspired Redesign)
             font-weight: 800;
             box-shadow: 0 0 0 2px #3fa7ff44;
         }
+        .detail-main {
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+            min-height: 0;
+        }
         .video-player-container {
             width: 100%;
             flex-grow: 1;
@@ -157,17 +164,21 @@ LoopSleuth Web: Clip Detail Page (Notch/Cursor-inspired Redesign)
             box-shadow: 0 8px 32px #000b, 0 1.5px 0 #23232a;
             display: flex;
             flex-direction: column;
-            align-items: center;
-            padding: 2.2em 1.5em 1.7em 1.5em;
-            margin-bottom: 1.5em;
+            padding: 2.2em 2.0em 1.7em 1.5em;
+        }
+        .video-player-container .sidebar-filename {
+            width: 100%;
+            text-align: center;
         }
         .video-player-container video {
             width: 100%;
-            max-width: 1000px;
             aspect-ratio: 16/9;
             background: #111;
             border-radius: 12px;
             box-shadow: 0 2px 16px #000a;
+            flex-grow: 1;
+            min-height: 0;
+            object-fit: contain;
         }
         .playback-bar {
             width: 100%;
@@ -180,6 +191,9 @@ LoopSleuth Web: Clip Detail Page (Notch/Cursor-inspired Redesign)
             border-radius: 8px;
             padding: 0.7em 1.2em;
             box-shadow: 0 2px 8px #0004;
+        }
+        .video-player-container .playback-bar {
+            box-sizing: border-box;
         }
         .playback-bar button {
             background: #23232a;
@@ -221,7 +235,7 @@ LoopSleuth Web: Clip Detail Page (Notch/Cursor-inspired Redesign)
 <body>
     <div id="all-playlists-data-container" style="display:none;" data-playlists="{{ all_playlists|tojson|e }}"></div>
 
-    <div style="display: block; width: 100%; box-sizing: border-box; padding: 0 1em 0 1em;">
+    <div style="display: block; width: 100%; box-sizing: border-box; padding: 0 1.5em 0 1em;">
       <button class="back-link" id="back-to-grid-btn" type="button" aria-label="Back to grid" tabindex="0" style="margin: 0.5em 0 0.5em 0; padding:0.3em 0.8em; font-size:0.85em; background:#181a1b; border:2px solid #3fa7ff; border-radius:999px; color:#3fa7ff; box-shadow:0 2px 12px #000a; cursor:pointer; transition:background 0.15s,color 0.15s;">← Back to grid</button>
     </div>
     <div class="detail-flex">
@@ -367,7 +381,6 @@ LoopSleuth Web: Clip Detail Page (Notch/Cursor-inspired Redesign)
 
     // Data for playlist management
     const clipIdForPlaylistMgmt = '{{ clip.id }}';
-    const allPlaylistsData = {{ all_playlists|tojson }};
 
     function openPlaylistManager() {
         document.getElementById('manage-playlists-btn').style.display = 'none';
