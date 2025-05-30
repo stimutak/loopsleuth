@@ -682,10 +682,10 @@ class MultiPlaylistClipUpdateRequest(BaseModel):
 
 # --- Playlist Endpoints ---
 @app.post("/playlists")
-def create_playlist(request: Request):
+async def create_playlist(request: Request):
     """Create a new playlist with a unique name and set its order to the next available value."""
     db_path = get_db_path_from_request(request)
-    data = request.json() if hasattr(request, 'json') else request._json
+    data = await request.json()
     name = data.get("name")
     if not name or not name.strip():
         return JSONResponse({"error": "Playlist name required"}, status_code=400)

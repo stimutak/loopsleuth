@@ -37,6 +37,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - Each video cell in the preview grid now has an "Open in Detail View" button (🔗 icon).
   - Added global "Play All / Pause All" button to control playback of all videos in the preview grid.
   - Added global "Mute All / Unmute All" button that also updates the individual mute buttons within each video cell.
+- Fixed: Scan logic now updates scan_id for skipped files (already in DB, not force_rescan), so all videos in the scanned folder remain in the database and appear in the UI after scanning. Previously, skipped files were deleted at the end of the scan.
+- Fixed: Playlist creation endpoint now properly awaits request.json(), resolving 'coroutine object has no attribute get' errors and ensuring playlist creation works as expected.
 
 ## [1.2.0] - 2025-04-26
 

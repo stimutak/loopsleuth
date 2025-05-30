@@ -119,6 +119,9 @@ def ingest_directory(
                 cursor.execute("SELECT id FROM clips WHERE path = ?", (path_str,))
                 existing = cursor.fetchone()
                 if existing and not force_rescan:
+                    # Update scan_id so this clip is not deleted at the end
+                    clip_id = existing[0]
+                    cursor.execute("UPDATE clips SET scan_id = ? WHERE id = ?", (scan_id, clip_id))
                     skipped_count += 1
                     # Update progress for skipped
                     with progress_path.open("w") as f:
